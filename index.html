@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#fff5eb" />
+  <title>Собачий дворик — Dog Yard Clicker</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>🐕 Собачий дворик</h1>
+    <span id="gp-status">Загрузка…</span>
+  </header>
+
+  <div id="season-top-banner" class="season-top-banner" hidden>
+    <span>🍂 Осенний фестиваль · жёлуди в сезоне!</span>
+    <button type="button" class="btn btn-sm" id="season-banner-go">В сезон</button>
+  </div>
+
+  <section class="stats" aria-label="Статистика">
+    <div class="stat">
+      <span class="stat-label">Косточки</span>
+      <span class="stat-value" id="stat-ore">0</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Кост./сек</span>
+      <span class="stat-value" id="stat-ops">0/с</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Почесушки</span>
+      <span class="stat-value" id="stat-click">1</span>
+    </div>
+    <div class="stat season-stat" id="acorn-stat" hidden>
+      <span class="stat-label">Жёлуди</span>
+      <span class="stat-value" id="stat-acorns">0</span>
+    </div>
+  </section>
+
+  <div class="hud-row">
+    <div id="boost-badge" hidden>x2 буст</div>
+    <div id="combo-badge" hidden>x1</div>
+    <div id="item-badge" hidden>Предмет</div>
+    <div id="medal-badge" title="Медальки выставки">🏅 <span id="stat-medals">0</span></div>
+  </div>
+
+  <section class="mine-area" id="mine-area">
+    <div class="yard-bg" id="yard-bg" aria-hidden="true"></div>
+    <button type="button" id="mine-btn" aria-label="Почесать пёсика">
+      <span class="dog-wrap" aria-hidden="true">
+        <img id="dogArt" src="assets/dog-click.png" alt="Щенок" class="dog-art" />
+        <img id="friendArt" class="friend-art" alt="" hidden />
+      </span>
+      <span class="mine-label">ПОЧЕСАТЬ</span>
+    </button>
+  </section>
+
+  <div class="actions">
+    <button type="button" class="btn btn-joy" id="btn-joy">Радость x2 · 10с</button>
+    <button type="button" class="btn btn-event" id="btn-event">Событие</button>
+    <button type="button" class="btn btn-ad" id="btn-ad">Видео: двойные косточки</button>
+    <button type="button" class="btn btn-save" id="btn-save">Сохранить</button>
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="Разделы">
+    <button type="button" class="tab active" data-tab="shop" role="tab" aria-selected="true">Магазин</button>
+    <button type="button" class="tab" data-tab="breeds" role="tab" aria-selected="false">Породы</button>
+    <button type="button" class="tab" data-tab="friends" role="tab" aria-selected="false">Друзья</button>
+    <button type="button" class="tab" data-tab="yard" role="tab" aria-selected="false">Двор</button>
+    <button type="button" class="tab" data-tab="album" role="tab" aria-selected="false">Альбом</button>
+    <button type="button" class="tab" data-tab="season" role="tab" aria-selected="false" id="tab-season">Сезон</button>
+    <button type="button" class="tab" data-tab="quests" role="tab" aria-selected="false">Квесты</button>
+    <button type="button" class="tab" data-tab="achievements" role="tab" aria-selected="false">Достижения</button>
+    <button type="button" class="tab" data-tab="story" role="tab" aria-selected="false">История</button>
+    <button type="button" class="tab" data-tab="prestige" role="tab" aria-selected="false">Выставка</button>
+  </nav>
+
+  <section class="panel-section" id="panel-shop" data-panel="shop">
+    <h2>Угощения и друзья</h2>
+    <div id="shop"></div>
+    <h2 class="shop-subhead">Предметы</h2>
+    <p class="panel-hint">Расходники: один активный буст за раз.</p>
+    <div id="consumables"></div>
+  </section>
+
+  <section class="panel-section" id="panel-breeds" data-panel="breeds" hidden>
+    <h2>Породы дворика</h2>
+    <p class="panel-hint">Выберите пёсика — получите маленький бонус.</p>
+    <div id="breeds"></div>
+  </section>
+
+  <section class="panel-section" id="panel-friends" data-panel="friends" hidden>
+    <h2>Друзья дворика</h2>
+    <p class="panel-hint">Откройте друга за косточки. Один активный друг даёт маленький бонус и сидит рядом.</p>
+    <div id="friends"></div>
+  </section>
+
+  <section class="panel-section" id="panel-yard" data-panel="yard" hidden>
+    <h2>Двор</h2>
+    <p class="panel-hint">Смените фон за пёсиком. Открывается за косточки или на сезонном фестивале.</p>
+    <div id="yards"></div>
+  </section>
+
+  <section class="panel-section" id="panel-album" data-panel="album" hidden>
+    <h2>Альбом наклеек</h2>
+    <p class="panel-hint">Собирайте наклейки из достижений, событий, истории и друзей. Наборы дают награду один раз.</p>
+    <div id="album-sets"></div>
+    <div id="album" class="album-grid"></div>
+  </section>
+
+  <section class="panel-section" id="panel-season" data-panel="season" hidden>
+    <h2>🍂 Осенний фестиваль</h2>
+    <p class="panel-hint" id="season-hint">Собирайте жёлуди кликами и мини-играми. Тратьте в сезонном магазине.</p>
+    <div class="season-banner-inline" id="season-banner-inline">Фестиваль активен! Жёлуди капают с почесушек.</div>
+    <div id="season-shop"></div>
+  </section>
+
+  <section class="panel-section" id="panel-quests" data-panel="quests" hidden>
+    <h2>Квесты дня</h2>
+    <p class="panel-hint">Простые цели с наградой в косточках.</p>
+    <div id="quests"></div>
+  </section>
+
+  <section class="panel-section" id="panel-achievements" data-panel="achievements" hidden>
+    <h2>Достижения</h2>
+    <p class="panel-hint">Заберите награду один раз.</p>
+    <div id="achievements"></div>
+  </section>
+
+  <section class="panel-section" id="panel-story" data-panel="story" hidden>
+    <h2>История дворика</h2>
+    <p class="panel-hint">Короткие главы открываются по прогрессу.</p>
+    <div id="story"></div>
+  </section>
+
+  <section class="panel-section" id="panel-prestige" data-panel="prestige" hidden>
+    <h2>Выставка 🏅</h2>
+    <div class="prestige-card">
+      <p id="prestige-info"></p>
+      <p class="panel-hint">Сбросятся уровни апгрейдов и текущие косточки. Останутся породы, двор, друзья, альбом, история, достижения и медальки.</p>
+      <button type="button" class="btn btn-prestige" id="btn-prestige">Устроить выставку</button>
+    </div>
+  </section>
+
+  <footer class="hint">
+    Автосохранение · офлайн-хвостики · без CDN
+  </footer>
+
+  <div id="popup-layer" aria-hidden="true"></div>
+  <div id="toast" role="status"></div>
+
+  <div id="offline-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="offline-title">
+      <h3 id="offline-title">Пока вас не было 🐾</h3>
+      <p id="offline-text"></p>
+      <button type="button" class="btn" id="offline-close">Забрать косточки</button>
+    </div>
+  </div>
+
+  <div id="prestige-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="prestige-title">
+      <h3 id="prestige-title">Выставка? 🏅</h3>
+      <p id="prestige-confirm-text"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-ghost" id="prestige-cancel">Ещё погуляем</button>
+        <button type="button" class="btn" id="prestige-confirm">На выставку!</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="event-banner" class="event-banner" hidden>
+    <span id="event-banner-text">Событие!</span>
+    <button type="button" class="btn btn-sm" id="event-banner-go">Играть</button>
+  </div>
+
+  <div id="toy-modal" class="modal" hidden>
+    <div class="modal-card modal-game" role="dialog" aria-labelledby="toy-title">
+      <h3 id="toy-title">Пропала игрушка! 🧸</h3>
+      <p class="panel-hint">Тапайте быстро — 10 секунд!</p>
+      <div class="game-timer" id="toy-timer">10.0</div>
+      <div class="game-score">Тапов: <strong id="toy-taps">0</strong></div>
+      <button type="button" class="btn btn-tap-frenzy" id="toy-tap">НАЙТИ!</button>
+      <p class="game-hint" id="toy-hint">Награда = число тапов × бонус</p>
+    </div>
+  </div>
+
+  <div id="train-modal" class="modal" hidden>
+    <div class="modal-card modal-game" role="dialog" aria-labelledby="train-title">
+      <h3 id="train-title">Дрессировка 🎓</h3>
+      <p class="panel-hint" id="train-hint">Запомните команду и повторите!</p>
+      <div class="train-step" id="train-step">Шаг 1/5</div>
+      <div class="train-prompt" id="train-prompt">…</div>
+      <div class="train-btns" id="train-btns"></div>
+      <p class="game-hint" id="train-status"></p>
+    </div>
+  </div>
+
+  <div id="story-modal" class="modal" hidden>
+    <div class="modal-card modal-story" role="dialog" aria-labelledby="story-modal-title">
+      <h3 id="story-modal-title">Глава</h3>
+      <div id="story-lines" class="story-lines"></div>
+      <button type="button" class="btn" id="story-next">Далее</button>
+    </div>
+  </div>
+
+  <div id="hide-modal" class="modal" hidden>
+    <div class="modal-card modal-game" role="dialog" aria-labelledby="hide-title">
+      <h3 id="hide-title">Прятки 🦴</h3>
+      <p class="panel-hint" id="hide-hint">Найди косточку среди карточек!</p>
+      <div class="hide-tries" id="hide-tries">Попыток: 2</div>
+      <div class="hide-cards" id="hide-cards"></div>
+      <p class="game-hint" id="hide-status"></p>
+    </div>
+  </div>
+
+  <div id="race-modal" class="modal" hidden>
+    <div class="modal-card modal-game" role="dialog" aria-labelledby="race-title">
+      <h3 id="race-title">Гонка за белкой 🐿️</h3>
+      <p class="panel-hint">Тапайте в ритме 5 секунд — заполните полоску!</p>
+      <div class="game-timer" id="race-timer">5.0</div>
+      <div class="race-bar"><span id="race-fill" style="width:0%"></span></div>
+      <div class="game-score">Ритм: <strong id="race-score">0%</strong></div>
+      <button type="button" class="btn btn-tap-frenzy" id="race-tap">ТАП!</button>
+      <p class="game-hint" id="race-hint">Держите темп — не слишком редко!</p>
+    </div>
+  </div>
+
+  <!--
+    GamePush Install Code:
+    Подставьте projectId и publicToken из панели GamePush → Установить код.
+    Константы также в js/gp-bridge.js (PROJECT_ID / PUBLIC_TOKEN).
+  -->
+  <script>
+    window.onGPInit = async function (gp) {
+      try { await gp.player.ready; } catch (e) {}
+      try {
+        await gp.ads.showPreloader();
+        gp.ads.showSticky();
+      } catch (e) {}
+      window.__gp = gp;
+      window.dispatchEvent(new Event("gp-ready"));
+    };
+  </script>
+  <!-- Placeholders 30253 / JBeptGYdA0CM3JtUuacEIwxxyIED8FIU — из панели GP → Install Code -->
+  <script async src="https://gamepush.com/sdk/game-score.js?projectId=30253&publicToken=JBeptGYdA0CM3JtUuacEIwxxyIED8FIU&callback=onGPInit"></script>
+
+  <script src="js/gp-bridge.js"></script>
+  <script src="js/sounds.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
