@@ -462,17 +462,58 @@
     }
   }
 
-  function setTab(tab) {
-    if (tab !== activeTab && window.Sounds && window.Sounds.playUi) window.Sounds.playUi();
-    activeTab = tab;
-    document.querySelectorAll('.tab').forEach(function (btn) {
-      const on = btn.dataset.tab === tab;
+  var SECONDARY_TAB_LABELS = {
+    friends: 'Друзья',
+    album: 'Альбом',
+    season: 'Сезон',
+    quests: 'Квесты',
+    achievements: 'Достиж.',
+    story: 'История',
+    prestige: 'Выставка'
+  };
+
+  function isSecondaryTab(tab) {
+    return !!SECONDARY_TAB_LABELS[tab];
+  }
+
+  function closeMoreSheet() {
+    var sheet = $('#more-sheet');
+    var moreBtn = $('#tab-more');
+    if (sheet) sheet.hidden = true;
+    if (moreBtn) moreBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  function openMoreSheet() {
+    var sheet = $('#more-sheet');
+    var moreBtn = $('#tab-more');
+    if (sheet) sheet.hidden = false;
+    if (moreBtn) moreBtn.setAttribute('aria-expanded', 'true');
+    if (window.Sounds && window.Sounds.playUi) window.Sounds.playUi();
+  }
+
+  function syncTabChrome(tab) {
+    var secondary = isSecondaryTab(tab);
+    document.querySelectorAll('.tabs > .tab').forEach(function (btn) {
+      var key = btn.dataset.tab;
+      var on = key === 'more' ? secondary : key === tab;
       btn.classList.toggle('active', on);
       btn.setAttribute('aria-selected', on ? 'true' : 'false');
-      if (on && typeof btn.scrollIntoView === 'function') {
-        try { btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); } catch (_) {}
-      }
     });
+    document.querySelectorAll('.more-item').forEach(function (btn) {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    var moreLabel = $('#tab-more-label');
+    if (moreLabel) {
+      moreLabel.textContent = secondary ? (SECONDARY_TAB_LABELS[tab] || 'Ещё') : 'Ещё';
+    }
+  }
+
+  function setTab(tab) {
+    if (!tab || tab === 'more') return;
+    if (tab !== activeTab && window.Sounds && window.Sounds.playUi) window.Sounds.playUi();
+    activeTab = tab;
+    closeMoreSheet();
+    syncTabChrome(tab);
     document.querySelectorAll('.panel-section').forEach(function (panel) {
       const show = panel.dataset.panel === tab;
       if (show) {
@@ -2137,8 +2178,23 @@
     });
     $('#season-banner-go') && $('#season-banner-go').addEventListener('click', function () { setTab('season'); });
 
-    document.querySelectorAll('.tab').forEach(function (btn) {
+    document.querySelectorAll('.tabs > .tab').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var key = btn.dataset.tab;
+        if (key === 'more') {
+          var sheet = $('#more-sheet');
+          if (sheet && !sheet.hidden) closeMoreSheet();
+          else openMoreSheet();
+          return;
+        }
+        setTab(key);
+      });
+    });
+    document.querySelectorAll('.more-item').forEach(function (btn) {
       btn.addEventListener('click', function () { setTab(btn.dataset.tab); });
+    });
+    document.querySelectorAll('[data-more-close]').forEach(function (el) {
+      el.addEventListener('click', function () { closeMoreSheet(); });
     });
     $('#mine-btn') && $('#mine-btn').addEventListener('contextmenu', function (e) { e.preventDefault(); });
 

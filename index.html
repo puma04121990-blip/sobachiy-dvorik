@@ -66,18 +66,66 @@
   </div>
 
   <nav class="tabs" role="tablist" aria-label="Разделы">
-    <button type="button" class="tab active" data-tab="shop" role="tab" aria-selected="true">Магазин</button>
-    <button type="button" class="tab" data-tab="breeds" role="tab" aria-selected="false">Породы</button>
-    <button type="button" class="tab" data-tab="friends" role="tab" aria-selected="false">Друзья</button>
-    <button type="button" class="tab" data-tab="yard" role="tab" aria-selected="false">Двор</button>
-    <button type="button" class="tab" data-tab="album" role="tab" aria-selected="false">Альбом</button>
-    <button type="button" class="tab" data-tab="season" role="tab" aria-selected="false" id="tab-season">Сезон</button>
-    <button type="button" class="tab" data-tab="quests" role="tab" aria-selected="false">Квесты</button>
-    <button type="button" class="tab" data-tab="achievements" role="tab" aria-selected="false">Достижения</button>
-    <button type="button" class="tab" data-tab="story" role="tab" aria-selected="false">История</button>
-    <button type="button" class="tab" data-tab="prestige" role="tab" aria-selected="false">Выставка</button>
-    <button type="button" class="tab" data-tab="gpshop" role="tab" aria-selected="false">Покупки</button>
+    <button type="button" class="tab active" data-tab="shop" role="tab" aria-selected="true">
+      <span class="tab-ico" aria-hidden="true">🛒</span>
+      <span class="tab-txt">Магазин</span>
+    </button>
+    <button type="button" class="tab" data-tab="breeds" role="tab" aria-selected="false">
+      <span class="tab-ico" aria-hidden="true">🐕</span>
+      <span class="tab-txt">Породы</span>
+    </button>
+    <button type="button" class="tab" data-tab="yard" role="tab" aria-selected="false">
+      <span class="tab-ico" aria-hidden="true">🏡</span>
+      <span class="tab-txt">Двор</span>
+    </button>
+    <button type="button" class="tab" data-tab="gpshop" role="tab" aria-selected="false">
+      <span class="tab-ico" aria-hidden="true">💎</span>
+      <span class="tab-txt">Покупки</span>
+    </button>
+    <button type="button" class="tab tab-more" data-tab="more" id="tab-more" role="tab" aria-selected="false" aria-haspopup="dialog" aria-controls="more-sheet" aria-expanded="false">
+      <span class="tab-ico" aria-hidden="true">⋯</span>
+      <span class="tab-txt" id="tab-more-label">Ещё</span>
+    </button>
   </nav>
+
+  <div id="more-sheet" class="more-sheet" hidden>
+    <button type="button" class="more-sheet-backdrop" data-more-close aria-label="Закрыть"></button>
+    <div class="more-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="more-sheet-title">
+      <div class="more-sheet-handle" aria-hidden="true"></div>
+      <h3 id="more-sheet-title" class="more-sheet-title">Ещё разделы</h3>
+      <div class="more-grid" role="menu">
+        <button type="button" class="more-item" data-tab="friends" role="menuitem">
+          <span class="more-ico" aria-hidden="true">🐾</span>
+          <span class="more-txt">Друзья</span>
+        </button>
+        <button type="button" class="more-item" data-tab="album" role="menuitem">
+          <span class="more-ico" aria-hidden="true">📒</span>
+          <span class="more-txt">Альбом</span>
+        </button>
+        <button type="button" class="more-item" data-tab="season" id="tab-season" role="menuitem">
+          <span class="more-ico" aria-hidden="true">🍂</span>
+          <span class="more-txt">Сезон</span>
+        </button>
+        <button type="button" class="more-item" data-tab="quests" role="menuitem">
+          <span class="more-ico" aria-hidden="true">🎯</span>
+          <span class="more-txt">Квесты</span>
+        </button>
+        <button type="button" class="more-item" data-tab="achievements" role="menuitem">
+          <span class="more-ico" aria-hidden="true">🏆</span>
+          <span class="more-txt">Достижения</span>
+        </button>
+        <button type="button" class="more-item" data-tab="story" role="menuitem">
+          <span class="more-ico" aria-hidden="true">📖</span>
+          <span class="more-txt">История</span>
+        </button>
+        <button type="button" class="more-item" data-tab="prestige" role="menuitem">
+          <span class="more-ico" aria-hidden="true">🏅</span>
+          <span class="more-txt">Выставка</span>
+        </button>
+      </div>
+      <button type="button" class="btn btn-ghost more-sheet-close" data-more-close>Закрыть</button>
+    </div>
+  </div>
 
   <section class="panel-section" id="panel-shop" data-panel="shop">
     <h2>Угощения и друзья</h2>
