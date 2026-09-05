@@ -67,19 +67,37 @@
   const UPGRADES = {
     pickaxe: { id: 'pickaxe', name: 'Лакомство', desc: '+0.7 к почесушкам', baseCost: 18, costMult: 1.22, clickPower: 0.7, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦴', unlock: null },
     miner: { id: 'miner', name: 'Щенок-помощник', desc: '+0.35 кост./сек', baseCost: 55, costMult: 1.22, clickPower: 0, orePerSec: 0.35, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🐕', unlock: null },
-    ball: { id: 'ball', name: 'Мячик', desc: '+2.5 к почесушкам', baseCost: 220, costMult: 1.24, clickPower: 2.5, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🎾', unlock: { type: 'level', id: 'pickaxe', min: 3, text: 'Нужно Лакомство ур. 3' } },
-    drill: { id: 'drill', name: 'Дрессировщик', desc: '+3.5 кост./сек', baseCost: 1400, costMult: 1.25, clickPower: 0, orePerSec: 3.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🧤', unlock: { type: 'level', id: 'miner', min: 2, text: 'Нужен Щенок-помощник ур. 2' } },
-    walk: { id: 'walk', name: 'Выгул', desc: '+12 кост./сек', baseCost: 18000, costMult: 1.30, clickPower: 0, orePerSec: 12, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦮', unlock: { type: 'level', id: 'drill', min: 1, text: 'Нужен Дрессировщик ур. 1' } },
-    warehouse: { id: 'warehouse', name: 'Будка', desc: '+7% к idle · офлайн', baseCost: 4800, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0.07, clickPct: 0, comboBonusMs: 0, icon: '🏠', unlock: { type: 'level', id: 'miner', min: 5, text: 'Нужен Щенок-помощник ур. 5' } },
-    groomer: { id: 'groomer', name: 'Грумер', desc: '+10% к idle', baseCost: 70000, costMult: 1.32, clickPower: 0, orePerSec: 0, idleMult: 0.10, clickPct: 0, comboBonusMs: 0, icon: '✂️', unlock: { type: 'level', id: 'warehouse', min: 2, text: 'Нужна Будка ур. 2' } },
-    kennel: { id: 'kennel', name: 'Питомник', desc: '+55 кост./сек', baseCost: 350000, costMult: 1.35, clickPower: 0, orePerSec: 55, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🏡', unlock: { type: 'level', id: 'walk', min: 2, text: 'Нужен Выгул ур. 2' } },
-    collar: { id: 'collar', name: 'Ошейник', desc: '+2% к почесушкам', baseCost: 400, costMult: 1.23, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.02, comboBonusMs: 0, icon: '📿', unlock: { type: 'level', id: 'pickaxe', min: 2, text: 'Нужно Лакомство ур. 2' } },
-    frisbee: { id: 'frisbee', name: 'Фрисби', desc: '+2.5 кост./сек', baseCost: 2500, costMult: 1.25, clickPower: 0, orePerSec: 2.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🥏', unlock: { type: 'level', id: 'miner', min: 3, text: 'Нужен Щенок-помощник ур. 3' } },
-    bed: { id: 'bed', name: 'Лежанка', desc: '+30 мин офлайн-капа · офлайн %', baseCost: 10000, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0.02, clickPct: 0, comboBonusMs: 0, icon: '🛏️', unlock: { type: 'level', id: 'warehouse', min: 1, text: 'Нужна Будка ур. 1' } },
-    whistle: { id: 'whistle', name: 'Свисток', desc: '+40 мс к окну комбо', baseCost: 5500, costMult: 1.27, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: WHISTLE_COMBO_MS, icon: '📣', unlock: { type: 'level', id: 'ball', min: 2, text: 'Нужен Мячик ур. 2' } },
+    ball: { id: 'ball', name: 'Мячик', desc: '+2.5 к почесушкам', baseCost: 220, costMult: 1.24, clickPower: 2.5, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🎾', unlock: { upgradeId: 'pickaxe', level: 3, text: 'Нужно Лакомство ур. 3' } },
+    drill: { id: 'drill', name: 'Дрессировщик', desc: '+3.5 кост./сек', baseCost: 1400, costMult: 1.25, clickPower: 0, orePerSec: 3.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🧤', unlock: { upgradeId: 'miner', level: 2, text: 'Нужен Щенок-помощник ур. 2' } },
+    walk: { id: 'walk', name: 'Выгул', desc: '+12 кост./сек', baseCost: 18000, costMult: 1.30, clickPower: 0, orePerSec: 12, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦮', unlock: { upgradeId: 'drill', level: 1, text: 'Нужен Дрессировщик ур. 1' } },
+    warehouse: { id: 'warehouse', name: 'Будка', desc: '+7% к idle · офлайн', baseCost: 4800, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0.07, clickPct: 0, comboBonusMs: 0, icon: '🏠', unlock: { upgradeId: 'miner', level: 5, text: 'Нужен Щенок-помощник ур. 5' } },
+    groomer: { id: 'groomer', name: 'Грумер', desc: '+10% к idle', baseCost: 70000, costMult: 1.32, clickPower: 0, orePerSec: 0, idleMult: 0.10, clickPct: 0, comboBonusMs: 0, icon: '✂️', unlock: { upgradeId: 'warehouse', level: 2, text: 'Нужна Будка ур. 2' } },
+    kennel: { id: 'kennel', name: 'Питомник', desc: '+55 кост./сек', baseCost: 350000, costMult: 1.35, clickPower: 0, orePerSec: 55, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🏡', unlock: { upgradeId: 'walk', level: 2, text: 'Нужен Выгул ур. 2' } },
+    collar: { id: 'collar', name: 'Ошейник', desc: '+2% к почесушкам', baseCost: 400, costMult: 1.23, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.02, comboBonusMs: 0, icon: '📿', unlock: { upgradeId: 'pickaxe', level: 2, text: 'Нужно Лакомство ур. 2' } },
+    frisbee: { id: 'frisbee', name: 'Фрисби', desc: '+2.5 кост./сек', baseCost: 2500, costMult: 1.25, clickPower: 0, orePerSec: 2.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🥏', unlock: { upgradeId: 'miner', level: 3, text: 'Нужен Щенок-помощник ур. 3' } },
+    bed: { id: 'bed', name: 'Лежанка', desc: '+30 мин офлайн-капа · офлайн %', baseCost: 10000, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0.02, clickPct: 0, comboBonusMs: 0, icon: '🛏️', unlock: { upgradeId: 'warehouse', level: 1, text: 'Нужна Будка ур. 1' } },
+    whistle: { id: 'whistle', name: 'Свисток', desc: '+40 мс к окну комбо', baseCost: 5500, costMult: 1.27, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: WHISTLE_COMBO_MS, icon: '📣', unlock: { upgradeId: 'ball', level: 2, text: 'Нужен Мячик ур. 2' } },
+    /* —— new gated chain —— */
+    clickWhistle: { id: 'clickWhistle', name: 'Свисток клика', desc: '+3% к почесушкам', baseCost: 3200, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.03, comboBonusMs: 0, icon: '🎵', unlock: { upgradeId: 'pickaxe', level: 5, text: 'Нужно Лакомство ур. 5' } },
+    treatBag: { id: 'treatBag', name: 'Запас лакомств', desc: '+4.5 к почесушкам', baseCost: 14000, costMult: 1.30, clickPower: 4.5, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🍖', unlock: { upgradeId: 'clickWhistle', level: 2, text: 'Нужен Свисток клика ур. 2' } },
+    volunteers: { id: 'volunteers', name: 'Волонтёры', desc: '+4.5 кост./сек', baseCost: 12000, costMult: 1.29, clickPower: 0, orePerSec: 4.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🤝', unlock: { upgradeId: 'miner', level: 6, text: 'Нужен Щенок-помощник ур. 6' } },
+    autofeeder: { id: 'autofeeder', name: 'Автокормушка', desc: '+8% к idle', baseCost: 95000, costMult: 1.32, clickPower: 0, orePerSec: 0, idleMult: 0.08, clickPct: 0, comboBonusMs: 0, icon: '🤖', unlock: { upgradeId: 'drill', level: 3, text: 'Нужен Дрессировщик ур. 3' } },
+    kennelPlus: { id: 'kennelPlus', name: 'Питомник+', desc: '+90 кост./сек', baseCost: 2.8e6, costMult: 1.38, clickPower: 0, orePerSec: 90, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🏰', unlock: { upgradeId: 'kennel', level: 4, lifetimeBones: 8e7, text: 'Нужен Питомник ур. 4 и 80M 🦴 за жизнь' } },
   };
 
-  const UPGRADE_ORDER = ['pickaxe','miner','collar','ball','frisbee','drill','warehouse','whistle','bed','walk','groomer','kennel'];
+  const UPGRADE_ORDER = ['pickaxe','miner','collar','ball','frisbee','drill','warehouse','whistle','clickWhistle','bed','volunteers','treatBag','walk','groomer','autofeeder','kennel','kennelPlus'];
+
+  /** Progressive training tree (Дрессировка) — buy previous to unlock next */
+  const TRAINING = [
+    { id: 'sit', name: 'Сит', desc: '+2.5% к почесушкам', baseCost: 1500, costMult: 1.45, clickPct: 0.025, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '🪑' },
+    { id: 'heel', name: 'Рядом', desc: '+7% реген энергии', baseCost: 6000, costMult: 1.47, clickPct: 0, energyRegen: 0.07, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '👣' },
+    { id: 'paw', name: 'Лапу', desc: '+35 мс к окну комбо', baseCost: 22000, costMult: 1.48, clickPct: 0, energyRegen: 0, comboBonusMs: 35, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '🐾' },
+    { id: 'voice', name: 'Голос', desc: '+6% награда прогулки', baseCost: 90000, costMult: 1.50, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0.06, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '📣' },
+    { id: 'fetch', name: 'Апорт', desc: '+4% к idle', baseCost: 320000, costMult: 1.52, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0.04, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '🦴' },
+    { id: 'trick', name: 'Трюк', desc: '+3% офлайн · +12% медалек выставки', baseCost: 1.4e6, costMult: 1.55, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0.03, medalYield: 0.12, allIncome: 0, icon: '🎪' },
+    { id: 'champ', name: 'Чемпион', desc: '+1.5% ко всем доходам', baseCost: 6e6, costMult: 1.58, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0.015, icon: '🏆' },
+  ];
+  const TRAINING_ORDER = TRAINING.map(function (t) { return t.id; });
 
   const BREEDS = {
     lab: { id: 'lab', name: 'Лабрадор', desc: 'Сбалансированный старт', src: 'assets/dog-click.png', unlockCost: 0, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: true },
@@ -296,10 +314,16 @@
     for (const id of UPGRADE_ORDER) levels[id] = 0;
     return levels;
   }
+  function defaultTrainingLevels() {
+    const levels = {};
+    for (let i = 0; i < TRAINING_ORDER.length; i++) levels[TRAINING_ORDER[i]] = 0;
+    return levels;
+  }
 
   const state = {
     ore: 0,
     levels: defaultLevels(),
+    levelsTraining: defaultTrainingLevels(),
     lastSaveAt: Date.now(),
     adBoostUntil: 0,
     pendingClickMult: 1,
@@ -431,6 +455,7 @@
     MEDAL_SHOP.forEach(function (item) {
       if (item.energyRegen) r *= 1 + getMedalLevel(item.id) * item.energyRegen;
     });
+    r *= 1 + getTrainingSum('energyRegen');
     return r;
   }
   function getYardStageMult() {
@@ -447,8 +472,19 @@
   }
   function getVipMult() { return state.vipTreats ? VIP_INCOME_MULT : 1; }
   function getWhistleBonus() { return (state.levels.whistle || 0) * WHISTLE_COMBO_MS; }
+  function getTrainingSum(field) {
+    let s = 0;
+    for (let i = 0; i < TRAINING.length; i++) {
+      const t = TRAINING[i];
+      s += (state.levelsTraining[t.id] || 0) * (t[field] || 0);
+    }
+    return s;
+  }
+  function getTrainingAllIncomeMult() {
+    return 1 + getTrainingSum('allIncome');
+  }
   function getComboWindow() {
-    return COMBO_WINDOW_MS + (getBreed().bonuses.comboWindowBonus || 0) + getWhistleBonus();
+    return COMBO_WINDOW_MS + (getBreed().bonuses.comboWindowBonus || 0) + getWhistleBonus() + getTrainingSum('comboBonusMs');
   }
   function getItemMult() {
     if (state.activeItem && Date.now() < state.activeItem.until) {
@@ -460,6 +496,7 @@
   function getClickPctMult() {
     let m = 1;
     for (const u of Object.values(UPGRADES)) m += (state.levels[u.id] || 0) * (u.clickPct || 0);
+    m += getTrainingSum('clickPct');
     return m;
   }
   function getEnergyClickMult() {
@@ -485,12 +522,14 @@
     p *= getItemMult();
     if (Date.now() < (state.seasonBoostUntil || 0)) p *= SEASON_BOOST_MULT;
     p *= getEnergyClickMult();
+    p *= getTrainingAllIncomeMult();
     if (!isFinite(p) || p < 0) return BASE_CLICK * ENERGY_TIRED_MULT;
     return p;
   }
   function getIdleMult() {
     let m = 1;
     for (const u of Object.values(UPGRADES)) m += (state.levels[u.id] || 0) * u.idleMult;
+    m += getTrainingSum('idleMult');
     m *= getBreed().bonuses.idleMult || 1;
     const fr = getFriend();
     if (fr) m *= fr.bonuses.idleMult || 1;
@@ -498,6 +537,7 @@
     m *= getMedalShopMult('idle');
     m *= getYardStageMult();
     m *= getVipMult();
+    m *= getTrainingAllIncomeMult();
     if (Date.now() < state.adBoostUntil) m *= AD_BOOST_MULT;
     m *= getItemMult();
     if (Date.now() < (state.seasonBoostUntil || 0)) m *= SEASON_BOOST_MULT;
@@ -517,7 +557,7 @@
   function getOfflineEfficiency() {
     const wh = state.levels.warehouse || 0;
     const bed = state.levels.bed || 0;
-    const eff = OFFLINE_BASE_EFF + wh * 0.045 + bed * 0.035 + getMedalOfflineBonus();
+    const eff = OFFLINE_BASE_EFF + wh * 0.045 + bed * 0.035 + getMedalOfflineBonus() + getTrainingSum('offlineBonus');
     return Math.min(1, Math.max(0.2, eff));
   }
   function contentGateOk(req) {
@@ -550,11 +590,43 @@
     const u = UPGRADES[id];
     return Math.floor(u.baseCost * Math.pow(u.costMult, state.levels[id] || 0));
   }
+  function unlockReqText(unlock) {
+    if (!unlock) return 'Закрыто';
+    if (unlock.text) return unlock.text;
+    const parts = [];
+    const uid = unlock.upgradeId || (unlock.type === 'level' ? unlock.id : null);
+    const min = unlock.level != null ? unlock.level : unlock.min;
+    if (uid && UPGRADES[uid] && min != null) parts.push(UPGRADES[uid].name + ' ур. ' + min);
+    if (unlock.lifetimeBones) parts.push(fmtStatic(unlock.lifetimeBones) + ' 🦴 за жизнь');
+    return parts.length ? 'Нужно: ' + parts.join(' · ') : 'Закрыто';
+  }
   function isUpgradeUnlocked(id) {
     const u = UPGRADES[id];
-    if (!u.unlock) return true;
-    if (u.unlock.type === 'level') return (state.levels[u.unlock.id] || 0) >= u.unlock.min;
+    if (!u || !u.unlock) return true;
+    const un = u.unlock;
+    const uid = un.upgradeId || (un.type === 'level' ? un.id : null);
+    const min = un.level != null ? un.level : un.min;
+    if (uid && min != null && (state.levels[uid] || 0) < min) return false;
+    if (un.lifetimeBones && (state.stats.lifetimeBones || 0) < un.lifetimeBones) return false;
+    if (un.type === 'lifetime' && (state.stats.lifetimeBones || 0) < (un.min || 0)) return false;
     return true;
+  }
+  function trainingCost(id) {
+    const t = TRAINING.find(function (x) { return x.id === id; });
+    if (!t) return Infinity;
+    return Math.floor(t.baseCost * Math.pow(t.costMult, state.levelsTraining[id] || 0));
+  }
+  function isTrainingUnlocked(id) {
+    const idx = TRAINING_ORDER.indexOf(id);
+    if (idx <= 0) return true;
+    const prev = TRAINING_ORDER[idx - 1];
+    return (state.levelsTraining[prev] || 0) >= 1;
+  }
+  function trainingUnlockText(id) {
+    const idx = TRAINING_ORDER.indexOf(id);
+    if (idx <= 0) return '';
+    const prev = TRAINING[idx - 1];
+    return 'Нужно: «' + prev.name + '» ур. 1';
   }
   function fmt(n) {
     if (!isFinite(n)) return '0';
@@ -622,6 +694,7 @@
   }
 
   var SECONDARY_TAB_LABELS = {
+    gpshop: 'Покупки',
     friends: 'Друзья',
     album: 'Альбом',
     season: 'Сезон',
@@ -690,6 +763,7 @@
 
   function renderActivePanel() {
     if (activeTab === 'shop') { renderShop(); renderConsumables(); }
+    else if (activeTab === 'training') renderTraining();
     else if (activeTab === 'breeds') renderBreeds();
     else if (activeTab === 'friends') renderFriends();
     else if (activeTab === 'yard') renderYards();
@@ -718,12 +792,36 @@
       card.className = 'upgrade' + (canBuy ? '' : ' disabled') + (unlocked ? '' : ' locked');
       card.dataset.id = id;
       if (!unlocked) {
-        card.innerHTML = '<span class="up-icon">🔒</span><span class="up-body"><span class="up-name">' + u.name + '</span><span class="up-desc">' + (u.unlock && u.unlock.text ? u.unlock.text : 'Закрыто') + '</span></span><span class="up-cost">—</span>';
+        card.innerHTML = '<span class="up-icon">🔒</span><span class="up-body"><span class="up-name">' + u.name + '</span><span class="up-desc">' + unlockReqText(u.unlock) + '</span></span><span class="up-cost">—</span>';
       } else {
         card.innerHTML = '<span class="up-icon">' + u.icon + '</span><span class="up-body"><span class="up-name">' + u.name + ' <em>ур.' + lvl + '</em></span><span class="up-desc">' + u.desc + '</span></span><span class="up-cost">🦴 ' + fmt(cost) + '</span>';
         card.addEventListener('click', function () { buyUpgrade(id); });
       }
       shop.appendChild(card);
+    }
+  }
+
+  function renderTraining() {
+    const root = $('#training');
+    if (!root) return;
+    root.innerHTML = '';
+    for (let i = 0; i < TRAINING.length; i++) {
+      const t = TRAINING[i];
+      const unlocked = isTrainingUnlocked(t.id);
+      const lvl = state.levelsTraining[t.id] || 0;
+      const cost = trainingCost(t.id);
+      const canBuy = unlocked && state.ore >= cost;
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'upgrade' + (canBuy ? '' : ' disabled') + (unlocked ? '' : ' locked');
+      card.dataset.trainingId = t.id;
+      if (!unlocked) {
+        card.innerHTML = '<span class="up-icon">🔒</span><span class="up-body"><span class="up-name">' + t.name + '</span><span class="up-desc">' + trainingUnlockText(t.id) + '</span></span><span class="up-cost">—</span>';
+      } else {
+        card.innerHTML = '<span class="up-icon">' + t.icon + '</span><span class="up-body"><span class="up-name">' + t.name + ' <em>ур.' + lvl + '</em></span><span class="up-desc">' + t.desc + '</span></span><span class="up-cost">🦴 ' + fmt(cost) + '</span>';
+        card.addEventListener('click', function () { buyTraining(t.id); });
+      }
+      root.appendChild(card);
     }
   }
 
@@ -1924,7 +2022,8 @@
   function walkRewardBones(tier) {
     const secs = tier.durationMs / 1000;
     const base = Math.max(8, getOrePerSec() * secs * 0.55 + getClickPower() * 14);
-    return Math.floor(base * tier.rewardMult * (1 + (state.yardStage || 1) * 0.03));
+    const trainWalk = 1 + getTrainingSum('walkRewardPct');
+    return Math.floor(base * tier.rewardMult * (1 + (state.yardStage || 1) * 0.03) * trainWalk);
   }
   function completeWalk(fromClaim) {
     const walk = state.activeWalk;
@@ -2156,7 +2255,9 @@
   function medalsGainOnPrestige() {
     const req = getPrestigeRequirement();
     const life = Math.max(req, state.stats.lifetimeBones);
-    return 1 + Math.max(0, Math.floor(Math.log10(life / req)));
+    const base = 1 + Math.max(0, Math.floor(Math.log10(life / req)));
+    const bonus = 1 + getTrainingSum('medalYield');
+    return Math.max(1, Math.floor(base * bonus));
   }
   function renderPrestige() {
     const info = $('#prestige-info');
@@ -2350,7 +2451,7 @@
 
   function buyUpgrade(id) {
     if (!isUpgradeUnlocked(id)) {
-      showToast((UPGRADES[id].unlock && UPGRADES[id].unlock.text) || 'Ещё закрыто');
+      showToast(unlockReqText(UPGRADES[id] && UPGRADES[id].unlock) || 'Ещё закрыто');
       if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
       return;
     }
@@ -2362,6 +2463,26 @@
     }
     state.ore -= cost;
     state.levels[id] = (state.levels[id] || 0) + 1;
+    state.stats.upgradesBought += 1;
+    bumpQuest('buy', 1);
+    if (window.Sounds) window.Sounds.playBuy();
+    checkAchievements(); maybeUnlockStory(); renderAll(); scheduleSave();
+  }
+
+  function buyTraining(id) {
+    if (!isTrainingUnlocked(id)) {
+      showToast(trainingUnlockText(id) || 'Ещё закрыто');
+      if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
+      return;
+    }
+    const cost = trainingCost(id);
+    if (state.ore < cost) {
+      showToast('Маловато косточек 🐾');
+      if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
+      return;
+    }
+    state.ore -= cost;
+    state.levelsTraining[id] = (state.levelsTraining[id] || 0) + 1;
     state.stats.upgradesBought += 1;
     bumpQuest('buy', 1);
     if (window.Sounds) window.Sounds.playBuy();
@@ -2425,6 +2546,7 @@
       v: SAVE_VERSION,
       ore: state.ore,
       levels: Object.assign(defaultLevels(), state.levels),
+      levelsTraining: Object.assign(defaultTrainingLevels(), state.levelsTraining || {}),
       lastSaveAt: now,
       adBoostUntil: adUntil > now ? adUntil : 0,
       pendingClickMult: state.pendingClickMult > 1 ? state.pendingClickMult : 1,
@@ -2541,6 +2663,19 @@
       out.stats.walksDone = Number(out.stats.walksDone) || 0;
       // Old saves may feel rich briefly under new costs — intentional soft migrate
     }
+    // Training tree: default 0s, never wipe existing progress
+    {
+      const baseT = defaultTrainingLevels();
+      const srcT = (out.levelsTraining && typeof out.levelsTraining === 'object' && !Array.isArray(out.levelsTraining)) ? out.levelsTraining : {};
+      out.levelsTraining = Object.assign(baseT, srcT);
+      for (let i = 0; i < TRAINING_ORDER.length; i++) {
+        const id = TRAINING_ORDER[i];
+        const n = Number(out.levelsTraining[id]);
+        out.levelsTraining[id] = isFinite(n) && n > 0 ? Math.floor(n) : 0;
+      }
+    }
+    // New shop upgrades default to 0 via defaultLevels merge (no wipe)
+    out.levels = Object.assign(defaultLevels(), out.levels || {});
     out.v = SAVE_VERSION;
     return out;
   }
@@ -2555,6 +2690,14 @@
       for (const id of UPGRADE_ORDER) {
         const n = Number(data.levels[id]);
         state.levels[id] = isFinite(n) && n > 0 ? Math.floor(n) : 0;
+      }
+    }
+    state.levelsTraining = defaultTrainingLevels();
+    if (data.levelsTraining && typeof data.levelsTraining === 'object') {
+      for (let i = 0; i < TRAINING_ORDER.length; i++) {
+        const id = TRAINING_ORDER[i];
+        const n = Number(data.levelsTraining[id]);
+        state.levelsTraining[id] = isFinite(n) && n > 0 ? Math.floor(n) : 0;
       }
     }
     state.adBoostUntil = Number(data.adBoostUntil) || 0;
@@ -2754,6 +2897,7 @@
   let shopDirtyAt = 0;
   function tickShopThrottle(now) {
     if (activeTab === 'shop' && now - shopDirtyAt > 400) { shopDirtyAt = now; renderShop(); renderConsumables(); }
+    else if (activeTab === 'training' && now - shopDirtyAt > 400) { shopDirtyAt = now; renderTraining(); }
     else if (activeTab === 'prestige' && now - shopDirtyAt > 800) { shopDirtyAt = now; renderPrestige(); }
     else if (activeTab === 'season' && now - shopDirtyAt > 500) { shopDirtyAt = now; renderSeason(); }
     requestAnimationFrame(tickShopThrottle);

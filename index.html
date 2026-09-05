@@ -77,6 +77,10 @@
       <span class="tab-ico" aria-hidden="true">🛒</span>
       <span class="tab-txt">Магазин</span>
     </button>
+    <button type="button" class="tab" data-tab="training" role="tab" aria-selected="false">
+      <span class="tab-ico" aria-hidden="true">🎓</span>
+      <span class="tab-txt">Дрессировка</span>
+    </button>
     <button type="button" class="tab" data-tab="breeds" role="tab" aria-selected="false">
       <span class="tab-ico" aria-hidden="true">🐕</span>
       <span class="tab-txt">Породы</span>
@@ -84,10 +88,6 @@
     <button type="button" class="tab" data-tab="yard" role="tab" aria-selected="false">
       <span class="tab-ico" aria-hidden="true">🏡</span>
       <span class="tab-txt">Двор</span>
-    </button>
-    <button type="button" class="tab" data-tab="gpshop" role="tab" aria-selected="false">
-      <span class="tab-ico" aria-hidden="true">💎</span>
-      <span class="tab-txt">Покупки</span>
     </button>
     <button type="button" class="tab tab-more" data-tab="more" id="tab-more" role="tab" aria-selected="false" aria-haspopup="dialog" aria-controls="more-sheet" aria-expanded="false">
       <span class="tab-ico" aria-hidden="true">⋯</span>
@@ -101,6 +101,10 @@
       <div class="more-sheet-handle" aria-hidden="true"></div>
       <h3 id="more-sheet-title" class="more-sheet-title">Ещё разделы</h3>
       <div class="more-grid" role="menu">
+        <button type="button" class="more-item" data-tab="gpshop" role="menuitem">
+          <span class="more-ico" aria-hidden="true">💎</span>
+          <span class="more-txt">Покупки</span>
+        </button>
         <button type="button" class="more-item" data-tab="friends" role="menuitem">
           <span class="more-ico" aria-hidden="true">🐾</span>
           <span class="more-txt">Друзья</span>
@@ -140,6 +144,12 @@
     <h2 class="shop-subhead">Предметы</h2>
     <p class="panel-hint">Расходники: один активный буст за раз.</p>
     <div id="consumables"></div>
+  </section>
+
+  <section class="panel-section" id="panel-training" data-panel="training" hidden>
+    <h2>Дрессировка 🎓</h2>
+    <p class="panel-hint">Цепочка команд: купите предыдущую, чтобы открыть следующую. Стоимость растёт круто — тренируйте постепенно.</p>
+    <div id="training"></div>
   </section>
 
   <section class="panel-section" id="panel-breeds" data-panel="breeds" hidden>
