@@ -24,7 +24,6 @@
       ctx = new AC();
       return ctx;
     } catch (_) {
-      muted = true;
       return null;
     }
   }
@@ -163,7 +162,17 @@
   function setMuted(v) {
     muted = !!v;
     try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch (_) {}
-    if (!muted) unlock();
+    if (muted) {
+      if (ctx && ctx.state === 'running') {
+        try { ctx.suspend().catch(function () {}); } catch (_) {}
+      }
+    } else {
+      // Unmute: allow context creation again even if a prior AC() failed
+      unlock();
+      if (ctx && ctx.state === 'suspended') {
+        try { ctx.resume().catch(function () {}); } catch (_) {}
+      }
+    }
     return muted;
   }
 

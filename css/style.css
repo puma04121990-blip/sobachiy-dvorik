@@ -60,8 +60,9 @@ header.app-header {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
+  max-width: 46%;
 }
 
 .btn-mute {
@@ -88,6 +89,11 @@ header h1 {
   letter-spacing: 0.02em;
   color: var(--accent);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.8);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
 }
 
 #gp-status,
@@ -681,6 +687,9 @@ footer.hint {
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
   scroll-padding-inline: 6px;
+  /* Soft edge fade hints horizontal scroll on narrow screens */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
 }
 
 .tabs::-webkit-scrollbar {
@@ -1473,6 +1482,33 @@ footer.hint {
   }
   .season-stat {
     grid-column: 1 / -1;
+  }
+  header.app-header {
+    gap: 6px;
+  }
+  header h1 {
+    font-size: 1.02rem;
+  }
+  .btn-mute {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+  #gp-status,
+  .gp-chip {
+    font-size: 0.6rem;
+    padding: 4px 8px;
+    max-width: 7.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .header-right {
+    gap: 4px;
+    max-width: 48%;
+  }
+  .gp-product .btn-sm {
+    min-width: 76px;
+    min-height: 38px;
   }
 }
 

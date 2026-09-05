@@ -1486,8 +1486,8 @@
   function maybeOfferFullscreen(reason) {
     if (state.noAds) return;
     if (!window.GPBridge || typeof window.GPBridge.showFullscreen !== 'function') return;
-    // ~35% chance after prestige / event win
-    if (Math.random() > 0.35) return;
+    // ~20% after prestige / event win (bridge also rate-limits ~180s)
+    if (Math.random() > 0.2) return;
     setTimeout(function () {
       window.GPBridge.showFullscreen(false).catch(function () {});
     }, reason === 'prestige' ? 900 : 600);
@@ -1496,9 +1496,13 @@
   function renderGpShop() {
     const root = $('#gp-shop');
     if (!root) return;
-    const payHint = (window.GPBridge && window.GPBridge.isPaymentsAvailable && window.GPBridge.isPaymentsAvailable())
-      ? 'Платежи GamePush доступны.'
-      : 'Локальный режим: покупка через подтверждение.';
+    const bridge = window.GPBridge;
+    const payOk = bridge && bridge.isPaymentsAvailable && bridge.isPaymentsAvailable();
+    const gpOn = bridge && bridge.isGpConnected && bridge.isGpConnected();
+    let payHint;
+    if (payOk) payHint = 'Платежи GamePush доступны.';
+    else if (gpOn) payHint = 'GamePush подключён, но платежи на этой платформе недоступны.';
+    else payHint = 'Локальный режим: покупка через подтверждение.';
     const flags = [];
     if (state.noAds) flags.push('NO_ADS ✓');
     if (state.vipTreats) flags.push('VIP ✓');
@@ -1521,9 +1525,12 @@
     });
   }
 
+  let gpBuyBusy = false;
+
   async function buyGpProduct(tag) {
     const product = GP_PRODUCTS.find(function (p) { return p.tag === tag; });
     if (!product) return;
+    if (gpBuyBusy) { showToast('Подождите…'); return; }
     if (product.kind === 'permanent') {
       if (product.flag === 'noAds' && state.noAds) { showToast('Уже куплено 🐾'); return; }
       if (product.flag === 'vipTreats' && state.vipTreats) { showToast('Уже куплено 🐾'); return; }
@@ -1534,33 +1541,43 @@
       if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
       return;
     }
-    const res = await bridge.purchase(tag);
-    if (!res || !res.ok) {
-      showToast(res && res.error === 'cancelled' ? 'Покупка отменена' : 'Не удалось купить');
-      if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
-      return;
+    gpBuyBusy = true;
+    try {
+      const res = await bridge.purchase(tag);
+      if (!res || !res.ok) {
+        const err = res && res.error;
+        let msg = 'Не удалось купить';
+        if (err === 'cancelled') msg = 'Покупка отменена';
+        else if (err === 'payments_unavailable') msg = 'Платежи сейчас недоступны';
+        showToast(msg);
+        if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
+        return;
+      }
+      if (product.kind === 'consumable') {
+        const gain = Number(product.bones) || 0;
+        // Grant once per successful purchase, then consume (prevents redelivery loops)
+        state.ore += gain;
+        state.stats.lifetimeBones += gain;
+        bumpQuest('earn', gain);
+        await persist();
+        if (typeof bridge.consume === 'function') await bridge.consume(tag);
+        if (window.Sounds && window.Sounds.playPurchase) window.Sounds.playPurchase();
+        else if (window.Sounds) window.Sounds.playBuy();
+        showToast('+' + fmt(gain) + ' косточек! 🦴');
+      } else {
+        if (product.flag === 'noAds') state.noAds = true;
+        if (product.flag === 'vipTreats') state.vipTreats = true;
+        applyNoAdsUi();
+        await persist();
+        if (window.Sounds && window.Sounds.playPurchase) window.Sounds.playPurchase();
+        else if (window.Sounds) window.Sounds.playBuy();
+        showToast(product.name + ' активировано! ✨');
+      }
+      checkAchievements();
+      renderAll();
+    } finally {
+      gpBuyBusy = false;
     }
-    if (product.kind === 'consumable') {
-      const gain = Number(product.bones) || 0;
-      state.ore += gain;
-      state.stats.lifetimeBones += gain;
-      bumpQuest('earn', gain);
-      await persist();
-      if (typeof bridge.consume === 'function') await bridge.consume(tag);
-      if (window.Sounds && window.Sounds.playPurchase) window.Sounds.playPurchase();
-      else if (window.Sounds) window.Sounds.playBuy();
-      showToast('+' + fmt(gain) + ' косточек! 🦴');
-    } else {
-      if (product.flag === 'noAds') state.noAds = true;
-      if (product.flag === 'vipTreats') state.vipTreats = true;
-      applyNoAdsUi();
-      await persist();
-      if (window.Sounds && window.Sounds.playPurchase) window.Sounds.playPurchase();
-      else if (window.Sounds) window.Sounds.playBuy();
-      showToast(product.name + ' активировано! ✨');
-    }
-    checkAchievements();
-    renderAll();
   }
 
   async function restoreGpPurchases() {
@@ -1772,38 +1789,56 @@
     renderStats(); scheduleSave();
   }
 
+  let rewardBusy = false;
+
   async function onRewarded() {
     const bridge = window.GPBridge;
-    if (!bridge) return;
-    let ok = false;
-    if (state.noAds) {
-      ok = true;
-    } else {
-      ok = await bridge.showRewarded();
+    if (!bridge || rewardBusy) return;
+    rewardBusy = true;
+    const btn = $('#btn-ad');
+    if (btn) btn.disabled = true;
+    try {
+      let ok = false;
+      if (state.noAds) {
+        ok = true;
+      } else {
+        ok = await bridge.showRewarded();
+      }
+      if (!ok) {
+        showToast('Видео не просмотрено');
+        if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
+        return;
+      }
+      state.pendingClickMult = AD_BOOST_MULT;
+      state.adBoostUntil = Date.now() + AD_BOOST_DURATION_MS;
+      if (window.Sounds && window.Sounds.playReward) window.Sounds.playReward();
+      else if (window.Sounds) window.Sounds.playBuy();
+      showToast(state.noAds ? 'Бонус NO_ADS! x2 почесушка + idle 60с 🐕' : 'Ура! x2 почесушка + idle буст 60с 🐕');
+      renderStats(); scheduleSave();
+    } finally {
+      rewardBusy = false;
+      if (btn) btn.disabled = false;
+      applyNoAdsUi();
     }
-    if (!ok) {
-      showToast('Видео не просмотрено');
-      if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
-      return;
-    }
-    state.pendingClickMult = AD_BOOST_MULT;
-    state.adBoostUntil = Date.now() + AD_BOOST_DURATION_MS;
-    if (window.Sounds && window.Sounds.playReward) window.Sounds.playReward();
-    else if (window.Sounds) window.Sounds.playBuy();
-    showToast(state.noAds ? 'Бонус NO_ADS! x2 почесушка + idle 60с 🐕' : 'Ура! x2 почесушка + idle буст 60с 🐕');
-    renderStats(); scheduleSave();
   }
 
   async function manualSave() { await persist(); showToast('Сохранено 💾'); }
 
   function serialize() {
+    const now = Date.now();
+    const adUntil = Number(state.adBoostUntil) || 0;
+    const joyUntil = Number(state.joyUntil) || 0;
+    const joyReady = Number(state.joyReadyAt) || 0;
+    const seasonUntil = Number(state.seasonBoostUntil) || 0;
+    let activeItem = state.activeItem;
+    if (activeItem && (!(Number(activeItem.until) > now) || !CONSUMABLES[activeItem.id])) activeItem = null;
     return {
       v: SAVE_VERSION,
       ore: state.ore,
       levels: Object.assign(defaultLevels(), state.levels),
-      lastSaveAt: Date.now(),
-      adBoostUntil: state.adBoostUntil,
-      pendingClickMult: state.pendingClickMult,
+      lastSaveAt: now,
+      adBoostUntil: adUntil > now ? adUntil : 0,
+      pendingClickMult: state.pendingClickMult > 1 ? state.pendingClickMult : 1,
       prestigeLevel: state.prestigeLevel,
       medals: state.medals,
       selectedBreed: state.selectedBreed,
@@ -1819,10 +1854,10 @@
       achievementsClaimed: Object.assign({}, state.achievementsClaimed),
       quests: state.quests,
       questDaySeed: state.questDaySeed,
-      joyUntil: state.joyUntil,
-      joyReadyAt: state.joyReadyAt,
+      joyUntil: joyUntil > now ? joyUntil : 0,
+      joyReadyAt: joyReady > now ? joyReady : 0,
       inventory: Object.assign({ boneBoost: 0 }, state.inventory || {}),
-      activeItem: state.activeItem,
+      activeItem: activeItem,
       storyRead: Object.assign({}, state.storyRead || {}),
       nextEventAt: state.nextEventAt,
       eventReadyType: state.eventReadyType,
@@ -1830,8 +1865,8 @@
       stickerSetsClaimed: Object.assign({}, state.stickerSetsClaimed || {}),
       unlockedFriends: (state.unlockedFriends || []).slice(),
       activeFriend: state.activeFriend,
-      acorns: isFinite(state.acorns) ? Math.max(0, state.acorns) : 0,
-      seasonBoostUntil: state.seasonBoostUntil || 0,
+      acorns: isFinite(state.acorns) ? Math.max(0, Math.round(state.acorns * 1000) / 1000) : 0,
+      seasonBoostUntil: seasonUntil > now ? seasonUntil : 0,
       seasonPurchases: Object.assign({}, state.seasonPurchases || {}),
       noAds: !!state.noAds,
       vipTreats: !!state.vipTreats,

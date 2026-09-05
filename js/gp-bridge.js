@@ -8,7 +8,7 @@ const PUBLIC_TOKEN = 'JBeptGYdA0CM3JtUuacEIwxxyIED8FIU';
 const LOCAL_KEY = 'dog-yard-clicker-v1';
 const LEGACY_LOCAL_KEY = 'ore-mine-clicker-v1';
 const GP_READY_TIMEOUT_MS = 10000;
-const FULLSCREEN_COOLDOWN_MS = 90 * 1000;
+const FULLSCREEN_COOLDOWN_MS = 180 * 1000;
 
 let _gp = null;
 let _readyPromise = null;
@@ -167,6 +167,9 @@ async function showRewarded() {
     }
   }
 
+  // Local confirm stub only with no SDK — never freebie when GP is present
+  if (gp) return false;
+
   const ok = window.confirm(
     'Режим без GamePush.\nСимулировать просмотр видео и получить двойные косточки?'
   );
@@ -219,7 +222,10 @@ async function purchase(tag) {
   if (!tag) return { ok: false, error: 'no_tag' };
 
   const gp = getGp();
-  if (gp && gp.payments && typeof gp.payments.purchase === 'function' && isPaymentsAvailable()) {
+  if (gp && gp.payments && typeof gp.payments.purchase === 'function') {
+    if (!isPaymentsAvailable()) {
+      return { ok: false, error: 'payments_unavailable' };
+    }
     try {
       const result = await gp.payments.purchase({ tag });
       if (result === false) return { ok: false, error: 'cancelled' };
@@ -229,6 +235,9 @@ async function purchase(tag) {
       return { ok: false, error: (e && e.message) || 'purchase_failed' };
     }
   }
+
+  // GP loaded but no payments API — do not offer free confirm stub
+  if (gp) return { ok: false, error: 'payments_unavailable' };
 
   const ok = window.confirm(
     'Режим без платежей GamePush.\nСимулировать покупку «' + tag + '»?'

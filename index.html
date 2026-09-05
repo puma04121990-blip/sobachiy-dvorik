@@ -252,8 +252,10 @@
         }
       } catch (e) {}
       try {
-        await gp.ads.showPreloader();
-        if (!skipAds) gp.ads.showSticky();
+        if (!skipAds) {
+          await gp.ads.showPreloader();
+          gp.ads.showSticky();
+        }
       } catch (e) {}
       window.__gp = gp;
       window.dispatchEvent(new Event("gp-ready"));
