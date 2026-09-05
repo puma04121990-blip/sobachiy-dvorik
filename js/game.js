@@ -2,12 +2,12 @@
  * Собачий дворик — idle/clicker (cute dogs theme) · content pack v5 (retention)
  *
  * ——— BALANCE CONSTANTS (документация) ———
- * Early snappy (~1–2 мин до idle); first prestige ~45–90 мин; full content days.
- * Cost growth ~1.18–1.28 by tier; late bases raised a lot.
- * Softcap click/idle after thresholds; prestige req scales (base 5e7).
- * Medals: flat +4%/medal + spendable shop in Выставка.
- * Energy 0–100 drains on click; walks timed; yard stages; daily goals.
- * Offline soft without warehouse/лежанка; events ~6–10 мин.
+ * Early fun ~5–10 мин; then steep walls; first prestige ~3–6 ч engaged.
+ * Cost growth ~1.22–1.35 by tier; mid/late bases ×2–4; soft walls hourly.
+ * Softcap click @180 / idle @70, power ~0.5; prestige 2e8 × 2.2^level.
+ * Medals: flat +2%/medal + spendable shop (дороже) in Выставка.
+ * Energy drains harder; walks longer/weaker; yard stages / unlocks ×2–3.
+ * Offline base ~20%; events CD ~10–15 мин, rewards tempered.
  */
 (function () {
   'use strict';
@@ -15,15 +15,15 @@
   const AUTOSAVE_MS = 4000;
   const OFFLINE_CAP_SEC = 8 * 60 * 60;
   const OFFLINE_BED_BONUS_SEC = 30 * 60;
-  const OFFLINE_BASE_EFF = 0.32;
+  const OFFLINE_BASE_EFF = 0.20;
   const AD_BOOST_MULT = 2;
   const AD_BOOST_DURATION_MS = 60 * 1000;
   const SAVE_KEY = 'dog-yard-clicker-v1';
   const LEGACY_SAVE_KEY = 'ore-mine-clicker-v1';
   const SAVE_VERSION = 5;
   const SEASON_FORCE = true;
-  const ACORN_PER_CLICK = 0.028;
-  const ACORN_EVENT_BASE = 10;
+  const ACORN_PER_CLICK = 0.022;
+  const ACORN_EVENT_BASE = 7;
   const SEASON_BOOST_MULT = 1.25;
   const SEASON_BOOST_MS = 60 * 1000;
   const HIDE_TRIES = 2;
@@ -41,68 +41,68 @@
   const JOY_DURATION_MS = 10 * 1000;
   const JOY_COOLDOWN_MS = 45 * 1000;
 
-  const PRESTIGE_REQ_BASE = 5e7;
-  const PRESTIGE_REQ_SCALE = 1.85;
-  const PRESTIGE_MEDAL_INCOME = 0.04;
-  const BASE_CLICK = 1.15;
+  const PRESTIGE_REQ_BASE = 2e8;
+  const PRESTIGE_REQ_SCALE = 2.2;
+  const PRESTIGE_MEDAL_INCOME = 0.02;
+  const BASE_CLICK = 0.85;
   const VIP_INCOME_MULT = 1.15;
 
-  const CLICK_SOFTCAP = 420;
-  const IDLE_SOFTCAP = 160;
-  const SOFTCAP_POWER = 0.62;
+  const CLICK_SOFTCAP = 180;
+  const IDLE_SOFTCAP = 70;
+  const SOFTCAP_POWER = 0.5;
 
   const ENERGY_MAX_BASE = 100;
-  const ENERGY_PER_CLICK = 1.15;
-  const ENERGY_REGEN_PER_SEC = 1.85;
-  const ENERGY_TIRED_MULT = 0.18;
+  const ENERGY_PER_CLICK = 1.6;
+  const ENERGY_REGEN_PER_SEC = 1.2;
+  const ENERGY_TIRED_MULT = 0.12;
   const ENERGY_REST_GAIN = 28;
   const ENERGY_REST_COOLDOWN_MS = 40 * 1000;
 
-  const EVENT_MIN_MS = 6 * 60 * 1000;
-  const EVENT_MAX_MS = 10 * 60 * 1000;
+  const EVENT_MIN_MS = 10 * 60 * 1000;
+  const EVENT_MAX_MS = 15 * 60 * 1000;
   const TOY_DURATION_MS = 10 * 1000;
-  const TOY_REWARD_PER_TAP = 3.4;
-  const EVENT_REWARD_MULT = 1.28;
+  const TOY_REWARD_PER_TAP = 2.2;
+  const EVENT_REWARD_MULT = 1.05;
 
   const UPGRADES = {
-    pickaxe: { id: 'pickaxe', name: 'Лакомство', desc: '+1 к почесушкам', baseCost: 14, costMult: 1.18, clickPower: 1, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦴', unlock: null },
-    miner: { id: 'miner', name: 'Щенок-помощник', desc: '+0.55 кост./сек', baseCost: 42, costMult: 1.18, clickPower: 0, orePerSec: 0.55, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🐕', unlock: null },
-    ball: { id: 'ball', name: 'Мячик', desc: '+4 к почесушкам', baseCost: 110, costMult: 1.20, clickPower: 4, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🎾', unlock: { type: 'level', id: 'pickaxe', min: 3, text: 'Нужно Лакомство ур. 3' } },
-    drill: { id: 'drill', name: 'Дрессировщик', desc: '+5.5 кост./сек', baseCost: 520, costMult: 1.20, clickPower: 0, orePerSec: 5.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🧤', unlock: { type: 'level', id: 'miner', min: 2, text: 'Нужен Щенок-помощник ур. 2' } },
-    walk: { id: 'walk', name: 'Выгул', desc: '+22 кост./сек', baseCost: 5200, costMult: 1.22, clickPower: 0, orePerSec: 22, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦮', unlock: { type: 'level', id: 'drill', min: 1, text: 'Нужен Дрессировщик ур. 1' } },
-    warehouse: { id: 'warehouse', name: 'Будка', desc: '+10% к idle · офлайн', baseCost: 1600, costMult: 1.22, clickPower: 0, orePerSec: 0, idleMult: 0.10, clickPct: 0, comboBonusMs: 0, icon: '🏠', unlock: { type: 'level', id: 'miner', min: 5, text: 'Нужен Щенок-помощник ур. 5' } },
-    groomer: { id: 'groomer', name: 'Грумер', desc: '+15% к idle', baseCost: 22000, costMult: 1.24, clickPower: 0, orePerSec: 0, idleMult: 0.15, clickPct: 0, comboBonusMs: 0, icon: '✂️', unlock: { type: 'level', id: 'warehouse', min: 2, text: 'Нужна Будка ур. 2' } },
-    kennel: { id: 'kennel', name: 'Питомник', desc: '+95 кост./сек', baseCost: 95000, costMult: 1.26, clickPower: 0, orePerSec: 95, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🏡', unlock: { type: 'level', id: 'walk', min: 2, text: 'Нужен Выгул ур. 2' } },
-    collar: { id: 'collar', name: 'Ошейник', desc: '+3% к почесушкам', baseCost: 260, costMult: 1.19, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.03, comboBonusMs: 0, icon: '📿', unlock: { type: 'level', id: 'pickaxe', min: 2, text: 'Нужно Лакомство ур. 2' } },
-    frisbee: { id: 'frisbee', name: 'Фрисби', desc: '+4 кост./сек', baseCost: 980, costMult: 1.20, clickPower: 0, orePerSec: 4, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🥏', unlock: { type: 'level', id: 'miner', min: 3, text: 'Нужен Щенок-помощник ур. 3' } },
-    bed: { id: 'bed', name: 'Лежанка', desc: '+30 мин офлайн-капа · офлайн %', baseCost: 3500, costMult: 1.23, clickPower: 0, orePerSec: 0, idleMult: 0.03, clickPct: 0, comboBonusMs: 0, icon: '🛏️', unlock: { type: 'level', id: 'warehouse', min: 1, text: 'Нужна Будка ур. 1' } },
-    whistle: { id: 'whistle', name: 'Свисток', desc: '+40 мс к окну комбо', baseCost: 2400, costMult: 1.21, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: WHISTLE_COMBO_MS, icon: '📣', unlock: { type: 'level', id: 'ball', min: 2, text: 'Нужен Мячик ур. 2' } },
+    pickaxe: { id: 'pickaxe', name: 'Лакомство', desc: '+0.7 к почесушкам', baseCost: 18, costMult: 1.22, clickPower: 0.7, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦴', unlock: null },
+    miner: { id: 'miner', name: 'Щенок-помощник', desc: '+0.35 кост./сек', baseCost: 55, costMult: 1.22, clickPower: 0, orePerSec: 0.35, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🐕', unlock: null },
+    ball: { id: 'ball', name: 'Мячик', desc: '+2.5 к почесушкам', baseCost: 220, costMult: 1.24, clickPower: 2.5, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🎾', unlock: { type: 'level', id: 'pickaxe', min: 3, text: 'Нужно Лакомство ур. 3' } },
+    drill: { id: 'drill', name: 'Дрессировщик', desc: '+3.5 кост./сек', baseCost: 1400, costMult: 1.25, clickPower: 0, orePerSec: 3.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🧤', unlock: { type: 'level', id: 'miner', min: 2, text: 'Нужен Щенок-помощник ур. 2' } },
+    walk: { id: 'walk', name: 'Выгул', desc: '+12 кост./сек', baseCost: 18000, costMult: 1.30, clickPower: 0, orePerSec: 12, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦮', unlock: { type: 'level', id: 'drill', min: 1, text: 'Нужен Дрессировщик ур. 1' } },
+    warehouse: { id: 'warehouse', name: 'Будка', desc: '+7% к idle · офлайн', baseCost: 4800, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0.07, clickPct: 0, comboBonusMs: 0, icon: '🏠', unlock: { type: 'level', id: 'miner', min: 5, text: 'Нужен Щенок-помощник ур. 5' } },
+    groomer: { id: 'groomer', name: 'Грумер', desc: '+10% к idle', baseCost: 70000, costMult: 1.32, clickPower: 0, orePerSec: 0, idleMult: 0.10, clickPct: 0, comboBonusMs: 0, icon: '✂️', unlock: { type: 'level', id: 'warehouse', min: 2, text: 'Нужна Будка ур. 2' } },
+    kennel: { id: 'kennel', name: 'Питомник', desc: '+55 кост./сек', baseCost: 350000, costMult: 1.35, clickPower: 0, orePerSec: 55, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🏡', unlock: { type: 'level', id: 'walk', min: 2, text: 'Нужен Выгул ур. 2' } },
+    collar: { id: 'collar', name: 'Ошейник', desc: '+2% к почесушкам', baseCost: 400, costMult: 1.23, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.02, comboBonusMs: 0, icon: '📿', unlock: { type: 'level', id: 'pickaxe', min: 2, text: 'Нужно Лакомство ур. 2' } },
+    frisbee: { id: 'frisbee', name: 'Фрисби', desc: '+2.5 кост./сек', baseCost: 2500, costMult: 1.25, clickPower: 0, orePerSec: 2.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🥏', unlock: { type: 'level', id: 'miner', min: 3, text: 'Нужен Щенок-помощник ур. 3' } },
+    bed: { id: 'bed', name: 'Лежанка', desc: '+30 мин офлайн-капа · офлайн %', baseCost: 10000, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0.02, clickPct: 0, comboBonusMs: 0, icon: '🛏️', unlock: { type: 'level', id: 'warehouse', min: 1, text: 'Нужна Будка ур. 1' } },
+    whistle: { id: 'whistle', name: 'Свисток', desc: '+40 мс к окну комбо', baseCost: 5500, costMult: 1.27, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: WHISTLE_COMBO_MS, icon: '📣', unlock: { type: 'level', id: 'ball', min: 2, text: 'Нужен Мячик ур. 2' } },
   };
 
   const UPGRADE_ORDER = ['pickaxe','miner','collar','ball','frisbee','drill','warehouse','whistle','bed','walk','groomer','kennel'];
 
   const BREEDS = {
     lab: { id: 'lab', name: 'Лабрадор', desc: 'Сбалансированный старт', src: 'assets/dog-click.png', unlockCost: 0, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: true },
-    corgi: { id: 'corgi', name: 'Корги', desc: '+5% к почесушкам', src: 'assets/dog-corgi.png', unlockCost: 14000, reqLifetime: 4e4, bonuses: { clickMult: 1.05, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: false },
-    husky: { id: 'husky', name: 'Хаски', desc: '+5% к idle', src: 'assets/dog-husky.png', unlockCost: 55000, reqLifetime: 2e5, bonuses: { clickMult: 1, idleMult: 1.05, comboWindowBonus: 0 }, startUnlocked: false },
-    dachshund: { id: 'dachshund', name: 'Такса', desc: '+200 мс к окну комбо', src: 'assets/dog-dachshund.png', unlockCost: 180000, reqLifetime: 8e5, reqMedals: 1, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 200 }, startUnlocked: false },
-    shiba: { id: 'shiba', name: 'Сиба', desc: '+4% к почесушкам и +2% idle', src: 'assets/dog-shiba.png', unlockCost: 420000, reqLifetime: 2e6, reqMedals: 2, bonuses: { clickMult: 1.04, idleMult: 1.02, comboWindowBonus: 0 }, startUnlocked: false },
-    poodle: { id: 'poodle', name: 'Пудель', desc: '+8% к idle', src: 'assets/dog-poodle.png', unlockCost: 950000, reqLifetime: 8e6, reqMedals: 3, bonuses: { clickMult: 1, idleMult: 1.08, comboWindowBonus: 0 }, startUnlocked: false },
-    beagle: { id: 'beagle', name: 'Бигль', desc: '+6% к почесушкам · +80 мс комбо', src: 'assets/dog-beagle.png', unlockCost: 2.4e6, reqLifetime: 2.5e7, reqMedals: 5, bonuses: { clickMult: 1.06, idleMult: 1, comboWindowBonus: 80 }, startUnlocked: false },
+    corgi: { id: 'corgi', name: 'Корги', desc: '+5% к почесушкам', src: 'assets/dog-corgi.png', unlockCost: 35000, reqLifetime: 1e5, bonuses: { clickMult: 1.05, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: false },
+    husky: { id: 'husky', name: 'Хаски', desc: '+5% к idle', src: 'assets/dog-husky.png', unlockCost: 140000, reqLifetime: 5e5, bonuses: { clickMult: 1, idleMult: 1.05, comboWindowBonus: 0 }, startUnlocked: false },
+    dachshund: { id: 'dachshund', name: 'Такса', desc: '+200 мс к окну комбо', src: 'assets/dog-dachshund.png', unlockCost: 450000, reqLifetime: 2.5e6, reqMedals: 1, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 200 }, startUnlocked: false },
+    shiba: { id: 'shiba', name: 'Сиба', desc: '+4% к почесушкам и +2% idle', src: 'assets/dog-shiba.png', unlockCost: 1.2e6, reqLifetime: 6e6, reqMedals: 2, bonuses: { clickMult: 1.04, idleMult: 1.02, comboWindowBonus: 0 }, startUnlocked: false },
+    poodle: { id: 'poodle', name: 'Пудель', desc: '+8% к idle', src: 'assets/dog-poodle.png', unlockCost: 2.8e6, reqLifetime: 2.5e7, reqMedals: 3, bonuses: { clickMult: 1, idleMult: 1.08, comboWindowBonus: 0 }, startUnlocked: false },
+    beagle: { id: 'beagle', name: 'Бигль', desc: '+6% к почесушкам · +80 мс комбо', src: 'assets/dog-beagle.png', unlockCost: 7e6, reqLifetime: 8e7, reqMedals: 5, bonuses: { clickMult: 1.06, idleMult: 1, comboWindowBonus: 80 }, startUnlocked: false },
   };
   const BREED_COUNT = Object.keys(BREEDS).length;
 
   const YARDS = {
     sunny: { id: 'sunny', name: 'Солнечный', desc: 'Тёплый день во дворе', src: 'assets/yard-sunny.png', unlockCost: 0, startUnlocked: true },
-    evening: { id: 'evening', name: 'Вечер', desc: 'Мягкий закат', src: 'assets/yard-evening.png', unlockCost: 32000, reqLifetime: 1.2e5, startUnlocked: false },
-    winter: { id: 'winter', name: 'Зима', desc: 'Снежный дворик', src: 'assets/yard-winter.png', unlockCost: 220000, reqLifetime: 1.2e6, reqMedals: 1, startUnlocked: false },
+    evening: { id: 'evening', name: 'Вечер', desc: 'Мягкий закат', src: 'assets/yard-evening.png', unlockCost: 80000, reqLifetime: 3.5e5, startUnlocked: false },
+    winter: { id: 'winter', name: 'Зима', desc: 'Снежный дворик', src: 'assets/yard-winter.png', unlockCost: 600000, reqLifetime: 3.5e6, reqMedals: 1, startUnlocked: false },
     autumn: { id: 'autumn', name: 'Осень', desc: 'Золотые листья фестиваля', src: 'assets/yard-autumn.png', unlockCost: 0, startUnlocked: false, seasonOnly: true },
   };
 
   const FRIENDS = {
-    cat: { id: 'cat', name: 'Котик', desc: '+3% к почесушкам', src: 'assets/pet-cat.png', unlockCost: 28000, reqLifetime: 9e4, bonuses: { clickMult: 1.03, idleMult: 1 } },
-    rabbit: { id: 'rabbit', name: 'Кролик', desc: '+3% к idle', src: 'assets/pet-rabbit.png', unlockCost: 65000, reqLifetime: 2.5e5, bonuses: { clickMult: 1, idleMult: 1.03 } },
-    hamster: { id: 'hamster', name: 'Хомячок', desc: '+2% клик · +2% idle', src: 'assets/pet-hamster.png', unlockCost: 160000, reqLifetime: 9e5, reqMedals: 1, bonuses: { clickMult: 1.02, idleMult: 1.02 } },
+    cat: { id: 'cat', name: 'Котик', desc: '+3% к почесушкам', src: 'assets/pet-cat.png', unlockCost: 70000, reqLifetime: 2.5e5, bonuses: { clickMult: 1.03, idleMult: 1 } },
+    rabbit: { id: 'rabbit', name: 'Кролик', desc: '+3% к idle', src: 'assets/pet-rabbit.png', unlockCost: 180000, reqLifetime: 7e5, bonuses: { clickMult: 1, idleMult: 1.03 } },
+    hamster: { id: 'hamster', name: 'Хомячок', desc: '+2% клик · +2% idle', src: 'assets/pet-hamster.png', unlockCost: 450000, reqLifetime: 2.5e6, reqMedals: 1, bonuses: { clickMult: 1.02, idleMult: 1.02 } },
   };
 
   const STICKERS = [
@@ -128,9 +128,9 @@
   ];
 
   const SEASON_SHOP = [
-    { id: 'yard_autumn', name: 'Осенний двор', desc: 'Фон «Осень» навсегда', icon: '🍂', costAcorns: 85, kind: 'yard' },
-    { id: 'sticker_acorn', name: 'Наклейка «Жёлудь»', desc: 'Эксклюзив фестиваля', icon: '🌰', costAcorns: 55, kind: 'sticker', stickerId: 'acorn' },
-    { id: 'temp_boost', name: 'Осенний заряд', desc: 'x1.25 косточки на 60 с', icon: '⚡', costAcorns: 42, kind: 'boost' },
+    { id: 'yard_autumn', name: 'Осенний двор', desc: 'Фон «Осень» навсегда', icon: '🍂', costAcorns: 110, kind: 'yard' },
+    { id: 'sticker_acorn', name: 'Наклейка «Жёлудь»', desc: 'Эксклюзив фестиваля', icon: '🌰', costAcorns: 75, kind: 'sticker', stickerId: 'acorn' },
+    { id: 'temp_boost', name: 'Осенний заряд', desc: 'x1.25 косточки на 60 с', icon: '⚡', costAcorns: 55, kind: 'boost' },
   ];
 
 
@@ -206,7 +206,7 @@
       { who: 'dog', text: 'Холодно носику, но тепло сердцу. Побегаем?' },
       { who: 'narrator', text: 'Вы бежали по снегу, а косточки звенели, как колокольчики.' },
     ]},
-    { id: 'ch7', title: 'Звезда дворика', unlock: (s) => s.prestigeLevel >= 1 || s.stats.lifetimeBones >= 5e7, lines: [
+    { id: 'ch7', title: 'Звезда дворика', unlock: (s) => s.prestigeLevel >= 1 || s.stats.lifetimeBones >= 2e8, lines: [
       { who: 'narrator', text: 'На выставке блестели медальки. Но пёсик смотрел только на вас.' },
       { who: 'dog', text: 'Пусть все хвалят породу. Я хвалю своего человека.' },
       { who: 'narrator', text: 'Самая важная награда — дружба. А дворик только начинается.' },
@@ -246,39 +246,39 @@
   ];
 
   const QUEST_POOL = [
-    { type: 'clicks', label: (n) => 'Почесать пёсика ' + n + ' раз', targets: [60, 100, 180, 300], rewardScale: 1.2 },
-    { type: 'earn', label: (n) => 'Заработать ' + fmtStatic(n) + ' косточек', targets: [1500, 5000, 20000, 80000, 3e5], rewardScale: 0.35 },
-    { type: 'buy', label: (n) => 'Купить апгрейды: ' + n, targets: [2, 3, 5], rewardScale: 2.5 },
+    { type: 'clicks', label: (n) => 'Почесать пёсика ' + n + ' раз', targets: [100, 180, 300, 500], rewardScale: 1.0 },
+    { type: 'earn', label: (n) => 'Заработать ' + fmtStatic(n) + ' косточек', targets: [4000, 15000, 60000, 2.5e5, 1e6], rewardScale: 0.28 },
+    { type: 'buy', label: (n) => 'Купить апгрейды: ' + n, targets: [3, 5, 8], rewardScale: 2.0 },
   ];
 
   const MEDAL_SHOP = [
-    { id: 'm_click', name: 'Лапки чемпиона', desc: '+6% к почесушкам за уровень', icon: '✋', maxLevel: 12, baseCost: 1, costMult: 1.55, clickMult: 0.06 },
-    { id: 'm_idle', name: 'Спокойный двор', desc: '+6% к idle за уровень', icon: '😴', maxLevel: 12, baseCost: 1, costMult: 1.55, idleMult: 0.06 },
-    { id: 'm_energy', name: 'Выносливость', desc: '+8 макс. энергии · +8% реген', icon: '⚡', maxLevel: 8, baseCost: 1, costMult: 1.7, energyMax: 8, energyRegen: 0.08 },
-    { id: 'm_offline', name: 'Сторож двора', desc: '+8% эффективности офлайна', icon: '🌙', maxLevel: 10, baseCost: 1, costMult: 1.6, offlineBonus: 0.08 },
+    { id: 'm_click', name: 'Лапки чемпиона', desc: '+6% к почесушкам за уровень', icon: '✋', maxLevel: 12, baseCost: 2, costMult: 1.75, clickMult: 0.06 },
+    { id: 'm_idle', name: 'Спокойный двор', desc: '+6% к idle за уровень', icon: '😴', maxLevel: 12, baseCost: 2, costMult: 1.75, idleMult: 0.06 },
+    { id: 'm_energy', name: 'Выносливость', desc: '+8 макс. энергии · +8% реген', icon: '⚡', maxLevel: 8, baseCost: 2, costMult: 1.9, energyMax: 8, energyRegen: 0.08 },
+    { id: 'm_offline', name: 'Сторож двора', desc: '+8% эффективности офлайна', icon: '🌙', maxLevel: 10, baseCost: 2, costMult: 1.8, offlineBonus: 0.08 },
   ];
 
   const WALK_TIERS = [
-    { id: 'short', name: 'Короткая', icon: '🚶', energy: 18, boneCost: 25, durationMs: 2 * 60 * 1000, rewardMult: 0.9, stickerChance: 0.08, acornChance: 0.12, unlockStage: 1 },
-    { id: 'park', name: 'В парк', icon: '🌳', energy: 32, boneCost: 220, durationMs: 3.5 * 60 * 1000, rewardMult: 1.7, stickerChance: 0.14, acornChance: 0.22, unlockStage: 2 },
-    { id: 'long', name: 'Дальняя', icon: '🏞️', energy: 48, boneCost: 1800, durationMs: 5 * 60 * 1000, rewardMult: 3.2, stickerChance: 0.22, acornChance: 0.35, unlockStage: 4, unlockPrestige: 1 },
+    { id: 'short', name: 'Короткая', icon: '🚶', energy: 18, boneCost: 40, durationMs: 3 * 60 * 1000, rewardMult: 0.5, stickerChance: 0.08, acornChance: 0.12, unlockStage: 1 },
+    { id: 'park', name: 'В парк', icon: '🌳', energy: 32, boneCost: 400, durationMs: 5.25 * 60 * 1000, rewardMult: 0.95, stickerChance: 0.14, acornChance: 0.22, unlockStage: 2 },
+    { id: 'long', name: 'Дальняя', icon: '🏞️', energy: 48, boneCost: 3200, durationMs: 7.5 * 60 * 1000, rewardMult: 1.75, stickerChance: 0.22, acornChance: 0.35, unlockStage: 4, unlockPrestige: 1 },
   ];
 
   const YARD_STAGES = [
     { level: 1, title: 'Пустой дворик', reqLifetime: 0, reqPrestige: 0, incomeMult: 1, hook: 'Первые лапки на земле.' },
-    { level: 2, title: 'Уютный дворик', reqLifetime: 5e4, reqPrestige: 0, incomeMult: 1.03, hook: 'Появилась любимая тропинка.' },
-    { level: 3, title: 'Известный двор', reqLifetime: 6e5, reqPrestige: 0, incomeMult: 1.07, hook: 'Соседи заглядывают через забор.' },
-    { level: 4, title: 'Чемпионский', reqLifetime: 8e6, reqPrestige: 1, incomeMult: 1.12, hook: 'Медальки блестят на калитке.' },
-    { level: 5, title: 'Легенда района', reqLifetime: 8e7, reqPrestige: 3, incomeMult: 1.18, hook: 'Гости приходят за почесушками.' },
-    { level: 6, title: 'Эпоха дворика', reqLifetime: 6e8, reqPrestige: 6, incomeMult: 1.25, hook: 'История пишется вместе.' },
+    { level: 2, title: 'Уютный дворик', reqLifetime: 1.2e5, reqPrestige: 0, incomeMult: 1.03, hook: 'Появилась любимая тропинка.' },
+    { level: 3, title: 'Известный двор', reqLifetime: 1.8e6, reqPrestige: 0, incomeMult: 1.07, hook: 'Соседи заглядывают через забор.' },
+    { level: 4, title: 'Чемпионский', reqLifetime: 2.5e7, reqPrestige: 1, incomeMult: 1.12, hook: 'Медальки блестят на калитке.' },
+    { level: 5, title: 'Легенда района', reqLifetime: 2.5e8, reqPrestige: 3, incomeMult: 1.18, hook: 'Гости приходят за почесушками.' },
+    { level: 6, title: 'Эпоха дворика', reqLifetime: 2e9, reqPrestige: 6, incomeMult: 1.25, hook: 'История пишется вместе.' },
   ];
 
   const DAILY_GOAL_POOL = [
-    { type: 'clicks', label: (n) => 'Почесать ' + n + ' раз', targets: [100, 180, 280], rewardBones: [400, 700, 1200] },
-    { type: 'earn', label: (n) => 'Заработать ' + fmtStatic(n) + ' 🦴', targets: [3000, 12000, 50000], rewardBones: [500, 900, 1800] },
-    { type: 'walks', label: (n) => 'Завершить прогулок: ' + n, targets: [1, 2], rewardBones: [600, 1100] },
-    { type: 'events', label: (n) => 'Событий: ' + n, targets: [1, 2], rewardBones: [700, 1300] },
-    { type: 'buy', label: (n) => 'Купить апгрейдов: ' + n, targets: [3, 5, 8], rewardBones: [450, 800, 1400] },
+    { type: 'clicks', label: (n) => 'Почесать ' + n + ' раз', targets: [180, 300, 450], rewardBones: [300, 550, 900] },
+    { type: 'earn', label: (n) => 'Заработать ' + fmtStatic(n) + ' 🦴', targets: [8000, 35000, 1.5e5], rewardBones: [400, 700, 1400] },
+    { type: 'walks', label: (n) => 'Завершить прогулок: ' + n, targets: [1, 2], rewardBones: [450, 850] },
+    { type: 'events', label: (n) => 'Событий: ' + n, targets: [1, 2], rewardBones: [500, 1000] },
+    { type: 'buy', label: (n) => 'Купить апгрейдов: ' + n, targets: [4, 7, 12], rewardBones: [350, 600, 1100] },
   ];
 
   function fmtStatic(n) {
