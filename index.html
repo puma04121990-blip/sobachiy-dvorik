@@ -10,7 +10,10 @@
 <body>
   <header class="app-header">
     <h1>🐕 Собачий дворик</h1>
-    <span id="gp-status">Загрузка…</span>
+    <div class="header-right">
+      <button type="button" class="btn-mute" id="btn-mute" aria-label="Звук" title="Звук">🔊</button>
+      <span id="gp-status" class="gp-chip gp-off">Загрузка…</span>
+    </div>
   </header>
 
   <div id="season-top-banner" class="season-top-banner" hidden>
@@ -73,6 +76,7 @@
     <button type="button" class="tab" data-tab="achievements" role="tab" aria-selected="false">Достижения</button>
     <button type="button" class="tab" data-tab="story" role="tab" aria-selected="false">История</button>
     <button type="button" class="tab" data-tab="prestige" role="tab" aria-selected="false">Выставка</button>
+    <button type="button" class="tab" data-tab="gpshop" role="tab" aria-selected="false">Покупки</button>
   </nav>
 
   <section class="panel-section" id="panel-shop" data-panel="shop">
@@ -140,6 +144,12 @@
       <p class="panel-hint">Сбросятся уровни апгрейдов и текущие косточки. Останутся породы, двор, друзья, альбом, история, достижения и медальки.</p>
       <button type="button" class="btn btn-prestige" id="btn-prestige">Устроить выставку</button>
     </div>
+  </section>
+
+  <section class="panel-section" id="panel-gpshop" data-panel="gpshop" hidden>
+    <h2>Магазин GP · Покупки</h2>
+    <p class="panel-hint">Реальные покупки через GamePush. Теги продуктов должны совпадать с панелью GP → Products.</p>
+    <div id="gp-shop"></div>
   </section>
 
   <footer class="hint">
@@ -233,9 +243,17 @@
   <script>
     window.onGPInit = async function (gp) {
       try { await gp.player.ready; } catch (e) {}
+      var skipAds = false;
+      try {
+        var raw = localStorage.getItem('dog-yard-clicker-v1');
+        if (raw) {
+          var parsed = JSON.parse(raw);
+          if (parsed && parsed.noAds) skipAds = true;
+        }
+      } catch (e) {}
       try {
         await gp.ads.showPreloader();
-        gp.ads.showSticky();
+        if (!skipAds) gp.ads.showSticky();
       } catch (e) {}
       window.__gp = gp;
       window.dispatchEvent(new Event("gp-ready"));

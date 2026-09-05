@@ -1,13 +1,19 @@
 /**
  * Web Audio synthesizer — no external MP3.
- * Mute-safe if AudioContext is blocked.
+ * Mute flag persisted in localStorage (`dog-yard-mute`).
  */
 (function (global) {
   'use strict';
 
+  const MUTE_KEY = 'dog-yard-mute';
+
   let ctx = null;
   let unlocked = false;
   let muted = false;
+
+  try {
+    muted = localStorage.getItem(MUTE_KEY) === '1';
+  } catch (_) {}
 
   function getCtx() {
     if (muted) return null;
@@ -28,7 +34,7 @@
     const c = getCtx();
     if (!c) return;
     if (c.state === 'suspended') {
-      c.resume().catch(function () { muted = true; });
+      c.resume().catch(function () {});
     }
     unlocked = true;
   }
@@ -84,7 +90,6 @@
     } catch (_) {}
   }
 
-  /** Soft woof / boop on pet click */
   function playPet() {
     unlock();
     tone(180, 0.09, 'triangle', 0.12, 0, 110);
@@ -92,7 +97,12 @@
     noiseBurst(0.05, 0.035, 0.01);
   }
 
-  /** Pleasant chime on successful purchase */
+  function playUi() {
+    unlock();
+    tone(640, 0.04, 'sine', 0.045, 0);
+    tone(820, 0.035, 'triangle', 0.03, 0.025);
+  }
+
   function playBuy() {
     unlock();
     tone(523.25, 0.12, 'sine', 0.1, 0);
@@ -100,7 +110,15 @@
     tone(783.99, 0.22, 'triangle', 0.08, 0.16);
   }
 
-  /** Soft fanfare for offline claim */
+  function playPurchase() {
+    unlock();
+    tone(392, 0.1, 'triangle', 0.09, 0);
+    tone(523.25, 0.12, 'sine', 0.1, 0.1);
+    tone(659.25, 0.14, 'sine', 0.1, 0.2);
+    tone(783.99, 0.18, 'triangle', 0.09, 0.32);
+    tone(1046.5, 0.28, 'sine', 0.08, 0.46);
+  }
+
   function playOffline() {
     unlock();
     tone(392, 0.16, 'triangle', 0.09, 0);
@@ -109,7 +127,6 @@
     tone(784, 0.28, 'sine', 0.11, 0.38);
   }
 
-  /** Short sparkle for combo milestone */
   function playCombo() {
     unlock();
     tone(880, 0.06, 'sine', 0.07, 0);
@@ -117,7 +134,6 @@
     tone(1396.91, 0.1, 'sine', 0.05, 0.1);
   }
 
-  /** Prestige / exhibition fanfare */
   function playPrestige() {
     unlock();
     tone(523.25, 0.14, 'triangle', 0.1, 0);
@@ -126,6 +142,32 @@
     tone(1046.5, 0.32, 'sine', 0.12, 0.4);
     tone(1318.5, 0.22, 'triangle', 0.07, 0.55);
   }
+
+  function playReward() {
+    unlock();
+    tone(523.25, 0.1, 'sine', 0.09, 0);
+    tone(659.25, 0.12, 'triangle', 0.1, 0.1);
+    tone(880, 0.16, 'sine', 0.11, 0.22);
+    tone(1174.66, 0.22, 'sine', 0.08, 0.36);
+  }
+
+  function playError() {
+    unlock();
+    tone(180, 0.1, 'sawtooth', 0.06, 0, 90);
+    tone(140, 0.14, 'square', 0.045, 0.08, 70);
+    noiseBurst(0.06, 0.025, 0.02);
+  }
+
+  function isMuted() { return muted; }
+
+  function setMuted(v) {
+    muted = !!v;
+    try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch (_) {}
+    if (!muted) unlock();
+    return muted;
+  }
+
+  function toggleMute() { return setMuted(!muted); }
 
   function bindUnlock() {
     const once = function () {
@@ -147,10 +189,17 @@
 
   global.Sounds = {
     playPet: playPet,
+    playUi: playUi,
     playBuy: playBuy,
+    playPurchase: playPurchase,
     playOffline: playOffline,
     playCombo: playCombo,
     playPrestige: playPrestige,
-    unlock: unlock
+    playReward: playReward,
+    playError: playError,
+    unlock: unlock,
+    isMuted: isMuted,
+    setMuted: setMuted,
+    toggleMute: toggleMute,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

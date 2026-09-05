@@ -42,6 +42,8 @@
 
   const PRESTIGE_REQ_LIFETIME = 1e6;
   const PRESTIGE_MEDAL_INCOME = 0.1;
+  const BASE_CLICK = 1.15;
+  const VIP_INCOME_MULT = 1.15;
 
   const EVENT_MIN_MS = 3 * 60 * 1000;
   const EVENT_MAX_MS = 5 * 60 * 1000;
@@ -49,16 +51,16 @@
   const TOY_REWARD_PER_TAP = 2.5;
 
   const UPGRADES = {
-    pickaxe: { id: 'pickaxe', name: 'Лакомство', desc: '+1 к почесушкам', baseCost: 12, costMult: 1.14, clickPower: 1, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦴', unlock: null },
-    miner: { id: 'miner', name: 'Щенок-помощник', desc: '+0.6 кост./сек', baseCost: 40, costMult: 1.14, clickPower: 0, orePerSec: 0.6, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🐕', unlock: null },
-    ball: { id: 'ball', name: 'Мячик', desc: '+4 к почесушкам', baseCost: 85, costMult: 1.15, clickPower: 4, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🎾', unlock: { type: 'level', id: 'pickaxe', min: 3, text: 'Нужно Лакомство ур. 3' } },
-    drill: { id: 'drill', name: 'Дрессировщик', desc: '+6 кост./сек', baseCost: 320, costMult: 1.15, clickPower: 0, orePerSec: 6, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🧤', unlock: { type: 'level', id: 'miner', min: 2, text: 'Нужен Щенок-помощник ур. 2' } },
+    pickaxe: { id: 'pickaxe', name: 'Лакомство', desc: '+1 к почесушкам', baseCost: 11, costMult: 1.14, clickPower: 1, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦴', unlock: null },
+    miner: { id: 'miner', name: 'Щенок-помощник', desc: '+0.6 кост./сек', baseCost: 36, costMult: 1.14, clickPower: 0, orePerSec: 0.6, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🐕', unlock: null },
+    ball: { id: 'ball', name: 'Мячик', desc: '+4 к почесушкам', baseCost: 78, costMult: 1.15, clickPower: 4, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🎾', unlock: { type: 'level', id: 'pickaxe', min: 3, text: 'Нужно Лакомство ур. 3' } },
+    drill: { id: 'drill', name: 'Дрессировщик', desc: '+6 кост./сек', baseCost: 300, costMult: 1.15, clickPower: 0, orePerSec: 6, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🧤', unlock: { type: 'level', id: 'miner', min: 2, text: 'Нужен Щенок-помощник ур. 2' } },
     walk: { id: 'walk', name: 'Выгул', desc: '+28 кост./сек', baseCost: 1800, costMult: 1.15, clickPower: 0, orePerSec: 28, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦮', unlock: { type: 'level', id: 'drill', min: 1, text: 'Нужен Дрессировщик ур. 1' } },
-    warehouse: { id: 'warehouse', name: 'Будка', desc: '+12% к idle', baseCost: 750, costMult: 1.16, clickPower: 0, orePerSec: 0, idleMult: 0.12, clickPct: 0, comboBonusMs: 0, icon: '🏠', unlock: { type: 'level', id: 'miner', min: 5, text: 'Нужен Щенок-помощник ур. 5' } },
+    warehouse: { id: 'warehouse', name: 'Будка', desc: '+12% к idle', baseCost: 720, costMult: 1.16, clickPower: 0, orePerSec: 0, idleMult: 0.12, clickPct: 0, comboBonusMs: 0, icon: '🏠', unlock: { type: 'level', id: 'miner', min: 5, text: 'Нужен Щенок-помощник ур. 5' } },
     groomer: { id: 'groomer', name: 'Грумер', desc: '+18% к idle', baseCost: 4500, costMult: 1.16, clickPower: 0, orePerSec: 0, idleMult: 0.18, clickPct: 0, comboBonusMs: 0, icon: '✂️', unlock: { type: 'level', id: 'warehouse', min: 2, text: 'Нужна Будка ур. 2' } },
     kennel: { id: 'kennel', name: 'Питомник', desc: '+120 кост./сек', baseCost: 14000, costMult: 1.17, clickPower: 0, orePerSec: 120, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🏡', unlock: { type: 'level', id: 'walk', min: 2, text: 'Нужен Выгул ур. 2' } },
-    collar: { id: 'collar', name: 'Ошейник', desc: '+3% к почесушкам', baseCost: 220, costMult: 1.15, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.03, comboBonusMs: 0, icon: '📿', unlock: { type: 'level', id: 'pickaxe', min: 2, text: 'Нужно Лакомство ур. 2' } },
-    frisbee: { id: 'frisbee', name: 'Фрисби', desc: '+4.5 кост./сек', baseCost: 480, costMult: 1.15, clickPower: 0, orePerSec: 4.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🥏', unlock: { type: 'level', id: 'miner', min: 3, text: 'Нужен Щенок-помощник ур. 3' } },
+    collar: { id: 'collar', name: 'Ошейник', desc: '+3% к почесушкам', baseCost: 200, costMult: 1.15, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.03, comboBonusMs: 0, icon: '📿', unlock: { type: 'level', id: 'pickaxe', min: 2, text: 'Нужно Лакомство ур. 2' } },
+    frisbee: { id: 'frisbee', name: 'Фрисби', desc: '+4.5 кост./сек', baseCost: 440, costMult: 1.15, clickPower: 0, orePerSec: 4.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🥏', unlock: { type: 'level', id: 'miner', min: 3, text: 'Нужен Щенок-помощник ур. 3' } },
     bed: { id: 'bed', name: 'Лежанка', desc: '+30 мин офлайн-капа', baseCost: 1200, costMult: 1.18, clickPower: 0, orePerSec: 0, idleMult: 0.04, clickPct: 0, comboBonusMs: 0, icon: '🛏️', unlock: { type: 'level', id: 'warehouse', min: 1, text: 'Нужна Будка ур. 1' } },
     whistle: { id: 'whistle', name: 'Свисток', desc: '+40 мс к окну комбо', baseCost: 900, costMult: 1.16, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: WHISTLE_COMBO_MS, icon: '📣', unlock: { type: 'level', id: 'ball', min: 2, text: 'Нужен Мячик ур. 2' } },
   };
@@ -115,6 +117,14 @@
     { id: 'yard_autumn', name: 'Осенний двор', desc: 'Фон «Осень» навсегда', icon: '🍂', costAcorns: 40, kind: 'yard' },
     { id: 'sticker_acorn', name: 'Наклейка «Жёлудь»', desc: 'Эксклюзив фестиваля', icon: '🌰', costAcorns: 25, kind: 'sticker', stickerId: 'acorn' },
     { id: 'temp_boost', name: 'Осенний заряд', desc: 'x1.25 косточки на 60 с', icon: '⚡', costAcorns: 18, kind: 'boost' },
+  ];
+
+
+  const GP_PRODUCTS = [
+    { tag: 'BONES_PACK_S', name: 'Горсть косточек', desc: '+2 500 косточек', icon: '🦴', kind: 'consumable', bones: 2500 },
+    { tag: 'BONES_PACK_M', name: 'Мешок косточек', desc: '+25 000 косточек', icon: '🎒', kind: 'consumable', bones: 25000 },
+    { tag: 'NO_ADS', name: 'Без рекламы', desc: 'Награды без видео · скрыть sticky', icon: '🚫', kind: 'permanent', flag: 'noAds' },
+    { tag: 'VIP_TREATS', name: 'VIP-лакомства', desc: '+15% ко всем доходам навсегда', icon: '👑', kind: 'permanent', flag: 'vipTreats' },
   ];
 
   const CONSUMABLES = {
@@ -263,6 +273,8 @@
     acorns: 0,
     seasonBoostUntil: 0,
     seasonPurchases: {},
+    noAds: false,
+    vipTreats: false,
   };
 
   let lastTick = performance.now();
@@ -315,7 +327,11 @@
     const ac = isFinite(state.acorns) ? state.acorns : 0;
     if (isSeasonActive() && ac >= 3) grantSticker('leaf', true);
   }
-  function getPrestigeMult() { return 1 + state.medals * PRESTIGE_MEDAL_INCOME; }
+  function getPrestigeMult() {
+    const m = Number(state.medals);
+    return 1 + (isFinite(m) ? m : 0) * PRESTIGE_MEDAL_INCOME;
+  }
+  function getVipMult() { return state.vipTreats ? VIP_INCOME_MULT : 1; }
   function getWhistleBonus() { return (state.levels.whistle || 0) * WHISTLE_COMBO_MS; }
   function getComboWindow() {
     return COMBO_WINDOW_MS + (getBreed().bonuses.comboWindowBonus || 0) + getWhistleBonus();
@@ -333,17 +349,19 @@
     return m;
   }
   function getClickPower() {
-    let p = 1;
+    let p = BASE_CLICK;
     for (const u of Object.values(UPGRADES)) p += (state.levels[u.id] || 0) * u.clickPower;
     p *= getClickPctMult();
     p *= getBreed().bonuses.clickMult || 1;
     const fr = getFriend();
     if (fr) p *= fr.bonuses.clickMult || 1;
     p *= getPrestigeMult();
+    p *= getVipMult();
     p *= Math.min(COMBO_MAX, Math.max(1, state.combo));
     if (Date.now() < state.joyUntil) p *= JOY_MULT;
     p *= getItemMult();
     if (Date.now() < (state.seasonBoostUntil || 0)) p *= SEASON_BOOST_MULT;
+    if (!isFinite(p) || p < 0) return BASE_CLICK;
     return p;
   }
   function getIdleMult() {
@@ -353,15 +371,18 @@
     const fr = getFriend();
     if (fr) m *= fr.bonuses.idleMult || 1;
     m *= getPrestigeMult();
+    m *= getVipMult();
     if (Date.now() < state.adBoostUntil) m *= AD_BOOST_MULT;
     m *= getItemMult();
     if (Date.now() < (state.seasonBoostUntil || 0)) m *= SEASON_BOOST_MULT;
+    if (!isFinite(m) || m < 0) return 1;
     return m;
   }
   function getOrePerSec() {
     let r = 0;
     for (const u of Object.values(UPGRADES)) r += (state.levels[u.id] || 0) * u.orePerSec;
-    return r * getIdleMult();
+    const out = r * getIdleMult();
+    return isFinite(out) && out > 0 ? out : 0;
   }
   function getOfflineCapSec() {
     return OFFLINE_CAP_SEC + (state.levels.bed || 0) * OFFLINE_BED_BONUS_SEC;
@@ -416,17 +437,17 @@
   function spawnClickFx(clientX, clientY) {
     const layer = $('#popup-layer');
     if (!layer) return;
-    const hearts = ['💕', '💗', '💖', '✨'];
-    const n = 4 + Math.floor(Math.random() * 3);
+    const hearts = ['💕', '💗', '💖', '💓', '✨', '🐾'];
+    const n = 6 + Math.floor(Math.random() * 4);
     for (let i = 0; i < n; i++) {
       const el = document.createElement('span');
-      const isHeart = Math.random() > 0.35;
+      const isHeart = Math.random() > 0.28;
       el.className = isHeart ? 'fx-heart' : 'fx-sparkle';
       if (isHeart) el.textContent = hearts[i % hearts.length];
       const angle = (Math.PI * 2 * i) / n + (Math.random() - 0.5) * 0.6;
-      const dist = 28 + Math.random() * 42;
+      const dist = 30 + Math.random() * 48;
       const hx = Math.cos(angle) * dist;
-      const hy = Math.sin(angle) * dist - 20;
+      const hy = Math.sin(angle) * dist - 22;
       el.style.left = clientX + 'px';
       el.style.top = clientY + 'px';
       if (isHeart) {
@@ -437,19 +458,32 @@
         el.style.setProperty('--sy', hy.toFixed(1) + 'px');
       }
       layer.appendChild(el);
-      setTimeout(function () { el.remove(); }, 750);
+      setTimeout(function () { el.remove(); }, 820);
     }
   }
 
   function setTab(tab) {
+    if (tab !== activeTab && window.Sounds && window.Sounds.playUi) window.Sounds.playUi();
     activeTab = tab;
     document.querySelectorAll('.tab').forEach(function (btn) {
       const on = btn.dataset.tab === tab;
       btn.classList.toggle('active', on);
       btn.setAttribute('aria-selected', on ? 'true' : 'false');
+      if (on && typeof btn.scrollIntoView === 'function') {
+        try { btn.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' }); } catch (_) {}
+      }
     });
     document.querySelectorAll('.panel-section').forEach(function (panel) {
-      panel.hidden = panel.dataset.panel !== tab;
+      const show = panel.dataset.panel === tab;
+      if (show) {
+        panel.hidden = false;
+        panel.classList.remove('panel-fade');
+        void panel.offsetWidth;
+        panel.classList.add('panel-fade');
+      } else {
+        panel.hidden = true;
+        panel.classList.remove('panel-fade');
+      }
     });
     renderActivePanel();
   }
@@ -465,6 +499,7 @@
     else if (activeTab === 'achievements') renderAchievements();
     else if (activeTab === 'story') renderStory();
     else if (activeTab === 'prestige') renderPrestige();
+    else if (activeTab === 'gpshop') renderGpShop();
   }
 
   function renderShop() {
@@ -1187,6 +1222,7 @@
       if (window.Sounds) window.Sounds.playOffline();
       showToast('Игрушка найдена! +' + fmt(reward) + ' 🦴 (' + taps + ' тапов)');
       checkAchievements(); maybeUnlockStory();
+      maybeOfferFullscreen('event');
     } else {
       showToast('Игрушка укатилась… 🐾');
     }
@@ -1276,6 +1312,7 @@
       addEventAcorns(1);
       if (window.Sounds) window.Sounds.playOffline();
       showToast('Дрессировка на ура! +' + fmt(reward) + ' 🦴');
+      maybeOfferFullscreen('event');
     }
     scheduleNextEvent();
     checkAchievements(); maybeUnlockStory(); renderStats(); updateEventBtn(); scheduleSave();
@@ -1346,6 +1383,7 @@
       const ac = addEventAcorns(1.1);
       if (window.Sounds) window.Sounds.playOffline();
       showToast('Нашли косточку! +' + fmt(reward) + ' 🦴' + (ac ? ' · 🌰+' + ac : ''));
+      maybeOfferFullscreen('event');
     } else {
       showToast('Косточка спряталась… 🐾');
     }
@@ -1368,11 +1406,14 @@
     if (modal) modal.hidden = false;
     if (window.Sounds) window.Sounds.playCombo();
     updateEventBtn();
-    function frame() {
+    let raceLastFrame = performance.now();
+    function frame(now) {
       if (!raceActive) return;
+      const dt = Math.min(0.05, Math.max(0.008, ((now || performance.now()) - raceLastFrame) / 1000));
+      raceLastFrame = now || performance.now();
       const left = Math.max(0, raceEndsAt - Date.now());
       if (timer) timer.textContent = (left / 1000).toFixed(1);
-      raceFill = Math.max(0, raceFill - RACE_DECAY_PER_SEC * 0.016);
+      raceFill = Math.max(0, raceFill - RACE_DECAY_PER_SEC * dt);
       if (fill) fill.style.width = Math.min(100, raceFill) + '%';
       if (score) score.textContent = Math.floor(Math.min(100, raceFill)) + '%';
       if (left <= 0) { endRaceGame(); return; }
@@ -1409,6 +1450,7 @@
       if (window.Sounds) window.Sounds.playOffline();
       showToast('Догнали белку! +' + fmt(reward) + ' 🦴 (' + Math.floor(pct) + '%)' + (ac ? ' · 🌰+' + ac : ''));
       checkAchievements(); maybeUnlockStory();
+      maybeOfferFullscreen('event');
     } else {
       showToast('Белка ускакала… ' + Math.floor(pct) + '% 🐾');
     }
@@ -1424,7 +1466,119 @@
     updateEventBtn();
   }
 
+
+  function applyNoAdsUi() {
+    const btn = $('#btn-ad');
+    if (btn) {
+      if (state.noAds) {
+        btn.textContent = 'Бонус без рекламы (NO_ADS)';
+        btn.classList.add('no-ads');
+      } else {
+        btn.classList.remove('no-ads');
+        if (!btn.disabled) btn.textContent = 'Видео: двойные косточки';
+      }
+    }
+    if (state.noAds && window.GPBridge && window.GPBridge.hideSticky) {
+      try { window.GPBridge.hideSticky(); } catch (_) {}
+    }
+  }
+
+  function maybeOfferFullscreen(reason) {
+    if (state.noAds) return;
+    if (!window.GPBridge || typeof window.GPBridge.showFullscreen !== 'function') return;
+    // ~35% chance after prestige / event win
+    if (Math.random() > 0.35) return;
+    setTimeout(function () {
+      window.GPBridge.showFullscreen(false).catch(function () {});
+    }, reason === 'prestige' ? 900 : 600);
+  }
+
+  function renderGpShop() {
+    const root = $('#gp-shop');
+    if (!root) return;
+    const payHint = (window.GPBridge && window.GPBridge.isPaymentsAvailable && window.GPBridge.isPaymentsAvailable())
+      ? 'Платежи GamePush доступны.'
+      : 'Локальный режим: покупка через подтверждение.';
+    const flags = [];
+    if (state.noAds) flags.push('NO_ADS ✓');
+    if (state.vipTreats) flags.push('VIP ✓');
+    root.innerHTML = '<p class="panel-hint">' + payHint + (flags.length ? ' · ' + flags.join(' · ') : '') + '</p>';
+    GP_PRODUCTS.forEach(function (p) {
+      const card = document.createElement('div');
+      card.className = 'upgrade gp-product';
+      let owned = false;
+      if (p.kind === 'permanent') {
+        owned = p.flag === 'noAds' ? !!state.noAds : !!state.vipTreats;
+      }
+      let action;
+      if (owned) action = '<span class="breed-active">Куплено ✓</span>';
+      else action = '<button type="button" class="btn btn-sm" data-gp-buy="' + p.tag + '">Купить</button>';
+      card.innerHTML = '<span class="up-icon">' + p.icon + '</span><span class="up-body"><span class="up-name">' + p.name + '</span><span class="up-desc">' + p.desc + '</span><span class="up-desc gp-tag">' + p.tag + '</span></span><span class="up-cost">' + action + '</span>';
+      root.appendChild(card);
+    });
+    root.querySelectorAll('[data-gp-buy]').forEach(function (btn) {
+      btn.addEventListener('click', function () { buyGpProduct(btn.getAttribute('data-gp-buy')); });
+    });
+  }
+
+  async function buyGpProduct(tag) {
+    const product = GP_PRODUCTS.find(function (p) { return p.tag === tag; });
+    if (!product) return;
+    if (product.kind === 'permanent') {
+      if (product.flag === 'noAds' && state.noAds) { showToast('Уже куплено 🐾'); return; }
+      if (product.flag === 'vipTreats' && state.vipTreats) { showToast('Уже куплено 🐾'); return; }
+    }
+    const bridge = window.GPBridge;
+    if (!bridge || typeof bridge.purchase !== 'function') {
+      showToast('Платежи недоступны');
+      if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
+      return;
+    }
+    const res = await bridge.purchase(tag);
+    if (!res || !res.ok) {
+      showToast(res && res.error === 'cancelled' ? 'Покупка отменена' : 'Не удалось купить');
+      if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
+      return;
+    }
+    if (product.kind === 'consumable') {
+      const gain = Number(product.bones) || 0;
+      state.ore += gain;
+      state.stats.lifetimeBones += gain;
+      bumpQuest('earn', gain);
+      await persist();
+      if (typeof bridge.consume === 'function') await bridge.consume(tag);
+      if (window.Sounds && window.Sounds.playPurchase) window.Sounds.playPurchase();
+      else if (window.Sounds) window.Sounds.playBuy();
+      showToast('+' + fmt(gain) + ' косточек! 🦴');
+    } else {
+      if (product.flag === 'noAds') state.noAds = true;
+      if (product.flag === 'vipTreats') state.vipTreats = true;
+      applyNoAdsUi();
+      await persist();
+      if (window.Sounds && window.Sounds.playPurchase) window.Sounds.playPurchase();
+      else if (window.Sounds) window.Sounds.playBuy();
+      showToast(product.name + ' активировано! ✨');
+    }
+    checkAchievements();
+    renderAll();
+  }
+
+  async function restoreGpPurchases() {
+    const bridge = window.GPBridge;
+    if (!bridge) return;
+    let changed = false;
+    try {
+      if (typeof bridge.hasPurchase === 'function') {
+        if (!state.noAds && (await bridge.hasPurchase('NO_ADS'))) { state.noAds = true; changed = true; }
+        if (!state.vipTreats && (await bridge.hasPurchase('VIP_TREATS'))) { state.vipTreats = true; changed = true; }
+      }
+    } catch (_) {}
+    applyNoAdsUi();
+    if (changed) scheduleSave();
+  }
+
   function canPrestige() { return state.stats.lifetimeBones >= PRESTIGE_REQ_LIFETIME; }
+
   function medalsGainOnPrestige() {
     const life = Math.max(PRESTIGE_REQ_LIFETIME, state.stats.lifetimeBones);
     return 1 + Math.max(0, Math.floor(Math.log10(life / PRESTIGE_REQ_LIFETIME)));
@@ -1453,8 +1607,9 @@
   function doPrestige() {
     if (!canPrestige()) return;
     const gain = medalsGainOnPrestige();
-    state.medals += gain;
-    state.prestigeLevel += 1;
+    if (!isFinite(gain) || gain < 1) return;
+    state.medals = (isFinite(state.medals) ? state.medals : 0) + gain;
+    state.prestigeLevel = (isFinite(state.prestigeLevel) ? state.prestigeLevel : 0) + 1;
     state.ore = 0;
     state.levels = defaultLevels();
     state.pendingClickMult = 1;
@@ -1473,6 +1628,7 @@
     const modal = $('#prestige-modal');
     if (modal) modal.hidden = true;
     checkAchievements(); maybeUnlockStory(); renderAll(); scheduleSave();
+    maybeOfferFullscreen('prestige');
   }
 
   function renderStats() {
@@ -1570,10 +1726,11 @@
     if (state.pendingClickMult > 1) { state.pendingClickMult = 1; showToast('Двойная почесушка использована! 🦴'); }
     const btn = $('#mine-btn');
     if (btn) {
-      btn.classList.remove('clicked', 'pulse');
+      btn.classList.remove('clicked', 'pulse', 'wag');
       void btn.offsetWidth;
       btn.classList.add('clicked');
-      setTimeout(function () { btn.classList.remove('clicked'); }, 160);
+      if (Math.random() < 0.28 || state.combo >= 1.5) btn.classList.add('wag');
+      setTimeout(function () { btn.classList.remove('clicked', 'wag'); }, 240);
     }
     let x = window.innerWidth / 2;
     let y = window.innerHeight * 0.35;
@@ -1586,9 +1743,17 @@
   }
 
   function buyUpgrade(id) {
-    if (!isUpgradeUnlocked(id)) { showToast((UPGRADES[id].unlock && UPGRADES[id].unlock.text) || 'Ещё закрыто'); return; }
+    if (!isUpgradeUnlocked(id)) {
+      showToast((UPGRADES[id].unlock && UPGRADES[id].unlock.text) || 'Ещё закрыто');
+      if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
+      return;
+    }
     const cost = upgradeCost(id);
-    if (state.ore < cost) { showToast('Маловато косточек 🐾'); return; }
+    if (state.ore < cost) {
+      showToast('Маловато косточек 🐾');
+      if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
+      return;
+    }
     state.ore -= cost;
     state.levels[id] = (state.levels[id] || 0) + 1;
     state.stats.upgradesBought += 1;
@@ -1610,11 +1775,22 @@
   async function onRewarded() {
     const bridge = window.GPBridge;
     if (!bridge) return;
-    const ok = await bridge.showRewarded();
-    if (!ok) { showToast('Видео не просмотрено'); return; }
+    let ok = false;
+    if (state.noAds) {
+      ok = true;
+    } else {
+      ok = await bridge.showRewarded();
+    }
+    if (!ok) {
+      showToast('Видео не просмотрено');
+      if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
+      return;
+    }
     state.pendingClickMult = AD_BOOST_MULT;
     state.adBoostUntil = Date.now() + AD_BOOST_DURATION_MS;
-    showToast('Ура! x2 почесушка + idle буст 60с 🐕');
+    if (window.Sounds && window.Sounds.playReward) window.Sounds.playReward();
+    else if (window.Sounds) window.Sounds.playBuy();
+    showToast(state.noAds ? 'Бонус NO_ADS! x2 почесушка + idle 60с 🐕' : 'Ура! x2 почесушка + idle буст 60с 🐕');
     renderStats(); scheduleSave();
   }
 
@@ -1657,6 +1833,8 @@
       acorns: isFinite(state.acorns) ? Math.max(0, state.acorns) : 0,
       seasonBoostUntil: state.seasonBoostUntil || 0,
       seasonPurchases: Object.assign({}, state.seasonPurchases || {}),
+      noAds: !!state.noAds,
+      vipTreats: !!state.vipTreats,
     };
   }
 
@@ -1728,7 +1906,9 @@
     state.adBoostUntil = Number(data.adBoostUntil) || 0;
     state.pendingClickMult = Number(data.pendingClickMult) || 1;
     state.prestigeLevel = Number(data.prestigeLevel) || 0;
+    if (!isFinite(state.prestigeLevel) || state.prestigeLevel < 0) state.prestigeLevel = 0;
     state.medals = Number(data.medals) || 0;
+    if (!isFinite(state.medals) || state.medals < 0) state.medals = 0;
     state.selectedBreed = BREEDS[data.selectedBreed] ? data.selectedBreed : 'lab';
     state.unlockedBreeds = Array.isArray(data.unlockedBreeds) ? data.unlockedBreeds.filter(function (id) { return !!BREEDS[id]; }) : ['lab'];
     state.unlockedBreeds = state.unlockedBreeds.filter(function (id, i, arr) { return arr.indexOf(id) === i; });
@@ -1745,6 +1925,11 @@
       upgradesBought: Number(data.stats && data.stats.upgradesBought) || 0,
       eventsDone: Number(data.stats && data.stats.eventsDone) || 0,
     };
+    Object.keys(state.stats).forEach(function (k) {
+      if (!isFinite(state.stats[k]) || state.stats[k] < 0) state.stats[k] = 0;
+    });
+    state.noAds = !!(data.noAds);
+    state.vipTreats = !!(data.vipTreats);
     state.achievementsClaimed = Object.assign({}, data.achievementsClaimed || {});
     state.quests = Array.isArray(data.quests) ? data.quests.map(function (q) {
       if (!q || typeof q !== 'object') return null;
@@ -1847,8 +2032,11 @@
   function tick(now) {
     const dt = Math.min(0.25, (now - lastTick) / 1000);
     lastTick = now;
+    if (!isFinite(state.ore) || state.ore < 0) state.ore = 0;
+    if (!isFinite(state.stats.lifetimeBones) || state.stats.lifetimeBones < 0) state.stats.lifetimeBones = 0;
+    if (!isFinite(state.acorns) || state.acorns < 0) state.acorns = 0;
     const gain = getOrePerSec() * dt;
-    if (gain > 0) { state.ore += gain; state.stats.lifetimeBones += gain; bumpQuest('earn', gain); }
+    if (gain > 0 && isFinite(gain)) { state.ore += gain; state.stats.lifetimeBones += gain; bumpQuest('earn', gain); }
     decayCombo(dt);
     renderStats();
     checkEventTimer();
@@ -1923,9 +2111,27 @@
     function setGpStatus() {
       const status = $('#gp-status');
       if (!status) return;
-      const mode = window.GPBridge && window.GPBridge.isGpConnected() ? 'GamePush' : 'локальный';
-      status.textContent = 'Режим: ' + mode;
+      const connected = window.GPBridge && window.GPBridge.isGpConnected();
+      status.textContent = connected ? 'GamePush' : 'Локально';
+      status.classList.toggle('gp-on', !!connected);
+      status.classList.toggle('gp-off', !connected);
+      status.title = connected ? 'Облако GamePush' : 'Локальное сохранение';
     }
+
+    function syncMuteBtn() {
+      const btn = $('#btn-mute');
+      if (!btn || !window.Sounds) return;
+      const m = window.Sounds.isMuted && window.Sounds.isMuted();
+      btn.textContent = m ? '🔇' : '🔊';
+      btn.setAttribute('aria-label', m ? 'Включить звук' : 'Выключить звук');
+      btn.title = m ? 'Звук выкл' : 'Звук вкл';
+    }
+
+    $('#btn-mute') && $('#btn-mute').addEventListener('click', function () {
+      if (window.Sounds && window.Sounds.toggleMute) window.Sounds.toggleMute();
+      syncMuteBtn();
+    });
+    syncMuteBtn();
 
     if (window.GPBridge) {
       await window.GPBridge.waitForGp(10000);
@@ -1949,8 +2155,11 @@
     setInterval(function () { persist(); }, AUTOSAVE_MS);
 
     setGpStatus();
+    applyNoAdsUi();
+    restoreGpPurchases();
     window.addEventListener('gp-ready', function () {
       setGpStatus();
+      restoreGpPurchases();
       showToast('GamePush подключён');
     });
 
