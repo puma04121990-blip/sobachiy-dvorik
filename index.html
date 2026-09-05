@@ -6,13 +6,17 @@
   <meta name="theme-color" content="#fff5eb" />
   <title>Собачий дворик — Dog Yard Clicker</title>
   <link rel="stylesheet" href="css/style.css" />
+  <style>
+    #gp-status,
+    footer.hint { display: none !important; }
+  </style>
 </head>
 <body>
   <header class="app-header">
     <h1>🐕 Собачий дворик</h1>
     <div class="header-right">
       <button type="button" class="btn-mute" id="btn-mute" aria-label="Звук" title="Звук">🔊</button>
-      <span id="gp-status" class="gp-chip gp-off">Загрузка…</span>
+      <span id="gp-status" class="gp-chip gp-off" hidden>Загрузка…</span>
     </div>
   </header>
 
@@ -218,7 +222,7 @@
     <div id="gp-shop"></div>
   </section>
 
-  <footer class="hint">
+  <footer class="hint" hidden>
     Автосохранение · офлайн-хвостики · без CDN
   </footer>
 
@@ -293,7 +297,7 @@
     <button type="button" class="more-sheet-backdrop" data-walk-close aria-label="Закрыть"></button>
     <div class="more-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="walk-sheet-title">
       <div class="more-sheet-handle" aria-hidden="true"></div>
-      <h3 id="walk-sheet-title" class="more-sheet-title">Прогулка 🦮</h3>
+      <h3 id="walk-sheet-title" class="more-sheet-title">Прогулка 🐕‍🦺</h3>
       <p class="panel-hint">Тратит энергию и косточки. Идёт в фоне по таймеру.</p>
       <div id="walk-sheet-list" class="walk-sheet-list"></div>
       <button type="button" class="btn btn-ghost more-sheet-close" data-walk-close>Закрыть</button>
