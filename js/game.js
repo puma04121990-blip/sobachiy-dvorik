@@ -1,13 +1,13 @@
 /**
- * Собачий дворик — idle/clicker (cute dogs theme) · content pack v4
+ * Собачий дворик — idle/clicker (cute dogs theme) · content pack v5 (retention)
  *
  * ——— BALANCE CONSTANTS (документация) ———
- * Early game snappy (~1–2 мин до первых idle), mid-game lasts.
- * Cost growth targets ~1.12–1.18 per level.
- * Prestige at 1e6 lifetime bones → +10% all income per медалька.
- * Combo window 800ms (dachshund +200ms, whistle +levels), soft-cap x3.
- * Радость: x2 click 10s, cooldown 45s.
- * Events ~3–5 min; consumable x2 bones 30s.
+ * Early snappy (~1–2 мин до idle); first prestige ~45–90 мин; full content days.
+ * Cost growth ~1.18–1.28 by tier; late bases raised a lot.
+ * Softcap click/idle after thresholds; prestige req scales (base 5e7).
+ * Medals: flat +4%/medal + spendable shop in Выставка.
+ * Energy 0–100 drains on click; walks timed; yard stages; daily goals.
+ * Offline soft without warehouse/лежанка; events ~6–10 мин.
  */
 (function () {
   'use strict';
@@ -15,14 +15,15 @@
   const AUTOSAVE_MS = 4000;
   const OFFLINE_CAP_SEC = 8 * 60 * 60;
   const OFFLINE_BED_BONUS_SEC = 30 * 60;
+  const OFFLINE_BASE_EFF = 0.32;
   const AD_BOOST_MULT = 2;
   const AD_BOOST_DURATION_MS = 60 * 1000;
   const SAVE_KEY = 'dog-yard-clicker-v1';
   const LEGACY_SAVE_KEY = 'ore-mine-clicker-v1';
-  const SAVE_VERSION = 4;
+  const SAVE_VERSION = 5;
   const SEASON_FORCE = true;
-  const ACORN_PER_CLICK = 0.08;
-  const ACORN_EVENT_BASE = 12;
+  const ACORN_PER_CLICK = 0.028;
+  const ACORN_EVENT_BASE = 10;
   const SEASON_BOOST_MULT = 1.25;
   const SEASON_BOOST_MS = 60 * 1000;
   const HIDE_TRIES = 2;
@@ -40,55 +41,68 @@
   const JOY_DURATION_MS = 10 * 1000;
   const JOY_COOLDOWN_MS = 45 * 1000;
 
-  const PRESTIGE_REQ_LIFETIME = 1e6;
-  const PRESTIGE_MEDAL_INCOME = 0.1;
+  const PRESTIGE_REQ_BASE = 5e7;
+  const PRESTIGE_REQ_SCALE = 1.85;
+  const PRESTIGE_MEDAL_INCOME = 0.04;
   const BASE_CLICK = 1.15;
   const VIP_INCOME_MULT = 1.15;
 
-  const EVENT_MIN_MS = 3 * 60 * 1000;
-  const EVENT_MAX_MS = 5 * 60 * 1000;
+  const CLICK_SOFTCAP = 420;
+  const IDLE_SOFTCAP = 160;
+  const SOFTCAP_POWER = 0.62;
+
+  const ENERGY_MAX_BASE = 100;
+  const ENERGY_PER_CLICK = 1.15;
+  const ENERGY_REGEN_PER_SEC = 1.85;
+  const ENERGY_TIRED_MULT = 0.18;
+  const ENERGY_REST_GAIN = 28;
+  const ENERGY_REST_COOLDOWN_MS = 40 * 1000;
+
+  const EVENT_MIN_MS = 6 * 60 * 1000;
+  const EVENT_MAX_MS = 10 * 60 * 1000;
   const TOY_DURATION_MS = 10 * 1000;
-  const TOY_REWARD_PER_TAP = 2.5;
+  const TOY_REWARD_PER_TAP = 3.4;
+  const EVENT_REWARD_MULT = 1.28;
 
   const UPGRADES = {
-    pickaxe: { id: 'pickaxe', name: 'Лакомство', desc: '+1 к почесушкам', baseCost: 11, costMult: 1.14, clickPower: 1, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦴', unlock: null },
-    miner: { id: 'miner', name: 'Щенок-помощник', desc: '+0.6 кост./сек', baseCost: 36, costMult: 1.14, clickPower: 0, orePerSec: 0.6, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🐕', unlock: null },
-    ball: { id: 'ball', name: 'Мячик', desc: '+4 к почесушкам', baseCost: 78, costMult: 1.15, clickPower: 4, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🎾', unlock: { type: 'level', id: 'pickaxe', min: 3, text: 'Нужно Лакомство ур. 3' } },
-    drill: { id: 'drill', name: 'Дрессировщик', desc: '+6 кост./сек', baseCost: 300, costMult: 1.15, clickPower: 0, orePerSec: 6, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🧤', unlock: { type: 'level', id: 'miner', min: 2, text: 'Нужен Щенок-помощник ур. 2' } },
-    walk: { id: 'walk', name: 'Выгул', desc: '+28 кост./сек', baseCost: 1800, costMult: 1.15, clickPower: 0, orePerSec: 28, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦮', unlock: { type: 'level', id: 'drill', min: 1, text: 'Нужен Дрессировщик ур. 1' } },
-    warehouse: { id: 'warehouse', name: 'Будка', desc: '+12% к idle', baseCost: 720, costMult: 1.16, clickPower: 0, orePerSec: 0, idleMult: 0.12, clickPct: 0, comboBonusMs: 0, icon: '🏠', unlock: { type: 'level', id: 'miner', min: 5, text: 'Нужен Щенок-помощник ур. 5' } },
-    groomer: { id: 'groomer', name: 'Грумер', desc: '+18% к idle', baseCost: 4500, costMult: 1.16, clickPower: 0, orePerSec: 0, idleMult: 0.18, clickPct: 0, comboBonusMs: 0, icon: '✂️', unlock: { type: 'level', id: 'warehouse', min: 2, text: 'Нужна Будка ур. 2' } },
-    kennel: { id: 'kennel', name: 'Питомник', desc: '+120 кост./сек', baseCost: 14000, costMult: 1.17, clickPower: 0, orePerSec: 120, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🏡', unlock: { type: 'level', id: 'walk', min: 2, text: 'Нужен Выгул ур. 2' } },
-    collar: { id: 'collar', name: 'Ошейник', desc: '+3% к почесушкам', baseCost: 200, costMult: 1.15, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.03, comboBonusMs: 0, icon: '📿', unlock: { type: 'level', id: 'pickaxe', min: 2, text: 'Нужно Лакомство ур. 2' } },
-    frisbee: { id: 'frisbee', name: 'Фрисби', desc: '+4.5 кост./сек', baseCost: 440, costMult: 1.15, clickPower: 0, orePerSec: 4.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🥏', unlock: { type: 'level', id: 'miner', min: 3, text: 'Нужен Щенок-помощник ур. 3' } },
-    bed: { id: 'bed', name: 'Лежанка', desc: '+30 мин офлайн-капа', baseCost: 1200, costMult: 1.18, clickPower: 0, orePerSec: 0, idleMult: 0.04, clickPct: 0, comboBonusMs: 0, icon: '🛏️', unlock: { type: 'level', id: 'warehouse', min: 1, text: 'Нужна Будка ур. 1' } },
-    whistle: { id: 'whistle', name: 'Свисток', desc: '+40 мс к окну комбо', baseCost: 900, costMult: 1.16, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: WHISTLE_COMBO_MS, icon: '📣', unlock: { type: 'level', id: 'ball', min: 2, text: 'Нужен Мячик ур. 2' } },
+    pickaxe: { id: 'pickaxe', name: 'Лакомство', desc: '+1 к почесушкам', baseCost: 14, costMult: 1.18, clickPower: 1, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦴', unlock: null },
+    miner: { id: 'miner', name: 'Щенок-помощник', desc: '+0.55 кост./сек', baseCost: 42, costMult: 1.18, clickPower: 0, orePerSec: 0.55, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🐕', unlock: null },
+    ball: { id: 'ball', name: 'Мячик', desc: '+4 к почесушкам', baseCost: 110, costMult: 1.20, clickPower: 4, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🎾', unlock: { type: 'level', id: 'pickaxe', min: 3, text: 'Нужно Лакомство ур. 3' } },
+    drill: { id: 'drill', name: 'Дрессировщик', desc: '+5.5 кост./сек', baseCost: 520, costMult: 1.20, clickPower: 0, orePerSec: 5.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🧤', unlock: { type: 'level', id: 'miner', min: 2, text: 'Нужен Щенок-помощник ур. 2' } },
+    walk: { id: 'walk', name: 'Выгул', desc: '+22 кост./сек', baseCost: 5200, costMult: 1.22, clickPower: 0, orePerSec: 22, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦮', unlock: { type: 'level', id: 'drill', min: 1, text: 'Нужен Дрессировщик ур. 1' } },
+    warehouse: { id: 'warehouse', name: 'Будка', desc: '+10% к idle · офлайн', baseCost: 1600, costMult: 1.22, clickPower: 0, orePerSec: 0, idleMult: 0.10, clickPct: 0, comboBonusMs: 0, icon: '🏠', unlock: { type: 'level', id: 'miner', min: 5, text: 'Нужен Щенок-помощник ур. 5' } },
+    groomer: { id: 'groomer', name: 'Грумер', desc: '+15% к idle', baseCost: 22000, costMult: 1.24, clickPower: 0, orePerSec: 0, idleMult: 0.15, clickPct: 0, comboBonusMs: 0, icon: '✂️', unlock: { type: 'level', id: 'warehouse', min: 2, text: 'Нужна Будка ур. 2' } },
+    kennel: { id: 'kennel', name: 'Питомник', desc: '+95 кост./сек', baseCost: 95000, costMult: 1.26, clickPower: 0, orePerSec: 95, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🏡', unlock: { type: 'level', id: 'walk', min: 2, text: 'Нужен Выгул ур. 2' } },
+    collar: { id: 'collar', name: 'Ошейник', desc: '+3% к почесушкам', baseCost: 260, costMult: 1.19, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.03, comboBonusMs: 0, icon: '📿', unlock: { type: 'level', id: 'pickaxe', min: 2, text: 'Нужно Лакомство ур. 2' } },
+    frisbee: { id: 'frisbee', name: 'Фрисби', desc: '+4 кост./сек', baseCost: 980, costMult: 1.20, clickPower: 0, orePerSec: 4, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🥏', unlock: { type: 'level', id: 'miner', min: 3, text: 'Нужен Щенок-помощник ур. 3' } },
+    bed: { id: 'bed', name: 'Лежанка', desc: '+30 мин офлайн-капа · офлайн %', baseCost: 3500, costMult: 1.23, clickPower: 0, orePerSec: 0, idleMult: 0.03, clickPct: 0, comboBonusMs: 0, icon: '🛏️', unlock: { type: 'level', id: 'warehouse', min: 1, text: 'Нужна Будка ур. 1' } },
+    whistle: { id: 'whistle', name: 'Свисток', desc: '+40 мс к окну комбо', baseCost: 2400, costMult: 1.21, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: WHISTLE_COMBO_MS, icon: '📣', unlock: { type: 'level', id: 'ball', min: 2, text: 'Нужен Мячик ур. 2' } },
   };
 
   const UPGRADE_ORDER = ['pickaxe','miner','collar','ball','frisbee','drill','warehouse','whistle','bed','walk','groomer','kennel'];
 
   const BREEDS = {
     lab: { id: 'lab', name: 'Лабрадор', desc: 'Сбалансированный старт', src: 'assets/dog-click.png', unlockCost: 0, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: true },
-    corgi: { id: 'corgi', name: 'Корги', desc: '+5% к почесушкам', src: 'assets/dog-corgi.png', unlockCost: 2500, bonuses: { clickMult: 1.05, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: false },
-    husky: { id: 'husky', name: 'Хаски', desc: '+5% к idle', src: 'assets/dog-husky.png', unlockCost: 8000, bonuses: { clickMult: 1, idleMult: 1.05, comboWindowBonus: 0 }, startUnlocked: false },
-    dachshund: { id: 'dachshund', name: 'Такса', desc: '+200 мс к окну комбо', src: 'assets/dog-dachshund.png', unlockCost: 15000, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 200 }, startUnlocked: false },
-    shiba: { id: 'shiba', name: 'Сиба', desc: '+4% к почесушкам и +2% idle', src: 'assets/dog-shiba.png', unlockCost: 22000, bonuses: { clickMult: 1.04, idleMult: 1.02, comboWindowBonus: 0 }, startUnlocked: false },
-    poodle: { id: 'poodle', name: 'Пудель', desc: '+8% к idle', src: 'assets/dog-poodle.png', unlockCost: 35000, bonuses: { clickMult: 1, idleMult: 1.08, comboWindowBonus: 0 }, startUnlocked: false },
-    beagle: { id: 'beagle', name: 'Бигль', desc: '+6% к почесушкам · +80 мс комбо', src: 'assets/dog-beagle.png', unlockCost: 48000, bonuses: { clickMult: 1.06, idleMult: 1, comboWindowBonus: 80 }, startUnlocked: false },
+    corgi: { id: 'corgi', name: 'Корги', desc: '+5% к почесушкам', src: 'assets/dog-corgi.png', unlockCost: 14000, reqLifetime: 4e4, bonuses: { clickMult: 1.05, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: false },
+    husky: { id: 'husky', name: 'Хаски', desc: '+5% к idle', src: 'assets/dog-husky.png', unlockCost: 55000, reqLifetime: 2e5, bonuses: { clickMult: 1, idleMult: 1.05, comboWindowBonus: 0 }, startUnlocked: false },
+    dachshund: { id: 'dachshund', name: 'Такса', desc: '+200 мс к окну комбо', src: 'assets/dog-dachshund.png', unlockCost: 180000, reqLifetime: 8e5, reqMedals: 1, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 200 }, startUnlocked: false },
+    shiba: { id: 'shiba', name: 'Сиба', desc: '+4% к почесушкам и +2% idle', src: 'assets/dog-shiba.png', unlockCost: 420000, reqLifetime: 2e6, reqMedals: 2, bonuses: { clickMult: 1.04, idleMult: 1.02, comboWindowBonus: 0 }, startUnlocked: false },
+    poodle: { id: 'poodle', name: 'Пудель', desc: '+8% к idle', src: 'assets/dog-poodle.png', unlockCost: 950000, reqLifetime: 8e6, reqMedals: 3, bonuses: { clickMult: 1, idleMult: 1.08, comboWindowBonus: 0 }, startUnlocked: false },
+    beagle: { id: 'beagle', name: 'Бигль', desc: '+6% к почесушкам · +80 мс комбо', src: 'assets/dog-beagle.png', unlockCost: 2.4e6, reqLifetime: 2.5e7, reqMedals: 5, bonuses: { clickMult: 1.06, idleMult: 1, comboWindowBonus: 80 }, startUnlocked: false },
   };
   const BREED_COUNT = Object.keys(BREEDS).length;
 
   const YARDS = {
     sunny: { id: 'sunny', name: 'Солнечный', desc: 'Тёплый день во дворе', src: 'assets/yard-sunny.png', unlockCost: 0, startUnlocked: true },
-    evening: { id: 'evening', name: 'Вечер', desc: 'Мягкий закат', src: 'assets/yard-evening.png', unlockCost: 5000, startUnlocked: false },
-    winter: { id: 'winter', name: 'Зима', desc: 'Снежный дворик', src: 'assets/yard-winter.png', unlockCost: 18000, startUnlocked: false },
+    evening: { id: 'evening', name: 'Вечер', desc: 'Мягкий закат', src: 'assets/yard-evening.png', unlockCost: 32000, reqLifetime: 1.2e5, startUnlocked: false },
+    winter: { id: 'winter', name: 'Зима', desc: 'Снежный дворик', src: 'assets/yard-winter.png', unlockCost: 220000, reqLifetime: 1.2e6, reqMedals: 1, startUnlocked: false },
     autumn: { id: 'autumn', name: 'Осень', desc: 'Золотые листья фестиваля', src: 'assets/yard-autumn.png', unlockCost: 0, startUnlocked: false, seasonOnly: true },
   };
 
   const FRIENDS = {
-    cat: { id: 'cat', name: 'Котик', desc: '+3% к почесушкам', src: 'assets/pet-cat.png', unlockCost: 4500, bonuses: { clickMult: 1.03, idleMult: 1 } },
-    rabbit: { id: 'rabbit', name: 'Кролик', desc: '+3% к idle', src: 'assets/pet-rabbit.png', unlockCost: 6500, bonuses: { clickMult: 1, idleMult: 1.03 } },
-    hamster: { id: 'hamster', name: 'Хомячок', desc: '+2% клик · +2% idle', src: 'assets/pet-hamster.png', unlockCost: 9000, bonuses: { clickMult: 1.02, idleMult: 1.02 } },
+    cat: { id: 'cat', name: 'Котик', desc: '+3% к почесушкам', src: 'assets/pet-cat.png', unlockCost: 28000, reqLifetime: 9e4, bonuses: { clickMult: 1.03, idleMult: 1 } },
+    rabbit: { id: 'rabbit', name: 'Кролик', desc: '+3% к idle', src: 'assets/pet-rabbit.png', unlockCost: 65000, reqLifetime: 2.5e5, bonuses: { clickMult: 1, idleMult: 1.03 } },
+    hamster: { id: 'hamster', name: 'Хомячок', desc: '+2% клик · +2% idle', src: 'assets/pet-hamster.png', unlockCost: 160000, reqLifetime: 9e5, reqMedals: 1, bonuses: { clickMult: 1.02, idleMult: 1.02 } },
   };
 
   const STICKERS = [
@@ -114,9 +128,9 @@
   ];
 
   const SEASON_SHOP = [
-    { id: 'yard_autumn', name: 'Осенний двор', desc: 'Фон «Осень» навсегда', icon: '🍂', costAcorns: 40, kind: 'yard' },
-    { id: 'sticker_acorn', name: 'Наклейка «Жёлудь»', desc: 'Эксклюзив фестиваля', icon: '🌰', costAcorns: 25, kind: 'sticker', stickerId: 'acorn' },
-    { id: 'temp_boost', name: 'Осенний заряд', desc: 'x1.25 косточки на 60 с', icon: '⚡', costAcorns: 18, kind: 'boost' },
+    { id: 'yard_autumn', name: 'Осенний двор', desc: 'Фон «Осень» навсегда', icon: '🍂', costAcorns: 85, kind: 'yard' },
+    { id: 'sticker_acorn', name: 'Наклейка «Жёлудь»', desc: 'Эксклюзив фестиваля', icon: '🌰', costAcorns: 55, kind: 'sticker', stickerId: 'acorn' },
+    { id: 'temp_boost', name: 'Осенний заряд', desc: 'x1.25 косточки на 60 с', icon: '⚡', costAcorns: 42, kind: 'boost' },
   ];
 
 
@@ -135,16 +149,28 @@
     { id: 'clicks_50', name: 'Первые лапки', desc: 'Почесать 50 раз', check: (s) => s.stats.totalClicks >= 50, reward: 80 },
     { id: 'clicks_500', name: 'Любимчик', desc: 'Почесать 500 раз', check: (s) => s.stats.totalClicks >= 500, reward: 400 },
     { id: 'clicks_5k', name: 'Чемпион почесушек', desc: 'Почесать 5 000 раз', check: (s) => s.stats.totalClicks >= 5000, reward: 2500 },
+    { id: 'clicks_25k', name: 'Бесконечные ласки', desc: 'Почесать 25 000 раз', check: (s) => s.stats.totalClicks >= 25000, reward: 18000 },
     { id: 'bones_1k', name: 'Косточка в лапке', desc: 'Заработать 1 000 косточек', check: (s) => s.stats.lifetimeBones >= 1e3, reward: 120 },
     { id: 'bones_100k', name: 'Сундук косточек', desc: 'Заработать 100 000 косточек', check: (s) => s.stats.lifetimeBones >= 1e5, reward: 2000 },
     { id: 'bones_1m', name: 'Миллионер дворика', desc: 'Заработать 1 000 000 косточек', check: (s) => s.stats.lifetimeBones >= 1e6, reward: 15000 },
+    { id: 'bones_100m', name: 'Собачий олигарх', desc: 'Заработать 100 000 000 косточек', check: (s) => s.stats.lifetimeBones >= 1e8, reward: 120000 },
+    { id: 'bones_1b', name: 'Легенда косточек', desc: 'Заработать 1 000 000 000 косточек', check: (s) => s.stats.lifetimeBones >= 1e9, reward: 800000 },
     { id: 'upgrades_10', name: 'Заботливый хозяин', desc: 'Купить 10 апгрейдов', check: (s) => s.stats.upgradesBought >= 10, reward: 200 },
     { id: 'upgrades_50', name: 'Питомник мечты', desc: 'Купить 50 апгрейдов', check: (s) => s.stats.upgradesBought >= 50, reward: 3000 },
+    { id: 'upgrades_200', name: 'Империя заботы', desc: 'Купить 200 апгрейдов', check: (s) => s.stats.upgradesBought >= 200, reward: 45000 },
     { id: 'prestige_1', name: 'Звезда выставки', desc: 'Устроить выставку 1 раз', check: (s) => s.prestigeLevel >= 1, reward: 5000 },
+    { id: 'prestige_5', name: 'Мастер ринга', desc: 'Устроить выставку 5 раз', check: (s) => s.prestigeLevel >= 5, reward: 80000 },
+    { id: 'prestige_10', name: 'Чемпион всех времён', desc: 'Устроить выставку 10 раз', check: (s) => s.prestigeLevel >= 10, reward: 350000 },
     { id: 'breed_1', name: 'Новый друг', desc: 'Открыть любую породу', check: (s) => (s.unlockedBreeds || []).filter((b) => b !== 'lab').length >= 1, reward: 800 },
     { id: 'breed_all', name: 'Собачья семья', desc: 'Открыть все породы', check: (s) => (s.unlockedBreeds || []).length >= BREED_COUNT, reward: 20000 },
     { id: 'yard_1', name: 'Новый вид', desc: 'Открыть фон двора', check: (s) => (s.unlockedYards || []).filter((y) => y !== 'sunny').length >= 1, reward: 600 },
     { id: 'event_3', name: 'Искатель игрушек', desc: 'Завершить 3 события', check: (s) => (s.stats.eventsDone || 0) >= 3, reward: 900 },
+    { id: 'event_25', name: 'Герой двора', desc: 'Завершить 25 событий', check: (s) => (s.stats.eventsDone || 0) >= 25, reward: 25000 },
+    { id: 'walks_10', name: 'Гуляка', desc: 'Завершить 10 прогулок', check: (s) => (s.stats.walksDone || 0) >= 10, reward: 5000 },
+    { id: 'walks_50', name: 'Следопыт', desc: 'Завершить 50 прогулок', check: (s) => (s.stats.walksDone || 0) >= 50, reward: 40000 },
+    { id: 'yard_stage_3', name: 'Этап III', desc: 'Достичь 3 этапа двора', check: (s) => (s.yardStage || 1) >= 3, reward: 12000 },
+    { id: 'yard_stage_5', name: 'Этап V', desc: 'Достичь 5 этапа двора', check: (s) => (s.yardStage || 1) >= 5, reward: 90000 },
+    { id: 'daily_streak_7', name: 'Неделя заботы', desc: 'Серия ежедневных целей 7 дней', check: (s) => (s.dailyStreak || 0) >= 7, reward: 20000 },
     { id: 'story_3', name: 'Сказочник', desc: 'Прочитать 3 главы', check: (s) => Object.keys(s.storyRead || {}).length >= 3, reward: 700 },
   ];
 
@@ -180,7 +206,7 @@
       { who: 'dog', text: 'Холодно носику, но тепло сердцу. Побегаем?' },
       { who: 'narrator', text: 'Вы бежали по снегу, а косточки звенели, как колокольчики.' },
     ]},
-    { id: 'ch7', title: 'Звезда дворика', unlock: (s) => s.prestigeLevel >= 1 || s.stats.lifetimeBones >= 1e6, lines: [
+    { id: 'ch7', title: 'Звезда дворика', unlock: (s) => s.prestigeLevel >= 1 || s.stats.lifetimeBones >= 5e7, lines: [
       { who: 'narrator', text: 'На выставке блестели медальки. Но пёсик смотрел только на вас.' },
       { who: 'dog', text: 'Пусть все хвалят породу. Я хвалю своего человека.' },
       { who: 'narrator', text: 'Самая важная награда — дружба. А дворик только начинается.' },
@@ -220,9 +246,39 @@
   ];
 
   const QUEST_POOL = [
-    { type: 'clicks', label: (n) => 'Почесать пёсика ' + n + ' раз', targets: [25, 40, 60, 100], rewardScale: 1.2 },
-    { type: 'earn', label: (n) => 'Заработать ' + fmtStatic(n) + ' косточек', targets: [200, 500, 1500, 5000, 20000], rewardScale: 0.35 },
-    { type: 'buy', label: () => 'Купить любой апгрейд', targets: [1], rewardScale: 2.5 },
+    { type: 'clicks', label: (n) => 'Почесать пёсика ' + n + ' раз', targets: [60, 100, 180, 300], rewardScale: 1.2 },
+    { type: 'earn', label: (n) => 'Заработать ' + fmtStatic(n) + ' косточек', targets: [1500, 5000, 20000, 80000, 3e5], rewardScale: 0.35 },
+    { type: 'buy', label: (n) => 'Купить апгрейды: ' + n, targets: [2, 3, 5], rewardScale: 2.5 },
+  ];
+
+  const MEDAL_SHOP = [
+    { id: 'm_click', name: 'Лапки чемпиона', desc: '+6% к почесушкам за уровень', icon: '✋', maxLevel: 12, baseCost: 1, costMult: 1.55, clickMult: 0.06 },
+    { id: 'm_idle', name: 'Спокойный двор', desc: '+6% к idle за уровень', icon: '😴', maxLevel: 12, baseCost: 1, costMult: 1.55, idleMult: 0.06 },
+    { id: 'm_energy', name: 'Выносливость', desc: '+8 макс. энергии · +8% реген', icon: '⚡', maxLevel: 8, baseCost: 1, costMult: 1.7, energyMax: 8, energyRegen: 0.08 },
+    { id: 'm_offline', name: 'Сторож двора', desc: '+8% эффективности офлайна', icon: '🌙', maxLevel: 10, baseCost: 1, costMult: 1.6, offlineBonus: 0.08 },
+  ];
+
+  const WALK_TIERS = [
+    { id: 'short', name: 'Короткая', icon: '🚶', energy: 18, boneCost: 25, durationMs: 2 * 60 * 1000, rewardMult: 0.9, stickerChance: 0.08, acornChance: 0.12, unlockStage: 1 },
+    { id: 'park', name: 'В парк', icon: '🌳', energy: 32, boneCost: 220, durationMs: 3.5 * 60 * 1000, rewardMult: 1.7, stickerChance: 0.14, acornChance: 0.22, unlockStage: 2 },
+    { id: 'long', name: 'Дальняя', icon: '🏞️', energy: 48, boneCost: 1800, durationMs: 5 * 60 * 1000, rewardMult: 3.2, stickerChance: 0.22, acornChance: 0.35, unlockStage: 4, unlockPrestige: 1 },
+  ];
+
+  const YARD_STAGES = [
+    { level: 1, title: 'Пустой дворик', reqLifetime: 0, reqPrestige: 0, incomeMult: 1, hook: 'Первые лапки на земле.' },
+    { level: 2, title: 'Уютный дворик', reqLifetime: 5e4, reqPrestige: 0, incomeMult: 1.03, hook: 'Появилась любимая тропинка.' },
+    { level: 3, title: 'Известный двор', reqLifetime: 6e5, reqPrestige: 0, incomeMult: 1.07, hook: 'Соседи заглядывают через забор.' },
+    { level: 4, title: 'Чемпионский', reqLifetime: 8e6, reqPrestige: 1, incomeMult: 1.12, hook: 'Медальки блестят на калитке.' },
+    { level: 5, title: 'Легенда района', reqLifetime: 8e7, reqPrestige: 3, incomeMult: 1.18, hook: 'Гости приходят за почесушками.' },
+    { level: 6, title: 'Эпоха дворика', reqLifetime: 6e8, reqPrestige: 6, incomeMult: 1.25, hook: 'История пишется вместе.' },
+  ];
+
+  const DAILY_GOAL_POOL = [
+    { type: 'clicks', label: (n) => 'Почесать ' + n + ' раз', targets: [100, 180, 280], rewardBones: [400, 700, 1200] },
+    { type: 'earn', label: (n) => 'Заработать ' + fmtStatic(n) + ' 🦴', targets: [3000, 12000, 50000], rewardBones: [500, 900, 1800] },
+    { type: 'walks', label: (n) => 'Завершить прогулок: ' + n, targets: [1, 2], rewardBones: [600, 1100] },
+    { type: 'events', label: (n) => 'Событий: ' + n, targets: [1, 2], rewardBones: [700, 1300] },
+    { type: 'buy', label: (n) => 'Купить апгрейдов: ' + n, targets: [3, 5, 8], rewardBones: [450, 800, 1400] },
   ];
 
   function fmtStatic(n) {
@@ -249,14 +305,17 @@
     pendingClickMult: 1,
     prestigeLevel: 0,
     medals: 0,
+    medalUpgrades: {},
     selectedBreed: 'lab',
     unlockedBreeds: ['lab'],
     selectedYard: 'sunny',
     unlockedYards: ['sunny'],
-    stats: { totalClicks: 0, lifetimeBones: 0, upgradesBought: 0, eventsDone: 0 },
+    stats: { totalClicks: 0, lifetimeBones: 0, upgradesBought: 0, eventsDone: 0, walksDone: 0 },
     achievementsClaimed: {},
     quests: [],
     questDaySeed: '',
+    questStreak: 0,
+    questLastClearDay: '',
     joyUntil: 0,
     joyReadyAt: 0,
     combo: 1,
@@ -275,6 +334,14 @@
     seasonPurchases: {},
     noAds: false,
     vipTreats: false,
+    energy: ENERGY_MAX_BASE,
+    energyRestReadyAt: 0,
+    activeWalk: null,
+    yardStage: 1,
+    dailyGoals: [],
+    dailyDayKey: '',
+    dailyStreak: 0,
+    dailyLastClearDay: '',
   };
 
   let lastTick = performance.now();
@@ -327,6 +394,53 @@
     const ac = isFinite(state.acorns) ? state.acorns : 0;
     if (isSeasonActive() && ac >= 3) grantSticker('leaf', true);
   }
+  function softcapValue(v, soft, power) {
+    if (!isFinite(v) || v <= soft) return Math.max(0, v || 0);
+    return soft + Math.pow(v - soft, power);
+  }
+  function getMedalLevel(id) {
+    const n = Number((state.medalUpgrades || {})[id]);
+    return isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  }
+  function getMedalShopMult(key) {
+    let m = 1;
+    MEDAL_SHOP.forEach(function (item) {
+      const lvl = getMedalLevel(item.id);
+      if (!lvl) return;
+      if (key === 'click' && item.clickMult) m += lvl * item.clickMult;
+      if (key === 'idle' && item.idleMult) m += lvl * item.idleMult;
+    });
+    return m;
+  }
+  function getMedalOfflineBonus() {
+    let b = 0;
+    MEDAL_SHOP.forEach(function (item) {
+      if (item.offlineBonus) b += getMedalLevel(item.id) * item.offlineBonus;
+    });
+    return b;
+  }
+  function getEnergyMax() {
+    let max = ENERGY_MAX_BASE;
+    MEDAL_SHOP.forEach(function (item) {
+      if (item.energyMax) max += getMedalLevel(item.id) * item.energyMax;
+    });
+    return max;
+  }
+  function getEnergyRegen() {
+    let r = ENERGY_REGEN_PER_SEC;
+    MEDAL_SHOP.forEach(function (item) {
+      if (item.energyRegen) r *= 1 + getMedalLevel(item.id) * item.energyRegen;
+    });
+    return r;
+  }
+  function getYardStageMult() {
+    const st = YARD_STAGES.find(function (x) { return x.level === (state.yardStage || 1); });
+    return (st && st.incomeMult) || 1;
+  }
+  function getPrestigeRequirement() {
+    const lvl = Math.max(0, Number(state.prestigeLevel) || 0);
+    return Math.floor(PRESTIGE_REQ_BASE * Math.pow(PRESTIGE_REQ_SCALE, lvl));
+  }
   function getPrestigeMult() {
     const m = Number(state.medals);
     return 1 + (isFinite(m) ? m : 0) * PRESTIGE_MEDAL_INCOME;
@@ -348,20 +462,30 @@
     for (const u of Object.values(UPGRADES)) m += (state.levels[u.id] || 0) * (u.clickPct || 0);
     return m;
   }
+  function getEnergyClickMult() {
+    const e = isFinite(state.energy) ? state.energy : 0;
+    if (e <= 0.05) return ENERGY_TIRED_MULT;
+    if (e < 15) return ENERGY_TIRED_MULT + (1 - ENERGY_TIRED_MULT) * (e / 15);
+    return 1;
+  }
   function getClickPower() {
     let p = BASE_CLICK;
     for (const u of Object.values(UPGRADES)) p += (state.levels[u.id] || 0) * u.clickPower;
+    p = softcapValue(p, CLICK_SOFTCAP, SOFTCAP_POWER);
     p *= getClickPctMult();
     p *= getBreed().bonuses.clickMult || 1;
     const fr = getFriend();
     if (fr) p *= fr.bonuses.clickMult || 1;
     p *= getPrestigeMult();
+    p *= getMedalShopMult('click');
+    p *= getYardStageMult();
     p *= getVipMult();
     p *= Math.min(COMBO_MAX, Math.max(1, state.combo));
     if (Date.now() < state.joyUntil) p *= JOY_MULT;
     p *= getItemMult();
     if (Date.now() < (state.seasonBoostUntil || 0)) p *= SEASON_BOOST_MULT;
-    if (!isFinite(p) || p < 0) return BASE_CLICK;
+    p *= getEnergyClickMult();
+    if (!isFinite(p) || p < 0) return BASE_CLICK * ENERGY_TIRED_MULT;
     return p;
   }
   function getIdleMult() {
@@ -371,6 +495,8 @@
     const fr = getFriend();
     if (fr) m *= fr.bonuses.idleMult || 1;
     m *= getPrestigeMult();
+    m *= getMedalShopMult('idle');
+    m *= getYardStageMult();
     m *= getVipMult();
     if (Date.now() < state.adBoostUntil) m *= AD_BOOST_MULT;
     m *= getItemMult();
@@ -381,11 +507,44 @@
   function getOrePerSec() {
     let r = 0;
     for (const u of Object.values(UPGRADES)) r += (state.levels[u.id] || 0) * u.orePerSec;
+    r = softcapValue(r, IDLE_SOFTCAP, SOFTCAP_POWER);
     const out = r * getIdleMult();
     return isFinite(out) && out > 0 ? out : 0;
   }
   function getOfflineCapSec() {
     return OFFLINE_CAP_SEC + (state.levels.bed || 0) * OFFLINE_BED_BONUS_SEC;
+  }
+  function getOfflineEfficiency() {
+    const wh = state.levels.warehouse || 0;
+    const bed = state.levels.bed || 0;
+    const eff = OFFLINE_BASE_EFF + wh * 0.045 + bed * 0.035 + getMedalOfflineBonus();
+    return Math.min(1, Math.max(0.2, eff));
+  }
+  function contentGateOk(req) {
+    if (!req) return true;
+    if (req.reqLifetime && (state.stats.lifetimeBones || 0) < req.reqLifetime) return false;
+    if (req.reqMedals && (state.medals || 0) < req.reqMedals) return false;
+    if (req.reqPrestige && (state.prestigeLevel || 0) < req.reqPrestige) return false;
+    if (req.unlockStage && (state.yardStage || 1) < req.unlockStage) return false;
+    return true;
+  }
+  function contentGateText(req) {
+    if (!req) return '';
+    const parts = [];
+    if (req.reqLifetime) parts.push('жизнь 🦴 ' + fmtStatic(req.reqLifetime));
+    if (req.reqMedals) parts.push('🏅 ' + req.reqMedals);
+    if (req.reqPrestige) parts.push('выставок ' + req.reqPrestige);
+    if (req.unlockStage) parts.push('этап двора ' + req.unlockStage);
+    return parts.length ? 'Нужно: ' + parts.join(' · ') : '';
+  }
+  function localDayKey() {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Vladivostok', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    } catch (_) {
+      const d = new Date();
+      const local = new Date(d.getTime() + 10 * 60 * 60 * 1000);
+      return local.getUTCFullYear() + '-' + String(local.getUTCMonth() + 1).padStart(2, '0') + '-' + String(local.getUTCDate()).padStart(2, '0');
+    }
   }
   function upgradeCost(id) {
     const u = UPGRADES[id];
@@ -668,8 +827,10 @@
       card.className = 'breed-card' + (selected ? ' selected' : '') + (unlocked ? '' : ' locked');
       let actionHtml = '';
       if (!unlocked) {
-        const can = state.ore >= b.unlockCost;
-        actionHtml = '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-unlock="' + b.id + '">Открыть · 🦴 ' + fmt(b.unlockCost) + '</button>';
+        const gated = contentGateOk(b);
+        const can = gated && state.ore >= b.unlockCost;
+        const gate = contentGateText(b);
+        actionHtml = (gate ? '<div class="gate-hint">' + gate + '</div>' : '') + '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-unlock="' + b.id + '">Открыть · 🦴 ' + fmt(b.unlockCost) + '</button>';
       } else if (!selected) {
         actionHtml = '<button type="button" class="btn btn-sm" data-select="' + b.id + '">Выбрать</button>';
       } else {
@@ -689,6 +850,7 @@
   function unlockBreed(id) {
     const b = BREEDS[id];
     if (!b || state.unlockedBreeds.indexOf(id) !== -1) return;
+    if (!contentGateOk(b)) { showToast(contentGateText(b) || 'Ещё закрыто'); return; }
     if (state.ore < b.unlockCost) { showToast('Маловато косточек 🐾'); return; }
     state.ore -= b.unlockCost;
     state.unlockedBreeds.push(id);
@@ -720,8 +882,10 @@
       card.className = 'breed-card' + (selected ? ' selected' : '') + (unlocked ? '' : ' locked');
       let actionHtml = '';
       if (!unlocked) {
-        const can = state.ore >= f.unlockCost;
-        actionHtml = '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-unlock-friend="' + f.id + '">Открыть · 🦴 ' + fmt(f.unlockCost) + '</button>';
+        const gated = contentGateOk(f);
+        const can = gated && state.ore >= f.unlockCost;
+        const gate = contentGateText(f);
+        actionHtml = (gate ? '<div class="gate-hint">' + gate + '</div>' : '') + '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-unlock-friend="' + f.id + '">Открыть · 🦴 ' + fmt(f.unlockCost) + '</button>';
       } else if (!selected) {
         actionHtml = '<button type="button" class="btn btn-sm" data-select-friend="' + f.id + '">Активировать</button>';
       } else {
@@ -744,6 +908,7 @@
   function unlockFriend(id) {
     const f = FRIENDS[id];
     if (!f || (state.unlockedFriends || []).indexOf(id) !== -1) return;
+    if (!contentGateOk(f)) { showToast(contentGateText(f) || 'Ещё закрыто'); return; }
     if (state.ore < f.unlockCost) { showToast('Маловато косточек 🐾'); return; }
     state.ore -= f.unlockCost;
     if (!state.unlockedFriends) state.unlockedFriends = [];
@@ -900,6 +1065,7 @@
     const root = $('#yards');
     if (!root) return;
     root.innerHTML = '';
+    root.appendChild(buildYardStageCard());
     Object.values(YARDS).forEach(function (y) {
       const unlocked = state.unlockedYards.indexOf(y.id) !== -1;
       const selected = state.selectedYard === y.id;
@@ -910,8 +1076,10 @@
         if (y.seasonOnly) {
           actionHtml = '<span class="breed-active">Только в сезоне 🍂</span>';
         } else {
-          const can = state.ore >= y.unlockCost;
-          actionHtml = '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-unlock-yard="' + y.id + '">Открыть · 🦴 ' + fmt(y.unlockCost) + '</button>';
+          const gated = contentGateOk(y);
+          const can = gated && state.ore >= y.unlockCost;
+          const gate = contentGateText(y);
+          actionHtml = (gate ? '<div class="gate-hint">' + gate + '</div>' : '') + '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-unlock-yard="' + y.id + '">Открыть · 🦴 ' + fmt(y.unlockCost) + '</button>';
         }
       } else if (!selected) {
         actionHtml = '<button type="button" class="btn btn-sm" data-select-yard="' + y.id + '">Выбрать</button>';
@@ -927,12 +1095,16 @@
     root.querySelectorAll('[data-select-yard]').forEach(function (btn) {
       btn.addEventListener('click', function () { selectYard(btn.getAttribute('data-select-yard')); });
     });
+    root.querySelectorAll('[data-yard-advance]').forEach(function (btn) {
+      btn.addEventListener('click', function () { tryAdvanceYardStage(); });
+    });
   }
 
   function unlockYard(id) {
     const y = YARDS[id];
     if (!y || state.unlockedYards.indexOf(id) !== -1) return;
     if (y.seasonOnly) { showToast('Откройте во вкладке «Сезон» 🍂'); return; }
+    if (!contentGateOk(y)) { showToast(contentGateText(y) || 'Ещё закрыто'); return; }
     if (state.ore < y.unlockCost) { showToast('Маловато косточек 🐾'); return; }
     state.ore -= y.unlockCost;
     state.unlockedYards.push(id);
@@ -949,10 +1121,7 @@
     renderYards(); scheduleSave();
   }
 
-  function daySeed() {
-    const d = new Date();
-    return d.getUTCFullYear() + '-' + (d.getUTCMonth() + 1) + '-' + d.getUTCDate();
-  }
+  function daySeed() { return localDayKey(); }
   function seededRand(seed, i) {
     let h = 2166136261;
     const str = seed + ':' + i;
@@ -960,10 +1129,11 @@
     return (h >>> 0) / 4294967296;
   }
   function makeQuestReward(type, target) {
-    if (type === 'clicks') return Math.floor(40 + target * 1.5);
-    if (type === 'earn') return Math.floor(target * 0.25 + 50);
-    if (type === 'buy') return 150 + Math.floor(state.stats.upgradesBought * 2);
-    return 100;
+    const streakBonus = 1 + Math.min(0.5, (state.questStreak || 0) * 0.05);
+    if (type === 'clicks') return Math.floor((50 + target * 1.8) * streakBonus);
+    if (type === 'earn') return Math.floor((target * 0.18 + 120) * streakBonus);
+    if (type === 'buy') return Math.floor((220 + target * 80 + state.stats.upgradesBought * 3) * streakBonus);
+    return Math.floor(120 * streakBonus);
   }
   function generateQuests(seed) {
     const used = {};
@@ -983,11 +1153,15 @@
   function ensureQuests() {
     const seed = daySeed();
     if (state.questDaySeed !== seed || !state.quests || state.quests.length === 0) {
+      if (state.questDaySeed && state.questDaySeed !== seed) {
+        const cleared = (state.questClaimsToday || 0) >= 3 || state.questLastClearDay === state.questDaySeed;
+        if (!cleared) state.questStreak = 0;
+      }
       state.questDaySeed = seed;
+      state.questClaimsToday = 0;
       state.quests = generateQuests(seed);
       return;
     }
-    // Drop orphan claimed rows (interrupted claim / bad save) so UI cannot stick on «Забрать»
     state.quests = state.quests.filter(function (q) {
       return !!(q && !q.claimed);
     });
@@ -998,12 +1172,14 @@
   }
   function bumpQuest(type, amount) {
     ensureQuests();
+    ensureDailyGoals();
     let changed = false;
     state.quests.forEach(function (q) {
       if (q.claimed || q.type !== type) return;
       q.progress = Math.min(q.target, (q.progress || 0) + amount);
       changed = true;
     });
+    bumpDailyGoal(type, amount);
     if (changed && activeTab === 'quests') renderQuests();
   }
   function claimQuest(id) {
@@ -1014,6 +1190,12 @@
     q.reward = 0;
     state.ore += reward;
     state.stats.lifetimeBones += reward;
+    state.questClaimsToday = (state.questClaimsToday || 0) + 1;
+    if (state.questClaimsToday === 3 && state.questLastClearDay !== daySeed()) {
+      state.questStreak = (state.questStreak || 0) + 1;
+      state.questLastClearDay = daySeed();
+      showToast('Серия квестов: ' + state.questStreak + ' дн.! 🔥');
+    }
     if (window.Sounds) window.Sounds.playBuy();
     showToast('Квест выполнен! +' + fmt(reward) + ' 🦴');
     const tpl = QUEST_POOL.find(function (t) { return t.type === q.type; }) || QUEST_POOL[0];
@@ -1025,9 +1207,29 @@
   }
   function renderQuests() {
     ensureQuests();
+    ensureDailyGoals();
     const root = $('#quests');
     if (!root) return;
     root.innerHTML = '';
+    const dailyHead = document.createElement('div');
+    dailyHead.className = 'section-subhead';
+    dailyHead.innerHTML = '<strong>Ежедневные цели</strong> · серия ' + (state.dailyStreak || 0) + ' дн.';
+    root.appendChild(dailyHead);
+    (state.dailyGoals || []).forEach(function (g) {
+      const done = !g.claimed && g.progress >= g.target;
+      const card = document.createElement('div');
+      card.className = 'quest-card daily-goal' + (done ? ' done' : '') + (g.claimed ? ' claimed' : '');
+      const pct = g.target > 0 ? Math.min(100, Math.floor((g.progress / g.target) * 100)) : 0;
+      let btn = '';
+      if (g.claimed) btn = '<span class="breed-active">Получено ✓</span>';
+      else if (done) btn = '<button type="button" class="btn btn-sm" data-claim-daily="' + g.id + '">Забрать</button>';
+      card.innerHTML = '<div class="quest-title">' + g.label + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(g.progress, g.target)) + ' / ' + fmt(g.target) + ' · 🦴 ' + fmt(g.reward) + '</div>' + btn;
+      root.appendChild(card);
+    });
+    const qHead = document.createElement('div');
+    qHead.className = 'section-subhead';
+    qHead.innerHTML = '<strong>Квесты дня</strong> · серия ' + (state.questStreak || 0) + ' дн. · сложнее цели';
+    root.appendChild(qHead);
     state.quests.forEach(function (q) {
       const done = !q.claimed && q.progress >= q.target;
       const card = document.createElement('div');
@@ -1038,6 +1240,9 @@
     });
     root.querySelectorAll('[data-claim]').forEach(function (btn) {
       btn.addEventListener('click', function () { claimQuest(btn.getAttribute('data-claim')); });
+    });
+    root.querySelectorAll('[data-claim-daily]').forEach(function (btn) {
+      btn.addEventListener('click', function () { claimDailyGoal(btn.getAttribute('data-claim-daily')); });
     });
   }
 
@@ -1254,10 +1459,11 @@
     toyTaps = 0;
     if (taps > 0) {
       const base = Math.max(1, getClickPower());
-      const reward = Math.floor(taps * TOY_REWARD_PER_TAP * Math.max(1, base * 0.15));
+      const reward = Math.floor(taps * TOY_REWARD_PER_TAP * Math.max(1, base * 0.15) * EVENT_REWARD_MULT);
       state.ore += reward;
       state.stats.lifetimeBones += reward;
       state.stats.eventsDone = (state.stats.eventsDone || 0) + 1;
+      bumpDailyGoal('events', 1);
       grantSticker('ball', true);
       addEventAcorns(0.8);
       if (window.Sounds) window.Sounds.playOffline();
@@ -1345,10 +1551,11 @@
     const modal = $('#train-modal');
     if (modal) modal.hidden = true;
     if (success) {
-      const reward = Math.floor(80 + getOrePerSec() * 8 + getClickPower() * 12 + trainSeq.length * 25);
+      const reward = Math.floor((80 + getOrePerSec() * 8 + getClickPower() * 12 + trainSeq.length * 25) * EVENT_REWARD_MULT);
       state.ore += reward;
       state.stats.lifetimeBones += reward;
       state.stats.eventsDone = (state.stats.eventsDone || 0) + 1;
+      bumpDailyGoal('events', 1);
       grantSticker('star', true);
       addEventAcorns(1);
       if (window.Sounds) window.Sounds.playOffline();
@@ -1416,10 +1623,11 @@
     const modal = $('#hide-modal');
     if (modal) modal.hidden = true;
     if (success) {
-      const reward = Math.floor(60 + getClickPower() * 10 + getOrePerSec() * 5);
+      const reward = Math.floor((60 + getClickPower() * 10 + getOrePerSec() * 5) * EVENT_REWARD_MULT);
       state.ore += reward;
       state.stats.lifetimeBones += reward;
       state.stats.eventsDone = (state.stats.eventsDone || 0) + 1;
+      bumpDailyGoal('events', 1);
       grantSticker('hide');
       const ac = addEventAcorns(1.1);
       if (window.Sounds) window.Sounds.playOffline();
@@ -1483,10 +1691,11 @@
     if (modal) modal.hidden = true;
     const pct = Math.min(100, raceFill);
     if (!forceFail && pct >= 55) {
-      const reward = Math.floor(50 + getClickPower() * 8 + getOrePerSec() * 6 + pct * 1.5);
+      const reward = Math.floor((50 + getClickPower() * 8 + getOrePerSec() * 6 + pct * 1.5) * EVENT_REWARD_MULT);
       state.ore += reward;
       state.stats.lifetimeBones += reward;
       state.stats.eventsDone = (state.stats.eventsDone || 0) + 1;
+      bumpDailyGoal('events', 1);
       const ac = addEventAcorns(0.9 + pct / 100);
       if (window.Sounds) window.Sounds.playOffline();
       showToast('Догнали белку! +' + fmt(reward) + ' 🦴 (' + Math.floor(pct) + '%)' + (ac ? ' · 🌰+' + ac : ''));
@@ -1635,21 +1844,352 @@
     if (changed) scheduleSave();
   }
 
-  function canPrestige() { return state.stats.lifetimeBones >= PRESTIGE_REQ_LIFETIME; }
+
+  /* ——— Energy / Walks / Yard stages / Daily goals / Medal shop ——— */
+  function clampEnergy() {
+    const max = getEnergyMax();
+    if (!isFinite(state.energy) || state.energy < 0) state.energy = 0;
+    if (state.energy > max) state.energy = max;
+  }
+  function regenEnergy(dt) {
+    if (state.activeWalk && state.activeWalk.endsAt > Date.now()) return;
+    const max = getEnergyMax();
+    if (state.energy >= max) return;
+    state.energy = Math.min(max, state.energy + getEnergyRegen() * dt);
+  }
+  function updateEnergyUI() {
+    clampEnergy();
+    const fill = $('#energy-fill');
+    const label = $('#energy-label');
+    const max = getEnergyMax();
+    const pct = max > 0 ? Math.max(0, Math.min(100, (state.energy / max) * 100)) : 0;
+    if (fill) fill.style.width = pct.toFixed(1) + '%';
+    if (label) label.textContent = Math.floor(state.energy) + ' / ' + max;
+    const restBtn = $('#btn-rest');
+    if (restBtn) {
+      const now = Date.now();
+      if (now < (state.energyRestReadyAt || 0)) {
+        restBtn.disabled = true;
+        restBtn.textContent = 'Отдых ' + Math.ceil((state.energyRestReadyAt - now) / 1000) + 'с';
+      } else if (state.energy >= max - 0.5) {
+        restBtn.disabled = true;
+        restBtn.textContent = 'Отдых';
+      } else {
+        restBtn.disabled = false;
+        restBtn.textContent = 'Отдых +' + ENERGY_REST_GAIN;
+      }
+    }
+    updateWalkUI();
+  }
+  function doRest() {
+    const now = Date.now();
+    if (now < (state.energyRestReadyAt || 0)) { showToast('Пёсик ещё отдыхает 🐾'); return; }
+    const max = getEnergyMax();
+    if (state.energy >= max - 0.5) { showToast('Энергия полная!'); return; }
+    state.energy = Math.min(max, state.energy + ENERGY_REST_GAIN);
+    state.energyRestReadyAt = now + ENERGY_REST_COOLDOWN_MS;
+    if (window.Sounds) window.Sounds.playBuy();
+    showToast('Отдых! Энергия +' + ENERGY_REST_GAIN + ' 😴');
+    updateEnergyUI(); scheduleSave();
+  }
+
+  function isWalkUnlocked(tier) {
+    if ((state.yardStage || 1) < (tier.unlockStage || 1)) return false;
+    if (tier.unlockPrestige && (state.prestigeLevel || 0) < tier.unlockPrestige) return false;
+    return true;
+  }
+  function startWalk(tierId) {
+    if (state.activeWalk && state.activeWalk.endsAt > Date.now()) {
+      showToast('Уже на прогулке…'); return;
+    }
+    // claim finished walk first
+    if (state.activeWalk && state.activeWalk.endsAt <= Date.now()) {
+      completeWalk(true); return;
+    }
+    const tier = WALK_TIERS.find(function (t) { return t.id === tierId; }) || WALK_TIERS[0];
+    if (!isWalkUnlocked(tier)) {
+      showToast('Нужен этап двора ' + tier.unlockStage + (tier.unlockPrestige ? ' и выставка' : ''));
+      return;
+    }
+    if (state.energy < tier.energy) { showToast('Мало энергии ⚡'); return; }
+    if (state.ore < tier.boneCost) { showToast('Маловато косточек 🐾'); return; }
+    state.energy -= tier.energy;
+    state.ore -= tier.boneCost;
+    state.activeWalk = { tierId: tier.id, endsAt: Date.now() + tier.durationMs, startedAt: Date.now() };
+    if (window.Sounds && window.Sounds.playWalkStart) window.Sounds.playWalkStart();
+    else if (window.Sounds) window.Sounds.playUi();
+    showToast(tier.icon + ' Прогулка «' + tier.name + '» · ' + Math.round(tier.durationMs / 60000) + ' мин');
+    updateEnergyUI(); renderStats(); scheduleSave();
+  }
+  function walkRewardBones(tier) {
+    const secs = tier.durationMs / 1000;
+    const base = Math.max(8, getOrePerSec() * secs * 0.55 + getClickPower() * 14);
+    return Math.floor(base * tier.rewardMult * (1 + (state.yardStage || 1) * 0.03));
+  }
+  function completeWalk(fromClaim) {
+    const walk = state.activeWalk;
+    if (!walk) return;
+    if (Date.now() < walk.endsAt) return;
+    const tier = WALK_TIERS.find(function (t) { return t.id === walk.tierId; }) || WALK_TIERS[0];
+    state.activeWalk = null;
+    const reward = walkRewardBones(tier);
+    state.ore += reward;
+    state.stats.lifetimeBones += reward;
+    state.stats.walksDone = (state.stats.walksDone || 0) + 1;
+    bumpDailyGoal('walks', 1);
+    let extra = '';
+    if (Math.random() < tier.stickerChance) {
+      const pool = ['paw', 'bone', 'leaf', 'ball'];
+      const sid = pool[Math.floor(Math.random() * pool.length)];
+      if (grantSticker(sid, true)) extra += ' · наклейка!';
+    }
+    if (isSeasonActive() && Math.random() < tier.acornChance) {
+      const ac = 2 + Math.floor(Math.random() * 5);
+      state.acorns = (isFinite(state.acorns) ? state.acorns : 0) + ac;
+      extra += ' · 🌰+' + ac;
+    }
+    // walk restores some energy
+    state.energy = Math.min(getEnergyMax(), state.energy + 12 + tier.energy * 0.25);
+    if (window.Sounds && window.Sounds.playWalkDone) window.Sounds.playWalkDone();
+    else if (window.Sounds) window.Sounds.playOffline();
+    showToast('Вернулись с прогулки! +' + fmt(reward) + ' 🦴' + extra);
+    checkAchievements(); maybeUnlockStory(); updateEnergyUI(); renderStats();
+    if (activeTab === 'quests') renderQuests();
+    scheduleSave();
+  }
+  function updateWalkUI() {
+    const btn = $('#btn-walk');
+    const meta = $('#walk-meta');
+    if (!btn) return;
+    if (state.activeWalk) {
+      const left = state.activeWalk.endsAt - Date.now();
+      if (left <= 0) {
+        btn.disabled = false;
+        btn.textContent = 'Забрать прогулку!';
+        btn.dataset.walkAction = 'claim';
+        if (meta) meta.textContent = 'Пёсик у калитки 🐾';
+      } else {
+        btn.disabled = true;
+        const m = Math.floor(left / 60000);
+        const s = Math.ceil((left % 60000) / 1000);
+        btn.textContent = 'На прогулке… ' + m + ':' + String(s).padStart(2, '0');
+        btn.dataset.walkAction = 'busy';
+        if (meta) {
+          const tier = WALK_TIERS.find(function (t) { return t.id === state.activeWalk.tierId; });
+          meta.textContent = (tier ? tier.icon + ' ' + tier.name : 'Прогулка') + ' · фон';
+        }
+      }
+      return;
+    }
+    btn.disabled = false;
+    btn.textContent = 'Прогулка';
+    btn.dataset.walkAction = 'menu';
+    if (meta) meta.textContent = '2–5 мин · энергия';
+  }
+  function onWalkButton() {
+    if (state.activeWalk && state.activeWalk.endsAt <= Date.now()) {
+      completeWalk(true); return;
+    }
+    if (state.activeWalk) { showToast('Ещё гуляем…'); return; }
+    openWalkSheet();
+  }
+  function openWalkSheet() {
+    const sheet = $('#walk-sheet');
+    const list = $('#walk-sheet-list');
+    if (!sheet || !list) {
+      startWalk('short');
+      return;
+    }
+    list.innerHTML = '';
+    WALK_TIERS.forEach(function (t) {
+      const unlocked = isWalkUnlocked(t);
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'walk-tier-btn' + (unlocked ? '' : ' locked');
+      row.disabled = !unlocked;
+      const mins = (t.durationMs / 60000).toFixed(t.durationMs % 60000 ? 1 : 0);
+      row.innerHTML = '<span class="walk-tier-ico">' + t.icon + '</span><span class="walk-tier-body"><strong>' + t.name + '</strong><small>' + mins + ' мин · ⚡' + t.energy + ' · 🦴 ' + fmt(t.boneCost) + (!unlocked ? ' · этап ' + t.unlockStage : '') + '</small></span>';
+      if (unlocked) row.addEventListener('click', function () { sheet.hidden = true; startWalk(t.id); });
+      list.appendChild(row);
+    });
+    sheet.hidden = false;
+  }
+
+  function currentYardStageDef() {
+    return YARD_STAGES.find(function (x) { return x.level === (state.yardStage || 1); }) || YARD_STAGES[0];
+  }
+  function nextYardStageDef() {
+    const cur = state.yardStage || 1;
+    return YARD_STAGES.find(function (x) { return x.level === cur + 1; }) || null;
+  }
+  function buildYardStageCard() {
+    const wrap = document.createElement('div');
+    wrap.className = 'yard-stage-card';
+    const cur = currentYardStageDef();
+    const next = nextYardStageDef();
+    let pct = 100;
+    let meta = 'Макс. этап';
+    let can = false;
+    if (next) {
+      const lifeNeed = next.reqLifetime || 1;
+      const lifePct = Math.min(100, Math.floor(((state.stats.lifetimeBones || 0) / lifeNeed) * 100));
+      pct = lifePct;
+      meta = 'До этапа ' + next.level + ': жизнь 🦴 ' + fmt(state.stats.lifetimeBones) + ' / ' + fmt(next.reqLifetime);
+      if (next.reqPrestige) meta += ' · выставок ' + (state.prestigeLevel || 0) + '/' + next.reqPrestige;
+      can = (state.stats.lifetimeBones || 0) >= next.reqLifetime && (state.prestigeLevel || 0) >= (next.reqPrestige || 0);
+    }
+    wrap.innerHTML = '<div class="yard-stage-title">Этап двора ' + cur.level + ' · ' + cur.title + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="yard-stage-meta">' + meta + '</div><div class="yard-stage-hook">' + cur.hook + ' · бонус дохода x' + cur.incomeMult.toFixed(2) + '</div>' + (next ? '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-yard-advance="1">' + (can ? 'Открыть этап ' + next.level : 'Ещё рано') + '</button>' : '');
+    return wrap;
+  }
+  function tryAdvanceYardStage() {
+    const next = nextYardStageDef();
+    if (!next) { showToast('Уже максимум!'); return; }
+    if ((state.stats.lifetimeBones || 0) < next.reqLifetime) { showToast('Нужно больше косточек за жизнь'); return; }
+    if ((state.prestigeLevel || 0) < (next.reqPrestige || 0)) { showToast('Нужно больше выставок'); return; }
+    state.yardStage = next.level;
+    if (window.Sounds) window.Sounds.playBuy();
+    showToast('Этап ' + next.level + ': ' + next.title + '! 🏡');
+    checkAchievements(); maybeUnlockStory();
+    if (activeTab === 'yard') renderYards();
+    if (activeTab === 'prestige') renderPrestige();
+    renderStats(); scheduleSave();
+  }
+  function syncYardStageFromProgress() {
+    // auto-unlock stages player already qualifies for (migration-friendly)
+    let advanced = false;
+    while (true) {
+      const next = nextYardStageDef();
+      if (!next) break;
+      if ((state.stats.lifetimeBones || 0) < next.reqLifetime) break;
+      if ((state.prestigeLevel || 0) < (next.reqPrestige || 0)) break;
+      state.yardStage = next.level;
+      advanced = true;
+    }
+    return advanced;
+  }
+
+  function generateDailyGoals(seed) {
+    const used = {};
+    const list = [];
+    for (let i = 0; i < 3; i++) {
+      let pick = Math.floor(seededRand(seed, i * 5) * DAILY_GOAL_POOL.length);
+      let guard = 0;
+      while (used[pick] && guard < 10) { pick = (pick + 1) % DAILY_GOAL_POOL.length; guard++; }
+      used[pick] = true;
+      const tpl = DAILY_GOAL_POOL[pick];
+      const ti = Math.floor(seededRand(seed, i * 5 + 1) * tpl.targets.length);
+      const target = tpl.targets[ti];
+      const reward = tpl.rewardBones[Math.min(ti, tpl.rewardBones.length - 1)];
+      list.push({ id: seed + '-dg-' + i + '-' + tpl.type, type: tpl.type, target: target, progress: 0, reward: reward, label: tpl.label(target), claimed: false });
+    }
+    return list;
+  }
+  function ensureDailyGoals() {
+    const key = localDayKey();
+    if (state.dailyDayKey !== key) {
+      if (state.dailyDayKey) {
+        const cleared = state.dailyLastClearDay === state.dailyDayKey
+          || ((state.dailyGoals || []).length > 0 && (state.dailyGoals || []).every(function (g) { return g.claimed; }));
+        if (!cleared) state.dailyStreak = 0;
+      }
+      state.dailyDayKey = key;
+      state.dailyGoals = generateDailyGoals(key);
+    }
+    if (!Array.isArray(state.dailyGoals) || state.dailyGoals.length === 0) {
+      state.dailyGoals = generateDailyGoals(key);
+    }
+  }
+  function bumpDailyGoal(type, amount) {
+    ensureDailyGoals();
+    let changed = false;
+    (state.dailyGoals || []).forEach(function (g) {
+      if (g.claimed || g.type !== type) return;
+      g.progress = Math.min(g.target, (g.progress || 0) + amount);
+      changed = true;
+    });
+    if (changed && activeTab === 'quests') renderQuests();
+  }
+  function claimDailyGoal(id) {
+    ensureDailyGoals();
+    const g = (state.dailyGoals || []).find(function (x) { return x.id === id; });
+    if (!g || g.claimed || g.progress < g.target) return;
+    g.claimed = true;
+    const streakMult = 1 + Math.min(0.6, (state.dailyStreak || 0) * 0.06);
+    const reward = Math.floor((Number(g.reward) || 0) * streakMult);
+    state.ore += reward;
+    state.stats.lifetimeBones += reward;
+    if (window.Sounds) window.Sounds.playBuy();
+    showToast('Цель дня! +' + fmt(reward) + ' 🦴');
+    const allClaimed = state.dailyGoals.every(function (x) { return x.claimed; });
+    if (allClaimed) {
+      if (state.dailyLastClearDay !== state.dailyDayKey) {
+        state.dailyStreak = (state.dailyStreak || 0) + 1;
+        state.dailyLastClearDay = state.dailyDayKey;
+      }
+      showToast('Все цели дня! Серия: ' + state.dailyStreak + ' 🔥');
+    }
+    checkAchievements(); renderQuests(); renderStats(); scheduleSave();
+  }
+
+  function medalUpgradeCost(item) {
+    const lvl = getMedalLevel(item.id);
+    return Math.max(1, Math.floor(item.baseCost * Math.pow(item.costMult, lvl)));
+  }
+  function buyMedalUpgrade(id) {
+    const item = MEDAL_SHOP.find(function (x) { return x.id === id; });
+    if (!item) return;
+    const lvl = getMedalLevel(id);
+    if (lvl >= item.maxLevel) { showToast('Макс. уровень'); return; }
+    const cost = medalUpgradeCost(item);
+    if ((state.medals || 0) < cost) { showToast('Мало медалек 🏅'); return; }
+    state.medals -= cost;
+    if (!state.medalUpgrades) state.medalUpgrades = {};
+    state.medalUpgrades[id] = lvl + 1;
+    if (window.Sounds) window.Sounds.playBuy();
+    showToast(item.name + ' ур.' + (lvl + 1) + '!');
+    clampEnergy();
+    renderPrestige(); renderStats(); scheduleSave();
+  }
+
+  function canPrestige() { return state.stats.lifetimeBones >= getPrestigeRequirement(); }
 
   function medalsGainOnPrestige() {
-    const life = Math.max(PRESTIGE_REQ_LIFETIME, state.stats.lifetimeBones);
-    return 1 + Math.max(0, Math.floor(Math.log10(life / PRESTIGE_REQ_LIFETIME)));
+    const req = getPrestigeRequirement();
+    const life = Math.max(req, state.stats.lifetimeBones);
+    return 1 + Math.max(0, Math.floor(Math.log10(life / req)));
   }
   function renderPrestige() {
     const info = $('#prestige-info');
     const btn = $('#btn-prestige');
+    const req = getPrestigeRequirement();
     if (info) {
-      info.innerHTML = 'Медальки: <strong>' + state.medals + '</strong> · уровень выставок: <strong>' + state.prestigeLevel + '</strong><br>Бонус дохода: <strong>+' + Math.round(state.medals * PRESTIGE_MEDAL_INCOME * 100) + '%</strong><br>За жизнь заработано: <strong>' + fmt(state.stats.lifetimeBones) + '</strong> / нужно ' + fmt(PRESTIGE_REQ_LIFETIME) + '<br>Офлайн-кап: <strong>' + Math.round(getOfflineCapSec() / 3600) + ' ч</strong>';
+      info.innerHTML = 'Медальки: <strong>' + state.medals + '</strong> · выставок: <strong>' + state.prestigeLevel + '</strong><br>Плоский бонус: <strong>+' + Math.round(state.medals * PRESTIGE_MEDAL_INCOME * 100) + '%</strong> + магазин медалек<br>За жизнь: <strong>' + fmt(state.stats.lifetimeBones) + '</strong> / нужно <strong>' + fmt(req) + '</strong><br>Этап двора: <strong>' + (state.yardStage || 1) + '</strong> · офлайн: <strong>' + Math.round(getOfflineEfficiency() * 100) + '%</strong> · кап <strong>' + Math.round(getOfflineCapSec() / 3600) + ' ч</strong>';
     }
     if (btn) {
       btn.disabled = !canPrestige();
-      btn.textContent = canPrestige() ? 'Устроить выставку (+' + medalsGainOnPrestige() + ' 🏅)' : 'Нужно ' + fmt(PRESTIGE_REQ_LIFETIME) + ' косточек за жизнь';
+      btn.textContent = canPrestige() ? 'Устроить выставку (+' + medalsGainOnPrestige() + ' 🏅)' : 'Нужно ' + fmt(req) + ' косточек за жизнь';
+    }
+    const shop = $('#medal-shop');
+    if (shop) {
+      shop.innerHTML = '<h3 class="shop-subhead">Магазин медалек</h3><p class="panel-hint">Тратьте 🏅 на постоянные бонусы. Плоский +' + Math.round(PRESTIGE_MEDAL_INCOME * 100) + '% за медальку остаётся.</p>';
+      MEDAL_SHOP.forEach(function (item) {
+        const lvl = getMedalLevel(item.id);
+        const maxed = lvl >= item.maxLevel;
+        const cost = medalUpgradeCost(item);
+        const can = !maxed && state.medals >= cost;
+        const card = document.createElement('div');
+        card.className = 'upgrade' + (can ? '' : ' disabled');
+        card.innerHTML = '<span class="up-icon">' + item.icon + '</span><span class="up-body"><span class="up-name">' + item.name + ' <em>ур.' + lvl + '/' + item.maxLevel + '</em></span><span class="up-desc">' + item.desc + '</span></span><span class="up-cost">' + (maxed ? 'MAX' : '🏅 ' + cost) + '</span>';
+        if (can) card.addEventListener('click', function () { buyMedalUpgrade(item.id); });
+        shop.appendChild(card);
+      });
+      const stageWrap = document.createElement('div');
+      stageWrap.className = 'yard-stage-wrap';
+      stageWrap.appendChild(buildYardStageCard());
+      shop.appendChild(stageWrap);
+      shop.querySelectorAll('[data-yard-advance]').forEach(function (b) {
+        b.addEventListener('click', function () { tryAdvanceYardStage(); });
+      });
     }
   }
   function openPrestigeModal() {
@@ -1658,7 +2198,7 @@
     const text = $('#prestige-confirm-text');
     const gain = medalsGainOnPrestige();
     if (text) {
-      text.textContent = 'Сбросить апгрейды и текущие косточки, получить +' + gain + ' медальки (+' + Math.round(gain * PRESTIGE_MEDAL_INCOME * 100) + '% к доходу навсегда)? Породы, двор, друзья, альбом, история и достижения сохранятся.';
+      text.textContent = 'Сбросить апгрейды и текущие косточки, получить +' + gain + ' медальки (+' + Math.round(gain * PRESTIGE_MEDAL_INCOME * 100) + '% плоско + магазин 🏅)? Породы, двор, друзья, альбом, этапы, медаль-апгрейды и достижения сохранятся.';
     }
     if (modal) modal.hidden = false;
   }
@@ -1679,7 +2219,10 @@
     lastComboMilestone = 1;
     state.activeItem = null;
     state.seasonBoostUntil = 0;
+    state.energy = getEnergyMax();
+    state.activeWalk = null;
     grantSticker('medal', true);
+    syncYardStageFromProgress();
     if (window.Sounds && window.Sounds.playPrestige) window.Sounds.playPrestige();
     else if (window.Sounds) window.Sounds.playOffline();
     showToast('Выставка! +' + gain + ' 🏅 Медальки: ' + state.medals);
@@ -1688,6 +2231,7 @@
     checkAchievements(); maybeUnlockStory(); renderAll(); scheduleSave();
     maybeOfferFullscreen('prestige');
   }
+
 
   function renderStats() {
     const oreEl = $('#stat-ore');
@@ -1735,6 +2279,7 @@
       else if (now < state.joyReadyAt) { joyBtn.disabled = true; joyBtn.textContent = 'Радость через ' + Math.ceil((state.joyReadyAt - now) / 1000) + 'с'; }
       else { joyBtn.disabled = false; joyBtn.textContent = 'Радость x2 · 10с'; }
     }
+    updateEnergyUI();
   }
 
   function renderAll() {
@@ -1743,6 +2288,7 @@
     applyFriendArt();
     updateSeasonUI();
     renderStats();
+    updateEnergyUI();
     renderActivePanel();
     updateEventBtn();
   }
@@ -1770,10 +2316,12 @@
 
   function mineClick(ev) {
     updateCombo();
+    clampEnergy();
     const power = getClickPower() * state.pendingClickMult;
     state.ore += power;
     state.stats.totalClicks += 1;
     state.stats.lifetimeBones += power;
+    state.energy = Math.max(0, state.energy - ENERGY_PER_CLICK);
     if (isSeasonActive()) {
       const prev = isFinite(state.acorns) ? state.acorns : 0;
       state.acorns = prev + ACORN_PER_CLICK;
@@ -1797,7 +2345,7 @@
     spawnPopup(x, y, '+' + fmt(power) + ' 🦴' + comboTag);
     spawnClickFx(x, y + 10);
     if (window.Sounds) window.Sounds.playPet();
-    checkAchievements(); maybeUnlockStory(); renderStats();
+    checkAchievements(); maybeUnlockStory(); renderStats(); updateEnergyUI();
   }
 
   function buyUpgrade(id) {
@@ -1891,10 +2439,14 @@
         lifetimeBones: state.stats.lifetimeBones,
         upgradesBought: state.stats.upgradesBought,
         eventsDone: state.stats.eventsDone || 0,
+        walksDone: state.stats.walksDone || 0,
       },
       achievementsClaimed: Object.assign({}, state.achievementsClaimed),
       quests: state.quests,
       questDaySeed: state.questDaySeed,
+      questStreak: Number(state.questStreak) || 0,
+      questLastClearDay: state.questLastClearDay || '',
+      questClaimsToday: Number(state.questClaimsToday) || 0,
       joyUntil: joyUntil > now ? joyUntil : 0,
       joyReadyAt: joyReady > now ? joyReady : 0,
       inventory: Object.assign({ boneBoost: 0 }, state.inventory || {}),
@@ -1911,6 +2463,15 @@
       seasonPurchases: Object.assign({}, state.seasonPurchases || {}),
       noAds: !!state.noAds,
       vipTreats: !!state.vipTreats,
+      medalUpgrades: Object.assign({}, state.medalUpgrades || {}),
+      energy: isFinite(state.energy) ? Math.max(0, state.energy) : ENERGY_MAX_BASE,
+      energyRestReadyAt: Number(state.energyRestReadyAt) || 0,
+      activeWalk: state.activeWalk && state.activeWalk.endsAt ? { tierId: String(state.activeWalk.tierId || 'short'), endsAt: Number(state.activeWalk.endsAt) || 0, startedAt: Number(state.activeWalk.startedAt) || 0 } : null,
+      yardStage: Math.max(1, Number(state.yardStage) || 1),
+      dailyGoals: Array.isArray(state.dailyGoals) ? state.dailyGoals : [],
+      dailyDayKey: state.dailyDayKey || '',
+      dailyStreak: Number(state.dailyStreak) || 0,
+      dailyLastClearDay: state.dailyLastClearDay || '',
     };
   }
 
@@ -1963,6 +2524,23 @@
       out.seasonPurchases = (out.seasonPurchases && typeof out.seasonPurchases === 'object' && !Array.isArray(out.seasonPurchases)) ? out.seasonPurchases : {};
       out.unlockedYards = Array.isArray(out.unlockedYards) ? out.unlockedYards : ['sunny'];
     }
+    if (ver < 5) {
+      out.medalUpgrades = (out.medalUpgrades && typeof out.medalUpgrades === 'object' && !Array.isArray(out.medalUpgrades)) ? out.medalUpgrades : {};
+      out.energy = isFinite(Number(out.energy)) ? Number(out.energy) : ENERGY_MAX_BASE;
+      out.energyRestReadyAt = Number(out.energyRestReadyAt) || 0;
+      out.activeWalk = out.activeWalk && typeof out.activeWalk === 'object' ? out.activeWalk : null;
+      out.yardStage = Math.max(1, Number(out.yardStage) || 1);
+      out.dailyGoals = Array.isArray(out.dailyGoals) ? out.dailyGoals : [];
+      out.dailyDayKey = out.dailyDayKey || '';
+      out.dailyStreak = Number(out.dailyStreak) || 0;
+      out.dailyLastClearDay = out.dailyLastClearDay || '';
+      out.questStreak = Number(out.questStreak) || 0;
+      out.questLastClearDay = out.questLastClearDay || '';
+      out.questClaimsToday = Number(out.questClaimsToday) || 0;
+      out.stats = out.stats || {};
+      out.stats.walksDone = Number(out.stats.walksDone) || 0;
+      // Old saves may feel rich briefly under new costs — intentional soft migrate
+    }
     out.v = SAVE_VERSION;
     return out;
   }
@@ -2000,6 +2578,7 @@
       lifetimeBones: Number(data.stats && data.stats.lifetimeBones) || 0,
       upgradesBought: Number(data.stats && data.stats.upgradesBought) || 0,
       eventsDone: Number(data.stats && data.stats.eventsDone) || 0,
+      walksDone: Number(data.stats && data.stats.walksDone) || 0,
     };
     Object.keys(state.stats).forEach(function (k) {
       if (!isFinite(state.stats[k]) || state.stats[k] < 0) state.stats[k] = 0;
@@ -2023,6 +2602,9 @@
       };
     }).filter(Boolean) : [];
     state.questDaySeed = data.questDaySeed || '';
+    state.questStreak = Number(data.questStreak) || 0;
+    state.questLastClearDay = data.questLastClearDay || '';
+    state.questClaimsToday = Number(data.questClaimsToday) || 0;
     state.joyUntil = Number(data.joyUntil) || 0;
     state.joyReadyAt = Number(data.joyReadyAt) || 0;
     state.inventory = Object.assign({ boneBoost: 0 }, data.inventory || {});
@@ -2056,23 +2638,68 @@
       ? Object.assign({}, data.seasonPurchases) : {};
     state.stickerSetsClaimed = (data.stickerSetsClaimed && typeof data.stickerSetsClaimed === 'object' && !Array.isArray(data.stickerSetsClaimed))
       ? Object.assign({}, data.stickerSetsClaimed) : {};
+    state.medalUpgrades = (data.medalUpgrades && typeof data.medalUpgrades === 'object' && !Array.isArray(data.medalUpgrades))
+      ? Object.assign({}, data.medalUpgrades) : {};
+    {
+      const e = Number(data.energy);
+      state.energy = isFinite(e) ? e : getEnergyMax();
+    }
+    state.energyRestReadyAt = Number(data.energyRestReadyAt) || 0;
+    if (data.activeWalk && typeof data.activeWalk === 'object' && Number(data.activeWalk.endsAt) > 0) {
+      state.activeWalk = {
+        tierId: String(data.activeWalk.tierId || 'short'),
+        endsAt: Number(data.activeWalk.endsAt),
+        startedAt: Number(data.activeWalk.startedAt) || 0,
+      };
+    } else {
+      state.activeWalk = null;
+    }
+    state.yardStage = Math.max(1, Number(data.yardStage) || 1);
+    state.dailyGoals = Array.isArray(data.dailyGoals) ? data.dailyGoals.map(function (g) {
+      if (!g || typeof g !== 'object') return null;
+      const target = Math.max(1, Number(g.target) || 1);
+      return {
+        id: String(g.id || ('dg-' + Math.random())),
+        type: ['clicks', 'earn', 'walks', 'events', 'buy'].indexOf(g.type) !== -1 ? g.type : 'clicks',
+        target: target,
+        progress: Math.min(target, Math.max(0, Number(g.progress) || 0)),
+        reward: Math.max(0, Number(g.reward) || 0),
+        label: typeof g.label === 'string' ? g.label : 'Цель',
+        claimed: !!g.claimed,
+      };
+    }).filter(Boolean) : [];
+    state.dailyDayKey = data.dailyDayKey || '';
+    state.dailyStreak = Number(data.dailyStreak) || 0;
+    state.dailyLastClearDay = data.dailyLastClearDay || '';
     state.combo = 1;
     state.lastClickAt = 0;
     const last = Number(data.lastSaveAt) || Date.now();
     state.lastSaveAt = last;
+    syncYardStageFromProgress();
+    clampEnergy();
     ensureQuests();
+    ensureDailyGoals();
     // Prefer restoring a ready event over wiping it with a fresh cooldown
     if (state.eventReadyType) {
       showEventBanner(state.eventReadyType);
     } else if (!state.nextEventAt || state.nextEventAt < Date.now() - EVENT_MAX_MS) {
       scheduleNextEvent(EVENT_MIN_MS * 0.4);
     }
+    // energy regen while offline (capped)
+    {
+      const offSec = Math.max(0, (Date.now() - last) / 1000);
+      state.energy = Math.min(getEnergyMax(), (isFinite(state.energy) ? state.energy : getEnergyMax()) + getEnergyRegen() * Math.min(offSec, 4 * 3600));
+    }
+    // finish walk if ended while away
+    if (state.activeWalk && state.activeWalk.endsAt && state.activeWalk.endsAt <= Date.now()) {
+      completeWalk(true);
+    }
     const elapsedSec = Math.min(getOfflineCapSec(), Math.max(0, (Date.now() - last) / 1000));
     const boostBackup = state.adBoostUntil;
     const itemBackup = state.activeItem;
     state.adBoostUntil = 0;
     state.activeItem = null;
-    const rate = getOrePerSec();
+    const rate = getOrePerSec() * getOfflineEfficiency();
     state.adBoostUntil = boostBackup;
     state.activeItem = itemBackup;
     const gained = rate * elapsedSec;
@@ -2113,6 +2740,11 @@
     if (!isFinite(state.acorns) || state.acorns < 0) state.acorns = 0;
     const gain = getOrePerSec() * dt;
     if (gain > 0 && isFinite(gain)) { state.ore += gain; state.stats.lifetimeBones += gain; bumpQuest('earn', gain); }
+    regenEnergy(dt);
+    if (state.activeWalk && state.activeWalk.endsAt <= Date.now()) {
+      // auto-notify once via UI; claim on button
+      updateWalkUI();
+    }
     decayCombo(dt);
     renderStats();
     checkEventTimer();
@@ -2137,7 +2769,7 @@
       return;
     }
     const hours = Math.round(getOfflineCapSec() / 3600);
-    text.textContent = 'Пока вас не было, хвостики набрали +' + fmt(gained) + ' косточек (макс. ' + hours + ' ч).';
+    text.textContent = 'Пока вас не было, хвостики набрали +' + fmt(gained) + ' косточек (макс. ' + hours + ' ч, эффективность офлайна ' + Math.round(getOfflineEfficiency() * 100) + '% — качайте Будку и Лежанку).';
     modal.hidden = false;
     const hide = function () { modal.hidden = true; if (window.Sounds) window.Sounds.playOffline(); };
     close && close.addEventListener('click', hide, { once: true });
@@ -2149,6 +2781,11 @@
     $('#btn-ad') && $('#btn-ad').addEventListener('click', onRewarded);
     $('#btn-save') && $('#btn-save').addEventListener('click', manualSave);
     $('#btn-joy') && $('#btn-joy').addEventListener('click', activateJoy);
+    $('#btn-rest') && $('#btn-rest').addEventListener('click', doRest);
+    $('#btn-walk') && $('#btn-walk').addEventListener('click', onWalkButton);
+    document.querySelectorAll('[data-walk-close]').forEach(function (el) {
+      el.addEventListener('click', function () { const s = $('#walk-sheet'); if (s) s.hidden = true; });
+    });
     $('#btn-event') && $('#btn-event').addEventListener('click', onEventButton);
     $('#btn-prestige') && $('#btn-prestige').addEventListener('click', openPrestigeModal);
     $('#prestige-confirm') && $('#prestige-confirm').addEventListener('click', doPrestige);
@@ -2228,11 +2865,11 @@
       await window.GPBridge.waitForGp(10000);
       const data = await window.GPBridge.loadCloudSave();
       if (data) gained = applySave(data);
-      else { ensureQuests(); scheduleNextEvent(EVENT_MIN_MS * 0.35); }
+      else { ensureQuests(); ensureDailyGoals(); state.energy = getEnergyMax(); scheduleNextEvent(EVENT_MIN_MS * 0.35); }
     } else {
       const data = readLocalSave();
       if (data) gained = applySave(data);
-      else { ensureQuests(); scheduleNextEvent(EVENT_MIN_MS * 0.35); }
+      else { ensureQuests(); ensureDailyGoals(); state.energy = getEnergyMax(); scheduleNextEvent(EVENT_MIN_MS * 0.35); }
     }
 
     applyBreedArt();

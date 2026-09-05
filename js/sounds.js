@@ -157,6 +157,22 @@
     noiseBurst(0.06, 0.025, 0.02);
   }
 
+  function playWalkStart() {
+    unlock();
+    tone(349.23, 0.1, 'triangle', 0.08, 0);
+    tone(440, 0.12, 'sine', 0.07, 0.1);
+    tone(523.25, 0.14, 'triangle', 0.06, 0.22);
+    noiseBurst(0.08, 0.02, 0.05);
+  }
+
+  function playWalkDone() {
+    unlock();
+    tone(392, 0.12, 'sine', 0.09, 0);
+    tone(523.25, 0.14, 'triangle', 0.1, 0.12);
+    tone(659.25, 0.18, 'sine', 0.1, 0.26);
+    tone(784, 0.26, 'sine', 0.09, 0.42);
+  }
+
   function isMuted() { return muted; }
 
   function setMuted(v) {
@@ -206,6 +222,8 @@
     playPrestige: playPrestige,
     playReward: playReward,
     playError: playError,
+    playWalkStart: playWalkStart,
+    playWalkDone: playWalkDone,
     unlock: unlock,
     isMuted: isMuted,
     setMuted: setMuted,

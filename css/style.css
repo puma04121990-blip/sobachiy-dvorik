@@ -1691,3 +1691,137 @@ footer.hint {
     animation: none !important;
   }
 }
+
+
+/* ——— v5 retention: energy, walks, stages ——— */
+.energy-wrap {
+  width: min(78vw, 260px);
+  margin: 10px auto 0;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 4px 14px rgba(196, 120, 74, 0.1);
+  backdrop-filter: blur(4px);
+}
+.energy-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.energy-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(92, 64, 51, 0.12);
+  overflow: hidden;
+}
+.energy-bar > span,
+#energy-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7ec8e8, #5bb8a8 45%, #f0c14a);
+  transition: width 0.2s ease;
+}
+
+.actions-main {
+  grid-template-columns: 1fr 1fr;
+}
+.btn-walk {
+  background: linear-gradient(180deg, #e8f7ff, #d4eefc);
+  border-color: #7ec8e8;
+  color: #3a7aaa;
+}
+.btn-rest {
+  background: linear-gradient(180deg, #f3f0ff, #e6e0ff);
+  border-color: #b8a8e8;
+  color: #6a5aad;
+}
+.walk-meta {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin: 4px 0 0;
+  min-height: 1.1em;
+}
+.walk-sheet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.walk-tier-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  padding: 12px 14px;
+  cursor: pointer;
+  color: var(--text);
+}
+.walk-tier-btn.locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.walk-tier-ico { font-size: 1.5rem; }
+.walk-tier-body { display: flex; flex-direction: column; gap: 2px; }
+.walk-tier-body small { color: var(--muted); font-size: 0.78rem; }
+
+.yard-stage-card {
+  background: linear-gradient(180deg, #fff8f0, #ffe9d4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+  box-shadow: 0 3px 12px rgba(196, 120, 74, 0.1);
+}
+.yard-stage-title {
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+.yard-stage-meta,
+.yard-stage-hook {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin: 6px 0;
+}
+.yard-stage-wrap { margin-top: 14px; }
+
+.gate-hint {
+  font-size: 0.72rem;
+  color: #a0673a;
+  margin-bottom: 6px;
+}
+
+.section-subhead {
+  margin: 14px 0 8px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.quest-card.daily-goal {
+  border-color: #7ec8e8;
+  background: linear-gradient(180deg, #f5fbff, #fff);
+}
+.quest-card.claimed {
+  opacity: 0.7;
+}
+.medal-shop {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+@media (min-width: 520px) {
+  .actions-main {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+}

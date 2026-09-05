@@ -56,14 +56,21 @@
       </span>
       <span class="mine-label">ПОЧЕСАТЬ</span>
     </button>
+    <div class="energy-wrap" id="energy-wrap" aria-label="Энергия пса">
+      <div class="energy-top"><span>⚡ Энергия</span><span id="energy-label">100 / 100</span></div>
+      <div class="energy-bar"><span id="energy-fill" style="width:100%"></span></div>
+    </div>
   </section>
 
-  <div class="actions">
+  <div class="actions actions-main">
     <button type="button" class="btn btn-joy" id="btn-joy">Радость x2 · 10с</button>
+    <button type="button" class="btn btn-walk" id="btn-walk" data-walk-action="menu">Прогулка</button>
+    <button type="button" class="btn btn-rest" id="btn-rest">Отдых</button>
     <button type="button" class="btn btn-event" id="btn-event">Событие</button>
     <button type="button" class="btn btn-ad" id="btn-ad">Видео: двойные косточки</button>
     <button type="button" class="btn btn-save" id="btn-save">Сохранить</button>
   </div>
+  <p class="walk-meta" id="walk-meta">2–5 мин · энергия</p>
 
   <nav class="tabs" role="tablist" aria-label="Разделы">
     <button type="button" class="tab active" data-tab="shop" role="tab" aria-selected="true">
@@ -149,7 +156,7 @@
 
   <section class="panel-section" id="panel-yard" data-panel="yard" hidden>
     <h2>Двор</h2>
-    <p class="panel-hint">Смените фон за пёсиком. Открывается за косточки или на сезонном фестивале.</p>
+    <p class="panel-hint">Этапы двора, фоны и бонусы. Фоны — за косточки, медальки или сезон.</p>
     <div id="yards"></div>
   </section>
 
@@ -168,8 +175,8 @@
   </section>
 
   <section class="panel-section" id="panel-quests" data-panel="quests" hidden>
-    <h2>Квесты дня</h2>
-    <p class="panel-hint">Простые цели с наградой в косточках.</p>
+    <h2>Квесты и цели</h2>
+    <p class="panel-hint">Ежедневные цели (Владивосток) и квесты. Серия сбрасывается, если день пропущен.</p>
     <div id="quests"></div>
   </section>
 
@@ -189,9 +196,10 @@
     <h2>Выставка 🏅</h2>
     <div class="prestige-card">
       <p id="prestige-info"></p>
-      <p class="panel-hint">Сбросятся уровни апгрейдов и текущие косточки. Останутся породы, двор, друзья, альбом, история, достижения и медальки.</p>
+      <p class="panel-hint">Сбросятся уровни апгрейдов и текущие косточки. Останутся породы, двор, друзья, альбом, этапы, медаль-апгрейды, история, достижения и медальки.</p>
       <button type="button" class="btn btn-prestige" id="btn-prestige">Устроить выставку</button>
     </div>
+    <div id="medal-shop" class="medal-shop"></div>
   </section>
 
   <section class="panel-section" id="panel-gpshop" data-panel="gpshop" hidden>
@@ -268,6 +276,17 @@
       <div class="hide-tries" id="hide-tries">Попыток: 2</div>
       <div class="hide-cards" id="hide-cards"></div>
       <p class="game-hint" id="hide-status"></p>
+    </div>
+  </div>
+
+  <div id="walk-sheet" class="more-sheet" hidden>
+    <button type="button" class="more-sheet-backdrop" data-walk-close aria-label="Закрыть"></button>
+    <div class="more-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="walk-sheet-title">
+      <div class="more-sheet-handle" aria-hidden="true"></div>
+      <h3 id="walk-sheet-title" class="more-sheet-title">Прогулка 🦮</h3>
+      <p class="panel-hint">Тратит энергию и косточки. Идёт в фоне по таймеру.</p>
+      <div id="walk-sheet-list" class="walk-sheet-list"></div>
+      <button type="button" class="btn btn-ghost more-sheet-close" data-walk-close>Закрыть</button>
     </div>
   </div>
 
