@@ -7,7 +7,6 @@
   <title>Собачий дворик — Dog Yard Clicker</title>
   <link rel="stylesheet" href="css/style.css" />
   <style>
-    #gp-status,
     footer.hint { display: none !important; }
   </style>
 </head>
@@ -16,7 +15,7 @@
     <h1>🐕 Собачий дворик</h1>
     <div class="header-right">
       <button type="button" class="btn-mute" id="btn-mute" aria-label="Звук" title="Звук">🔊</button>
-      <span id="gp-status" class="gp-chip gp-off" hidden>Загрузка…</span>
+      <span id="gp-status" class="gp-chip gp-off" aria-live="polite">Локально</span>
     </div>
   </header>
 
@@ -55,7 +54,7 @@
     <div class="yard-bg" id="yard-bg" aria-hidden="true"></div>
     <button type="button" id="mine-btn" aria-label="Почесать пёсика">
       <span class="dog-wrap" aria-hidden="true">
-        <img id="dogArt" src="assets/dog-click.png" alt="Щенок" class="dog-art" />
+        <img id="dogArt" src="assets/dog-click.webp" alt="Щенок" class="dog-art" />
         <img id="friendArt" class="friend-art" alt="" hidden />
       </span>
       <span class="mine-label">ПОЧЕСАТЬ</span>
@@ -347,6 +346,7 @@
 
   <script src="js/gp-bridge.js"></script>
   <script src="js/sounds.js"></script>
+  <script src="js/game-core.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

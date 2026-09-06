@@ -1,6 +1,6 @@
 # Собачий дворик (Dog Yard Clicker)
 
-Idle/clicker на чистом HTML5 для [GamePush](https://gamepush.com/). Милая тема про пёсиков и косточки. Без сборки. **Content pack v5 (retention)**.
+Idle/clicker на чистом HTML5 для [GamePush](https://gamepush.com/). Милая тема про пёсиков и косточки. Без обязательной сборки. **Content pack v5 (retention)**.
 
 Папка проекта: `sobachiy-dvorik` (локальный сервер на порту 8765).
 
@@ -55,3 +55,17 @@ python3 -m http.server 8765 --bind 127.0.0.1
 | Save | Автосейв v5; старые сейвы мигрируют без вайпа |
 
 Баланс-константы в начале `js/game.js`.
+
+## Проверки разработчика
+
+```bash
+npm test
+npm run check
+python3 -m http.server 8765 --bind 127.0.0.1
+```
+
+Чистая игровая математика находится в `js/game-core.js`, а тесты — в `tests/game-core.test.js`. Сохранения в облако отправляются последовательно, чтобы параллельные autosave-вызовы не могли перезаписать новый прогресс старым payload. Сохранённые строки квестов и сюжетных сцен выводятся как текст, а не как HTML.
+
+Изображения хранятся в оптимизированном формате WebP. Статус в верхней части интерфейса показывает режим SDK, cloud save, рекламу и платежи; при ошибке cloud save игра продолжает работать через localStorage.
+
+Если GamePush показывает ошибку `project token invalid`, необходимо заменить `projectId` и `publicToken` в `index.html` и `js/gp-bridge.js` значениями из актуального Install Code панели GamePush. Эти значения нельзя восстановить по коду игры.

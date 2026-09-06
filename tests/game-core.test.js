@@ -1,0 +1,23 @@
+const assert = require('node:assert/strict');
+const core = require('../js/game-core.js');
+
+assert.equal(core.softcapValue(100, 180, 0.5), 100);
+assert.equal(core.softcapValue(280, 180, 0.5), 190);
+assert.equal(core.softcapValue(-5, 180, 0.5), 0);
+assert.equal(core.geometricCost(100, 1.25, 0), 100);
+assert.equal(core.geometricCost(100, 1.25, 2), 156);
+assert.equal(core.geometricCost(100, 0.5, 2), 100);
+assert.equal(core.offlineGain(10, 0.2, 3600, 28800), 7200);
+assert.equal(core.offlineGain(10, 0.2, 999999, 28800), 57600);
+assert.equal(core.offlineGain(10, 0.2, -1, 28800), 0);
+assert.equal(core.clampProgress(99, 10), 10);
+assert.equal(core.clampProgress(-2, 10), 0);
+assert.deepEqual(core.normalizeSave({ v: 4, ore: 12 }), { v: 4, ore: 12 });
+assert.equal(core.normalizeSave(null), null);
+assert.equal(core.normalizeSave([]), null);
+const hostile = JSON.parse('{"ore":10,"__proto__":{"polluted":true}}');
+const normalized = core.normalizeSave(hostile);
+assert.equal(normalized.ore, 10);
+assert.equal(Object.prototype.polluted, undefined);
+
+console.log('game-core tests: ok');

@@ -101,27 +101,27 @@
   const TRAINING_ORDER = TRAINING.map(function (t) { return t.id; });
 
   const BREEDS = {
-    lab: { id: 'lab', name: 'Лабрадор', desc: 'Сбалансированный старт', src: 'assets/dog-click.png', unlockCost: 0, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: true },
-    corgi: { id: 'corgi', name: 'Корги', desc: '+5% к почесушкам', src: 'assets/dog-corgi.png', unlockCost: 35000, reqLifetime: 1e5, bonuses: { clickMult: 1.05, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: false },
-    husky: { id: 'husky', name: 'Хаски', desc: '+5% к idle', src: 'assets/dog-husky.png', unlockCost: 140000, reqLifetime: 5e5, bonuses: { clickMult: 1, idleMult: 1.05, comboWindowBonus: 0 }, startUnlocked: false },
-    dachshund: { id: 'dachshund', name: 'Такса', desc: '+200 мс к окну комбо', src: 'assets/dog-dachshund.png', unlockCost: 450000, reqLifetime: 2.5e6, reqMedals: 1, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 200 }, startUnlocked: false },
-    shiba: { id: 'shiba', name: 'Сиба', desc: '+4% к почесушкам и +2% idle', src: 'assets/dog-shiba.png', unlockCost: 1.2e6, reqLifetime: 6e6, reqMedals: 2, bonuses: { clickMult: 1.04, idleMult: 1.02, comboWindowBonus: 0 }, startUnlocked: false },
-    poodle: { id: 'poodle', name: 'Пудель', desc: '+8% к idle', src: 'assets/dog-poodle.png', unlockCost: 2.8e6, reqLifetime: 2.5e7, reqMedals: 3, bonuses: { clickMult: 1, idleMult: 1.08, comboWindowBonus: 0 }, startUnlocked: false },
-    beagle: { id: 'beagle', name: 'Бигль', desc: '+6% к почесушкам · +80 мс комбо', src: 'assets/dog-beagle.png', unlockCost: 7e6, reqLifetime: 8e7, reqMedals: 5, bonuses: { clickMult: 1.06, idleMult: 1, comboWindowBonus: 80 }, startUnlocked: false },
+    lab: { id: 'lab', name: 'Лабрадор', desc: 'Сбалансированный старт', src: 'assets/dog-click.webp', unlockCost: 0, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: true },
+    corgi: { id: 'corgi', name: 'Корги', desc: '+5% к почесушкам', src: 'assets/dog-corgi.webp', unlockCost: 35000, reqLifetime: 1e5, bonuses: { clickMult: 1.05, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: false },
+    husky: { id: 'husky', name: 'Хаски', desc: '+5% к idle', src: 'assets/dog-husky.webp', unlockCost: 140000, reqLifetime: 5e5, bonuses: { clickMult: 1, idleMult: 1.05, comboWindowBonus: 0 }, startUnlocked: false },
+    dachshund: { id: 'dachshund', name: 'Такса', desc: '+200 мс к окну комбо', src: 'assets/dog-dachshund.webp', unlockCost: 450000, reqLifetime: 2.5e6, reqMedals: 1, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 200 }, startUnlocked: false },
+    shiba: { id: 'shiba', name: 'Сиба', desc: '+4% к почесушкам и +2% idle', src: 'assets/dog-shiba.webp', unlockCost: 1.2e6, reqLifetime: 6e6, reqMedals: 2, bonuses: { clickMult: 1.04, idleMult: 1.02, comboWindowBonus: 0 }, startUnlocked: false },
+    poodle: { id: 'poodle', name: 'Пудель', desc: '+8% к idle', src: 'assets/dog-poodle.webp', unlockCost: 2.8e6, reqLifetime: 2.5e7, reqMedals: 3, bonuses: { clickMult: 1, idleMult: 1.08, comboWindowBonus: 0 }, startUnlocked: false },
+    beagle: { id: 'beagle', name: 'Бигль', desc: '+6% к почесушкам · +80 мс комбо', src: 'assets/dog-beagle.webp', unlockCost: 7e6, reqLifetime: 8e7, reqMedals: 5, bonuses: { clickMult: 1.06, idleMult: 1, comboWindowBonus: 80 }, startUnlocked: false },
   };
   const BREED_COUNT = Object.keys(BREEDS).length;
 
   const YARDS = {
-    sunny: { id: 'sunny', name: 'Солнечный', desc: 'Тёплый день во дворе', src: 'assets/yard-sunny.png', unlockCost: 0, startUnlocked: true },
-    evening: { id: 'evening', name: 'Вечер', desc: 'Мягкий закат', src: 'assets/yard-evening.png', unlockCost: 80000, reqLifetime: 3.5e5, startUnlocked: false },
-    winter: { id: 'winter', name: 'Зима', desc: 'Снежный дворик', src: 'assets/yard-winter.png', unlockCost: 600000, reqLifetime: 3.5e6, reqMedals: 1, startUnlocked: false },
-    autumn: { id: 'autumn', name: 'Осень', desc: 'Золотые листья фестиваля', src: 'assets/yard-autumn.png', unlockCost: 0, startUnlocked: false, seasonOnly: true },
+    sunny: { id: 'sunny', name: 'Солнечный', desc: 'Тёплый день во дворе', src: 'assets/yard-sunny.webp', unlockCost: 0, startUnlocked: true },
+    evening: { id: 'evening', name: 'Вечер', desc: 'Мягкий закат', src: 'assets/yard-evening.webp', unlockCost: 80000, reqLifetime: 3.5e5, startUnlocked: false },
+    winter: { id: 'winter', name: 'Зима', desc: 'Снежный дворик', src: 'assets/yard-winter.webp', unlockCost: 600000, reqLifetime: 3.5e6, reqMedals: 1, startUnlocked: false },
+    autumn: { id: 'autumn', name: 'Осень', desc: 'Золотые листья фестиваля', src: 'assets/yard-autumn.webp', unlockCost: 0, startUnlocked: false, seasonOnly: true },
   };
 
   const FRIENDS = {
-    cat: { id: 'cat', name: 'Котик', desc: '+3% к почесушкам', src: 'assets/pet-cat.png', unlockCost: 70000, reqLifetime: 2.5e5, bonuses: { clickMult: 1.03, idleMult: 1 } },
-    rabbit: { id: 'rabbit', name: 'Кролик', desc: '+3% к idle', src: 'assets/pet-rabbit.png', unlockCost: 180000, reqLifetime: 7e5, bonuses: { clickMult: 1, idleMult: 1.03 } },
-    hamster: { id: 'hamster', name: 'Хомячок', desc: '+2% клик · +2% idle', src: 'assets/pet-hamster.png', unlockCost: 450000, reqLifetime: 2.5e6, reqMedals: 1, bonuses: { clickMult: 1.02, idleMult: 1.02 } },
+    cat: { id: 'cat', name: 'Котик', desc: '+3% к почесушкам', src: 'assets/pet-cat.webp', unlockCost: 70000, reqLifetime: 2.5e5, bonuses: { clickMult: 1.03, idleMult: 1 } },
+    rabbit: { id: 'rabbit', name: 'Кролик', desc: '+3% к idle', src: 'assets/pet-rabbit.webp', unlockCost: 180000, reqLifetime: 7e5, bonuses: { clickMult: 1, idleMult: 1.03 } },
+    hamster: { id: 'hamster', name: 'Хомячок', desc: '+2% клик · +2% idle', src: 'assets/pet-hamster.webp', unlockCost: 450000, reqLifetime: 2.5e6, reqMedals: 1, bonuses: { clickMult: 1.02, idleMult: 1.02 } },
   };
 
   const STICKERS = [
@@ -420,6 +420,7 @@
     if (isSeasonActive() && ac >= 3) grantSticker('leaf', true);
   }
   function softcapValue(v, soft, power) {
+    if (window.GameCore && window.GameCore.softcapValue) return window.GameCore.softcapValue(v, soft, power);
     if (!isFinite(v) || v <= soft) return Math.max(0, v || 0);
     return soft + Math.pow(v - soft, power);
   }
@@ -589,6 +590,7 @@
   }
   function upgradeCost(id) {
     const u = UPGRADES[id];
+    if (window.GameCore && window.GameCore.geometricCost) return window.GameCore.geometricCost(u.baseCost, u.costMult, state.levels[id] || 0);
     return Math.floor(u.baseCost * Math.pow(u.costMult, state.levels[id] || 0));
   }
   function unlockReqText(unlock) {
@@ -615,6 +617,7 @@
   function trainingCost(id) {
     const t = TRAINING.find(function (x) { return x.id === id; });
     if (!t) return Infinity;
+    if (window.GameCore && window.GameCore.geometricCost) return window.GameCore.geometricCost(t.baseCost, t.costMult, state.levelsTraining[id] || 0);
     return Math.floor(t.baseCost * Math.pow(t.costMult, state.levelsTraining[id] || 0));
   }
   function isTrainingUnlocked(id) {
@@ -639,6 +642,12 @@
     if (abs >= 100) return Math.floor(n).toString();
     if (abs >= 10) return n.toFixed(1);
     return n.toFixed(2);
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    });
   }
 
   const $ = (sel) => document.querySelector(sel);
@@ -1321,8 +1330,8 @@
       const pct = g.target > 0 ? Math.min(100, Math.floor((g.progress / g.target) * 100)) : 0;
       let btn = '';
       if (g.claimed) btn = '<span class="breed-active">Получено ✓</span>';
-      else if (done) btn = '<button type="button" class="btn btn-sm" data-claim-daily="' + g.id + '">Забрать</button>';
-      card.innerHTML = '<div class="quest-title">' + g.label + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(g.progress, g.target)) + ' / ' + fmt(g.target) + ' · 🦴 ' + fmt(g.reward) + '</div>' + btn;
+      else if (done) btn = '<button type="button" class="btn btn-sm" data-claim-daily="' + escapeHtml(g.id) + '">Забрать</button>';
+      card.innerHTML = '<div class="quest-title">' + escapeHtml(g.label) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(g.progress, g.target)) + ' / ' + fmt(g.target) + ' · 🦴 ' + fmt(g.reward) + '</div>' + btn;
       root.appendChild(card);
     });
     const qHead = document.createElement('div');
@@ -1334,7 +1343,7 @@
       const card = document.createElement('div');
       card.className = 'quest-card' + (done ? ' done' : '');
       const pct = q.target > 0 ? Math.min(100, Math.floor((q.progress / q.target) * 100)) : 0;
-      card.innerHTML = '<div class="quest-title">' + q.label + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(q.progress, q.target)) + ' / ' + fmt(q.target) + ' · награда 🦴 ' + fmt(q.reward) + '</div>' + (done ? '<button type="button" class="btn btn-sm" data-claim="' + q.id + '">Забрать</button>' : '');
+      card.innerHTML = '<div class="quest-title">' + escapeHtml(q.label) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(q.progress, q.target)) + ' / ' + fmt(q.target) + ' · награда 🦴 ' + fmt(q.reward) + '</div>' + (done ? '<button type="button" class="btn btn-sm" data-claim="' + escapeHtml(q.id) + '">Забрать</button>' : '');
       root.appendChild(card);
     });
     root.querySelectorAll('[data-claim]').forEach(function (btn) {
@@ -1429,7 +1438,11 @@
       const line = storyPlaying.lines[i];
       const div = document.createElement('div');
       div.className = 'story-line ' + (line.who === 'dog' ? 'dog' : 'narrator');
-      div.innerHTML = '<span class="who">' + (line.who === 'dog' ? 'Пёсик' : 'Рассказчик') + '</span>' + line.text;
+      const who = document.createElement('span');
+      who.className = 'who';
+      who.textContent = line.who === 'dog' ? 'Пёсик' : 'Рассказчик';
+      div.appendChild(who);
+      div.appendChild(document.createTextNode(String(line.text == null ? '' : line.text)));
       box.appendChild(div);
     }
     box.scrollTop = box.scrollHeight;
@@ -2607,7 +2620,10 @@
 
   function migrateSave(data) {
     if (!data || typeof data !== 'object') return null;
-    const out = Object.assign({}, data);
+    const out = window.GameCore && window.GameCore.normalizeSave
+      ? window.GameCore.normalizeSave(data)
+      : Object.assign({}, data);
+    if (!out) return null;
     const ver = Number(out.v) || 1;
     if (ver < 2) {
       out.prestigeLevel = Number(out.prestigeLevel) || 0;
@@ -2853,7 +2869,9 @@
     const rate = getOrePerSec() * getOfflineEfficiency();
     state.adBoostUntil = boostBackup;
     state.activeItem = itemBackup;
-    const gained = rate * elapsedSec;
+    const gained = window.GameCore && window.GameCore.offlineGain
+      ? window.GameCore.offlineGain(rate, 1, elapsedSec, getOfflineCapSec())
+      : rate * elapsedSec;
     if (gained > 0.01) { state.ore += gained; state.stats.lifetimeBones += gained; return gained; }
     return 0;
   }
@@ -2991,11 +3009,13 @@
     function setGpStatus() {
       const status = $('#gp-status');
       if (!status) return;
-      const connected = window.GPBridge && window.GPBridge.isGpConnected();
-      status.textContent = connected ? 'GamePush' : 'Локально';
-      status.classList.toggle('gp-on', !!connected);
-      status.classList.toggle('gp-off', !connected);
-      status.title = connected ? 'Облако GamePush' : 'Локальное сохранение';
+      const bridge = window.GPBridge;
+      const info = bridge && bridge.getStatus ? bridge.getStatus() : { connected: false, sdk: 'local', cloudSave: 'local', ads: 'local', payments: 'local' };
+      const label = info.connected ? (info.cloudSave === 'error' ? 'GamePush · cloud ошибка' : 'GamePush · cloud') : 'Локально';
+      status.textContent = label;
+      status.classList.toggle('gp-on', !!info.connected && info.cloudSave !== 'error');
+      status.classList.toggle('gp-off', !info.connected || info.cloudSave === 'error');
+      status.title = 'SDK: ' + info.sdk + ' · сохранение: ' + info.cloudSave + ' · реклама: ' + info.ads + ' · платежи: ' + info.payments + (info.lastError ? ' · ' + info.lastError : '');
     }
 
     function syncMuteBtn() {
@@ -3033,6 +3053,7 @@
     requestAnimationFrame(tick);
     requestAnimationFrame(tickShopThrottle);
     setInterval(function () { persist(); }, AUTOSAVE_MS);
+    setInterval(setGpStatus, AUTOSAVE_MS);
 
     setGpStatus();
     applyNoAdsUi();

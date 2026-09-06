@@ -13,6 +13,14 @@ const FULLSCREEN_COOLDOWN_MS = 180 * 1000;
 let _gp = null;
 let _readyPromise = null;
 let _lastFullscreenAt = 0;
+let _saveChain = Promise.resolve();
+const _status = {
+  sdk: 'loading',
+  cloudSave: 'unknown',
+  ads: 'unknown',
+  payments: 'unknown',
+  lastError: '',
+};
 
 function isPlaceholder(v) {
   if (!v) return true;
@@ -47,6 +55,7 @@ function waitForGp(timeoutMs = GP_READY_TIMEOUT_MS) {
       if (settled) return;
       settled = true;
       _gp = gp || null;
+      _status.sdk = _gp ? 'ready' : 'local';
       resolve(_gp);
     };
 
@@ -91,10 +100,13 @@ async function loadCloudSave() {
           try {
             localStorage.setItem(LOCAL_KEY, JSON.stringify(parsed));
           } catch (_) {}
+          _status.cloudSave = 'ready';
           return parsed;
         }
       }
     } catch (e) {
+      _status.cloudSave = 'error';
+      _status.lastError = (e && e.message) || 'cloud_load_failed';
       console.warn('[gp-bridge] cloud load failed, using local', e);
     }
   }
@@ -121,24 +133,41 @@ async function saveCloudSave(state) {
     return;
   }
 
-  const gp = getGp();
-  if (gp && gp.player) {
+  // Keep all cloud writes ordered: autosave, manual save, and rewards can
+  // otherwise race and let an older payload overwrite a newer one.
+  _saveChain = _saveChain.catch(function () {}).then(async function () {
+    const gp = getGp();
+    if (!gp || !gp.player) {
+      _status.cloudSave = 'local';
+      return;
+    }
     try {
       await gp.player.ready;
       gp.player.set('save', json);
       await gp.player.sync();
+      _status.cloudSave = 'ready';
     } catch (e) {
+      _status.cloudSave = 'error';
+      _status.lastError = (e && e.message) || 'cloud_save_failed';
       console.warn('[gp-bridge] cloud save failed', e);
     }
-  }
+  });
+  return _saveChain;
 }
 
 function isRewardedAvailable() {
   const gp = getGp();
-  if (!gp || !gp.ads) return true; // local stub always "available"
+  if (!gp || !gp.ads) { _status.ads = 'local'; return true; }
   try {
-    if (typeof gp.ads.isRewardedAvailable === 'boolean') return gp.ads.isRewardedAvailable;
-    if (typeof gp.ads.isRewardedAvailable === 'function') return !!gp.ads.isRewardedAvailable();
+    if (typeof gp.ads.isRewardedAvailable === 'boolean') {
+      _status.ads = gp.ads.isRewardedAvailable ? 'ready' : 'unavailable';
+      return gp.ads.isRewardedAvailable;
+    }
+    if (typeof gp.ads.isRewardedAvailable === 'function') {
+      const ok = !!gp.ads.isRewardedAvailable();
+      _status.ads = ok ? 'ready' : 'unavailable';
+      return ok;
+    }
   } catch (_) {}
   return true;
 }
@@ -158,10 +187,13 @@ async function showRewarded() {
         return false;
       }
       const result = await gp.ads.showRewardedVideo();
+      _status.ads = 'ready';
       if (result === true) return true;
       if (result && (result.success || result.rewarded || result.isRewarded)) return true;
       return !!result;
     } catch (e) {
+      _status.ads = 'error';
+      _status.lastError = (e && e.message) || 'rewarded_failed';
       console.warn('[gp-bridge] rewarded failed', e);
       return false;
     }
@@ -203,11 +235,20 @@ async function showFullscreen(force) {
 
 function isPaymentsAvailable() {
   const gp = getGp();
-  if (!gp || !gp.payments) return false;
+  if (!gp || !gp.payments) { _status.payments = 'local'; return false; }
   try {
-    if (typeof gp.payments.isAvailable === 'boolean') return gp.payments.isAvailable;
-    if (typeof gp.payments.isAvailable === 'function') return !!gp.payments.isAvailable();
-    return typeof gp.payments.purchase === 'function';
+    if (typeof gp.payments.isAvailable === 'boolean') {
+      _status.payments = gp.payments.isAvailable ? 'ready' : 'unavailable';
+      return gp.payments.isAvailable;
+    }
+    if (typeof gp.payments.isAvailable === 'function') {
+      const ok = !!gp.payments.isAvailable();
+      _status.payments = ok ? 'ready' : 'unavailable';
+      return ok;
+    }
+    const ok = typeof gp.payments.purchase === 'function';
+    _status.payments = ok ? 'ready' : 'unavailable';
+    return ok;
   } catch (_) {
     return false;
   }
@@ -308,6 +349,10 @@ function isGpConnected() {
   return !!getGp();
 }
 
+function getStatus() {
+  return Object.assign({}, _status, { connected: isGpConnected() });
+}
+
 function getProjectConfig() {
   return {
     PROJECT_ID,
@@ -333,5 +378,6 @@ window.GPBridge = {
   fetchProducts,
   hideSticky,
   isGpConnected,
+  getStatus,
   getProjectConfig,
 };
