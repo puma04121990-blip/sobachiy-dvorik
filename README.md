@@ -2,12 +2,12 @@
 
 Idle/clicker на чистом HTML5 для [GamePush](https://gamepush.com/). Милая тема про пёсиков и косточки. Без сборки. **Content pack v5 (retention)**.
 
-Папка проекта: `ore-mine-clicker` (локальный сервер на порту 8765).
+Папка проекта: `sobachiy-dvorik` (локальный сервер на порту 8765).
 
 ## Локально
 
 ```bash
-cd /workspace/ore-mine-clicker
+cd /path/to/sobachiy-dvorik
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
@@ -17,7 +17,7 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 1. Панель → **Установить код** → `projectId` / `publicToken` (уже: **30253**).
 2. Поле игрока **`save`** (строка/JSON) — уже используется в `js/gp-bridge.js`.
-3. Без SDK работает локально (`dog-yard-clicker-v1`, миграция с `ore-mine-clicker-v1`). Save **v5**.
+3. Без SDK работает локально (`dog-yard-clicker-v1`, миграция с `ore-mine-clicker-v1`). Формат сохранения — **v5**; суффикс ключа localStorage остаётся `v1` для совместимости.
 
 ### Продукты (обязательно создать в панели)
 

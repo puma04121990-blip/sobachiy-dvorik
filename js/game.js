@@ -21,7 +21,8 @@
   const SAVE_KEY = 'dog-yard-clicker-v1';
   const LEGACY_SAVE_KEY = 'ore-mine-clicker-v1';
   const SAVE_VERSION = 5;
-  const SEASON_FORCE = true;
+  // In production the festival follows the calendar. Set to true only for local QA.
+  const SEASON_FORCE = false;
   const ACORN_PER_CLICK = 0.022;
   const ACORN_EVENT_BASE = 7;
   const SEASON_BOOST_MULT = 1.25;
@@ -1966,7 +1967,10 @@
     const restBtn = $('#btn-rest');
     if (restBtn) {
       const now = Date.now();
-      if (now < (state.energyRestReadyAt || 0)) {
+      if (state.activeWalk) {
+        restBtn.disabled = true;
+        restBtn.textContent = state.activeWalk.endsAt > now ? 'Отдых после прогулки' : 'Заберите прогулку';
+      } else if (now < (state.energyRestReadyAt || 0)) {
         restBtn.disabled = true;
         restBtn.textContent = 'Отдых ' + Math.ceil((state.energyRestReadyAt - now) / 1000) + 'с';
       } else if (state.energy >= max - 0.5) {
@@ -1981,6 +1985,10 @@
   }
   function doRest() {
     const now = Date.now();
+    if (state.activeWalk) {
+      showToast(state.activeWalk.endsAt > now ? 'Пёсик ещё на прогулке 🐕‍🦺' : 'Сначала заберите прогулку 🐾');
+      return;
+    }
     if (now < (state.energyRestReadyAt || 0)) { showToast('Пёсик ещё отдыхает 🐾'); return; }
     const max = getEnergyMax();
     if (state.energy >= max - 0.5) { showToast('Энергия полная!'); return; }
