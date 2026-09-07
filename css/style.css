@@ -1,10 +1,9 @@
 /* Собачий дворик — soft warm cute dogs aesthetic, mobile-first */
-*,
-*::before,
-*::after {
+.dvorik,
+.dvorik *,
+.dvorik *::before,
+.dvorik *::after {
   box-sizing: border-box;
-  margin: 0;
-  padding: 0;
 }
 
 :root {
@@ -27,9 +26,17 @@
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Ubuntu, sans-serif;
 }
 
-html,
-body {
-  min-height: 100%;
+.dvorik {
+  min-height: 100dvh;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 12px 12px 28px;
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-bottom: max(28px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
   background:
     radial-gradient(ellipse at 50% -10%, #ffe0c8 0%, transparent 50%),
     radial-gradient(ellipse at 80% 60%, rgba(184, 217, 242, 0.45) 0%, transparent 45%),
@@ -38,16 +45,6 @@ body {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   overflow-x: hidden;
-}
-
-body {
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 12px 12px 28px;
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
 header.app-header {
@@ -62,24 +59,35 @@ header.app-header {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  max-width: 46%;
+  max-width: none;
 }
 
-.btn-mute {
+.header-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-mute,
+.btn-icon {
   width: 36px;
   height: 36px;
   border-radius: 50%;
   border: 1px solid var(--border);
   background: var(--bg-card);
+  color: var(--text);
   font-size: 1rem;
   line-height: 1;
   cursor: pointer;
   touch-action: manipulation;
   box-shadow: 0 2px 8px rgba(196, 120, 74, 0.1);
   padding: 0;
+  display: grid;
+  place-items: center;
 }
 
-.btn-mute:active {
+.btn-mute:active,
+.btn-icon:active {
   transform: scale(0.94);
 }
 
@@ -128,6 +136,10 @@ header h1 {
   gap: 8px;
 }
 
+.stats:has(#acorn-stat:not([hidden])) {
+  grid-template-columns: 1fr 1fr;
+}
+
 .stat {
   background: var(--bg-card);
   border: 1px solid var(--border);
@@ -173,6 +185,10 @@ header h1 {
   justify-content: center;
   padding: 16px 0 8px;
   min-height: 220px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: #ffe8d6;
 }
 
 #mine-btn {
@@ -186,9 +202,9 @@ header h1 {
   background:
     radial-gradient(circle at 35% 28%, #fff9f2 0%, #ffd4b0 32%, #f5a878 65%, #e8916a 100%);
   box-shadow:
-    0 0 0 5px rgba(232, 145, 106, 0.22),
-    0 0 0 10px rgba(126, 184, 232, 0.15),
-    0 12px 36px rgba(196, 120, 74, 0.28),
+    0 0 0 5px rgba(232, 145, 106, 0.28),
+    0 0 0 11px rgba(126, 184, 232, 0.18),
+    0 14px 40px rgba(92, 64, 51, 0.28),
     inset 0 -10px 24px rgba(180, 90, 50, 0.12);
   display: flex;
   flex-direction: column;
@@ -198,6 +214,7 @@ header h1 {
   padding: 0;
   transition: transform 0.12s ease;
   touch-action: manipulation;
+  z-index: 1;
 }
 
 .dog-wrap {
@@ -208,6 +225,7 @@ header h1 {
   display: block;
   pointer-events: none;
   animation: dog-bob 2.4s ease-in-out infinite;
+  background: #ffd4b0 url("assets/dog-click.webp") center 40% / cover no-repeat;
 }
 
 .dog-art {
@@ -218,8 +236,7 @@ header h1 {
   border-radius: 50%;
   display: block;
   pointer-events: none;
-  /* soften any hard photo edges against the warm button */
-  filter: saturate(1.05) contrast(1.02);
+  filter: saturate(1.08) contrast(1.06) drop-shadow(0 4px 10px rgba(92, 64, 51, 0.25));
 }
 
 .mine-label {
@@ -420,7 +437,9 @@ header h1 {
 }
 
 #shop,
-#gp-shop {
+#gp-shop,
+#training,
+#friends {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -494,7 +513,7 @@ header h1 {
 #toast {
   position: fixed;
   left: 50%;
-  bottom: 24px;
+  bottom: max(80px, calc(24px + env(safe-area-inset-bottom)));
   transform: translateX(-50%) translateY(20px);
   max-width: min(90vw, 400px);
   background: var(--bg-card);
@@ -506,7 +525,7 @@ header h1 {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.25s, transform 0.25s;
-  z-index: 100;
+  z-index: 360;
   text-align: center;
   box-shadow: 0 8px 28px rgba(92, 64, 51, 0.18);
 }
@@ -563,22 +582,14 @@ header h1 {
   box-shadow: 0 4px 14px var(--accent-glow);
 }
 
-footer.hint {
-  font-size: 0.7rem;
-  color: var(--muted);
-  text-align: center;
-  line-height: 1.4;
-  margin-top: auto;
-  padding-top: 8px;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .dog-wrap {
-    animation: none;
-  }
+  .dog-wrap,
   #mine-btn.clicked,
-  #mine-btn.pulse {
-    animation: none;
+  #mine-btn.pulse,
+  .panel-section.panel-fade,
+  #mine-btn.wag .dog-wrap,
+  .hint-first {
+    animation: none !important;
   }
   .fx-heart,
   .fx-sparkle {
@@ -863,6 +874,10 @@ footer.hint {
   display: none !important;
 }
 
+.panel-section[hidden] {
+  display: none !important;
+}
+
 .panel-section h2 {
   font-size: 0.95rem;
   margin-bottom: 6px;
@@ -1057,36 +1072,19 @@ footer.hint {
   gap: 8px;
 }
 
-@media (max-width: 360px) {
-  .tab {
-    font-size: 0.55rem;
-    padding: 5px 1px;
-    min-height: 44px;
-  }
-  .tab-ico {
-    font-size: 0.95rem;
-  }
-}
-
-/* ——— Content pack v3 ——— */
-.mine-area {
-  position: relative;
-  overflow: hidden;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: #ffe8d6;
-}
-
+/* ——— Yard background ——— */
 .yard-bg {
   position: absolute;
   inset: 0;
   z-index: 0;
+  background-image: url("assets/yard-sunny.webp");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   opacity: 0.92;
   pointer-events: none;
   transition: background-image 0.35s ease, filter 0.35s ease;
+  filter: saturate(1.05) contrast(1.04);
 }
 
 .yard-bg::after {
@@ -1097,30 +1095,6 @@ footer.hint {
     radial-gradient(ellipse at 50% 45%, transparent 35%, rgba(92, 64, 51, 0.22) 100%),
     linear-gradient(180deg, rgba(255, 245, 235, 0.12) 0%, rgba(255, 232, 214, 0.28) 55%, rgba(92, 64, 51, 0.18) 100%);
   pointer-events: none;
-}
-
-.yard-bg {
-  filter: saturate(1.05) contrast(1.04);
-}
-
-#mine-btn {
-  box-shadow:
-    0 0 0 5px rgba(232, 145, 106, 0.28),
-    0 0 0 11px rgba(126, 184, 232, 0.18),
-    0 14px 40px rgba(92, 64, 51, 0.28),
-    inset 0 -10px 24px rgba(180, 90, 50, 0.12);
-}
-
-.dog-art {
-  filter: saturate(1.08) contrast(1.06) drop-shadow(0 4px 10px rgba(92, 64, 51, 0.25));
-}
-
-#mine-btn {
-  z-index: 1;
-}
-
-.actions {
-  grid-template-columns: 1fr 1fr;
 }
 
 .actions .btn-joy {
@@ -1378,19 +1352,54 @@ footer.hint {
   margin-bottom: 4px;
 }
 
-@media (max-width: 375px) {
+@media (max-width: 480px) {
+  .album-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
   .tab {
-    font-size: 0.58rem;
+    font-size: 0.55rem;
     padding: 5px 1px;
   }
   .tab-ico {
-    font-size: 0.98rem;
+    font-size: 0.95rem;
   }
-  .actions .btn-joy {
-    grid-column: 1 / -1;
-  }
+  .actions .btn-joy,
   .btn-event {
     grid-column: 1 / -1;
+  }
+  .stats,
+  .stats:has(#acorn-stat:not([hidden])) {
+    grid-template-columns: 1fr 1fr;
+  }
+  .season-stat {
+    grid-column: auto;
+  }
+  header.app-header {
+    gap: 6px;
+  }
+  header h1 {
+    font-size: 1.02rem;
+  }
+  .btn-mute,
+  .btn-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 0.9rem;
+  }
+  #gp-status,
+  .gp-chip {
+    font-size: 0.6rem;
+    padding: 4px 8px;
+    max-width: 7.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .header-right {
+    gap: 4px;
+  }
+  .gp-product .btn-sm {
+    min-width: 76px;
+    min-height: 38px;
   }
 }
 
@@ -1606,49 +1615,6 @@ footer.hint {
   border-radius: 999px;
 }
 
-@media (max-width: 375px) {
-  .album-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .tab {
-    font-size: 0.55rem;
-  }
-  .stats {
-    grid-template-columns: 1fr 1fr;
-  }
-  .season-stat {
-    grid-column: 1 / -1;
-  }
-  header.app-header {
-    gap: 6px;
-  }
-  header h1 {
-    font-size: 1.02rem;
-  }
-  .btn-mute {
-    width: 32px;
-    height: 32px;
-    font-size: 0.9rem;
-  }
-  #gp-status,
-  .gp-chip {
-    font-size: 0.6rem;
-    padding: 4px 8px;
-    max-width: 7.5rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .header-right {
-    gap: 4px;
-    max-width: 48%;
-  }
-  .gp-product .btn-sm {
-    min-width: 76px;
-    min-height: 38px;
-  }
-}
-
-
 /* ——— Polish: panel micro-fade, GP shop, no-ads ——— */
 .panel-section.panel-fade {
   animation: panel-fade-in 0.18s ease-out;
@@ -1685,16 +1651,10 @@ footer.hint {
   padding: 13px 12px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .panel-section.panel-fade,
-  #mine-btn.wag .dog-wrap {
-    animation: none !important;
-  }
-}
-
-
-/* ——— v5 retention: energy, walks, stages ——— */
+/* ——— Energy, walks, stages ——— */
 .energy-wrap {
+  position: relative;
+  z-index: 2;
   width: min(78vw, 260px);
   margin: 10px auto 0;
   padding: 8px 12px;
@@ -1825,3 +1785,87 @@ footer.hint {
     grid-template-columns: 1fr 1fr 1fr;
   }
 }
+
+.boot-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(92, 64, 51, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.boot-overlay[hidden],
+.hint-first[hidden] {
+  display: none !important;
+}
+.boot-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 22px 20px;
+  max-width: 340px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 16px 40px rgba(92, 64, 51, 0.18);
+}
+.boot-card h2 { color: var(--accent); margin-bottom: 8px; }
+.hint-first {
+  text-align: center;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--accent);
+  animation: dvorik-pulse 1.4s ease-in-out infinite;
+}
+@keyframes dvorik-pulse {
+  0%, 100% { opacity: 0.55; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-3px); }
+}
+.status-detail {
+  font-size: 0.72rem;
+  color: var(--muted);
+  text-align: center;
+}
+.help-list {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 16px;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.help-list li { list-style: none; padding-left: 0; }
+.settings-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+.btn-danger {
+  background: #fde8e8;
+  border-color: #e8a0a0;
+  color: #9a3b3b;
+}
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: rgba(92, 64, 51, 0.35);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.confirm-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 22px 20px;
+  max-width: 340px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 16px 40px rgba(92, 64, 51, 0.18);
+  color: var(--text);
+}
+.confirm-card h3 { color: var(--accent); margin-bottom: 8px; }
+

@@ -1,13 +1,16 @@
 /**
  * GamePush bridge — cloud save, ads, payments with local fallbacks.
- * projectId 30253 wired; player field `save`.
+ * In this web build the SDK is optional: we start in local mode immediately
+ * so a missing/slow GamePush script cannot freeze the first 10 seconds or
+ * overwrite clicks made before the save loaded.
  */
 const PROJECT_ID = '30253';
 const PUBLIC_TOKEN = 'JBeptGYdA0CM3JtUuacEIwxxyIED8FIU';
 
 const LOCAL_KEY = 'dog-yard-clicker-v1';
 const LEGACY_LOCAL_KEY = 'ore-mine-clicker-v1';
-const GP_READY_TIMEOUT_MS = 10000;
+const BACKUP_KEY = 'dog-yard-clicker-v1-bak';
+const GP_READY_TIMEOUT_MS = 400;
 const FULLSCREEN_COOLDOWN_MS = 180 * 1000;
 
 let _gp = null;
@@ -15,10 +18,10 @@ let _readyPromise = null;
 let _lastFullscreenAt = 0;
 let _saveChain = Promise.resolve();
 const _status = {
-  sdk: 'loading',
-  cloudSave: 'unknown',
-  ads: 'unknown',
-  payments: 'unknown',
+  sdk: 'local',
+  cloudSave: 'local',
+  ads: 'local',
+  payments: 'local',
   lastError: '',
 };
 
@@ -34,19 +37,45 @@ function isPlaceholder(v) {
 }
 
 function getGp() {
-  return _gp || window.__gp || null;
+  return _gp || (typeof window !== 'undefined' && window.__gp) || null;
+}
+
+function askConfirm(message) {
+  if (typeof window !== 'undefined' && typeof window.__dvorikConfirm === 'function') {
+    return Promise.resolve(window.__dvorikConfirm(message));
+  }
+  try {
+    return Promise.resolve(window.confirm(message));
+  } catch (_) {
+    return Promise.resolve(false);
+  }
 }
 
 /**
- * Wait for GamePush SDK (gp-ready event) or timeout → local mode.
+ * Wait for GamePush SDK or resolve local immediately.
+ * Never block gameplay: if the SDK is not already present, local mode wins.
  */
 function waitForGp(timeoutMs = GP_READY_TIMEOUT_MS) {
   if (_readyPromise) return _readyPromise;
 
   _readyPromise = new Promise((resolve) => {
-    if (window.__gp) {
-      _gp = window.__gp;
+    const existing = getGp();
+    if (existing) {
+      _gp = existing;
+      _status.sdk = 'ready';
       resolve(_gp);
+      return;
+    }
+
+    const hasSdkScript =
+      typeof document !== 'undefined' &&
+      !!document.querySelector('script[src*="gamepush"], script[src*="game-score.js"]');
+    if (!hasSdkScript) {
+      _status.sdk = 'local';
+      _status.cloudSave = 'local';
+      _status.ads = 'local';
+      _status.payments = 'local';
+      resolve(null);
       return;
     }
 
@@ -56,11 +85,19 @@ function waitForGp(timeoutMs = GP_READY_TIMEOUT_MS) {
       settled = true;
       _gp = gp || null;
       _status.sdk = _gp ? 'ready' : 'local';
+      if (!_gp) {
+        _status.cloudSave = 'local';
+        _status.ads = 'local';
+        _status.payments = 'local';
+      }
       resolve(_gp);
     };
 
-    window.addEventListener('gp-ready', () => finish(window.__gp), { once: true });
-    setTimeout(() => finish(getGp() || window.__gp || null), timeoutMs);
+    if (typeof window !== 'undefined') {
+      window.addEventListener('gp-ready', () => finish(window.__gp), { once: true });
+    }
+    // Tiny grace period in case the SDK is about to fire; never the old 10s stall.
+    setTimeout(() => finish(getGp()), Math.min(timeoutMs, GP_READY_TIMEOUT_MS));
   });
 
   return _readyPromise;
@@ -77,18 +114,36 @@ function readLocalRaw() {
         } catch (_) {}
       }
     }
+    if (!raw) {
+      raw = localStorage.getItem(BACKUP_KEY);
+    }
     return raw;
   } catch (_) {
     return null;
   }
 }
 
-/**
- * Load save: cloud (gp.player.get('save')) then localStorage merge fallback.
- */
+function writeLocalRaw(json) {
+  try {
+    const prev = localStorage.getItem(LOCAL_KEY);
+    if (prev && prev !== json) {
+      try {
+        localStorage.setItem(BACKUP_KEY, prev);
+      } catch (_) {}
+    }
+    localStorage.setItem(LOCAL_KEY, json);
+    return true;
+  } catch (e) {
+    console.warn('[gp-bridge] local save failed', e);
+    _status.lastError = (e && e.message) || 'local_save_failed';
+    return false;
+  }
+}
+
 async function loadCloudSave() {
   await waitForGp();
   const gp = getGp();
+  let cloud = null;
 
   if (gp && gp.player) {
     try {
@@ -96,12 +151,9 @@ async function loadCloudSave() {
       const raw = gp.player.get('save');
       if (raw) {
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        if (parsed && typeof parsed === 'object') {
-          try {
-            localStorage.setItem(LOCAL_KEY, JSON.stringify(parsed));
-          } catch (_) {}
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          cloud = parsed;
           _status.cloudSave = 'ready';
-          return parsed;
         }
       }
     } catch (e) {
@@ -111,30 +163,42 @@ async function loadCloudSave() {
     }
   }
 
+  let local = null;
   try {
-    const local = readLocalRaw();
-    if (local) return JSON.parse(local);
+    const raw = readLocalRaw();
+    if (raw) local = JSON.parse(raw);
   } catch (_) {}
+
+  const cloudAt = cloud && Number(cloud.lastSaveAt) ? Number(cloud.lastSaveAt) : 0;
+  const localAt = local && Number(local.lastSaveAt) ? Number(local.lastSaveAt) : 0;
+  if (cloud && cloudAt > localAt + 1000) {
+    try {
+      writeLocalRaw(JSON.stringify(cloud));
+    } catch (_) {}
+    _status.cloudSave = 'ready';
+    return cloud;
+  }
+  if (local) {
+    if (!gp) _status.cloudSave = 'local';
+    else if (!cloud) _status.cloudSave = 'local';
+    return local;
+  }
+  if (cloud) return cloud;
   return null;
 }
 
-/**
- * Save: localStorage always; cloud when gp available.
- */
 async function saveCloudSave(state) {
   if (!state || typeof state !== 'object') return;
 
   let json;
   try {
     json = JSON.stringify(state);
-    localStorage.setItem(LOCAL_KEY, json);
+    if (!writeLocalRaw(json)) return;
   } catch (e) {
     console.warn('[gp-bridge] local save failed', e);
     return;
   }
 
-  // Keep all cloud writes ordered: autosave, manual save, and rewards can
-  // otherwise race and let an older payload overwrite a newer one.
   _saveChain = _saveChain.catch(function () {}).then(async function () {
     const gp = getGp();
     if (!gp || !gp.player) {
@@ -157,7 +221,10 @@ async function saveCloudSave(state) {
 
 function isRewardedAvailable() {
   const gp = getGp();
-  if (!gp || !gp.ads) { _status.ads = 'local'; return true; }
+  if (!gp || !gp.ads) {
+    _status.ads = 'local';
+    return true;
+  }
   try {
     if (typeof gp.ads.isRewardedAvailable === 'boolean') {
       _status.ads = gp.ads.isRewardedAvailable ? 'ready' : 'unavailable';
@@ -172,10 +239,6 @@ function isRewardedAvailable() {
   return true;
 }
 
-/**
- * Show rewarded video. Real GP when available; else confirm stub for local testing.
- * @returns {Promise<boolean>} true if reward should be granted
- */
 async function showRewarded() {
   await waitForGp();
   const gp = getGp();
@@ -199,19 +262,13 @@ async function showRewarded() {
     }
   }
 
-  // Local confirm stub only with no SDK — never freebie when GP is present
   if (gp) return false;
 
-  const ok = window.confirm(
-    'Режим без GamePush.\nСимулировать просмотр видео и получить двойные косточки?'
+  return askConfirm(
+    'Локальный режим — без видео.\nПолучить двойные косточки (x2 почесушка + idle 60 с)?'
   );
-  return ok;
 }
 
-/**
- * Optional fullscreen interstitial (prestige / event breaks). Rate-limited.
- * @returns {Promise<boolean>}
- */
 async function showFullscreen(force) {
   await waitForGp();
   const now = Date.now();
@@ -228,14 +285,16 @@ async function showFullscreen(force) {
       return false;
     }
   }
-  // Local: silent no-op (avoid nagging confirms on every prestige)
   _lastFullscreenAt = now;
   return false;
 }
 
 function isPaymentsAvailable() {
   const gp = getGp();
-  if (!gp || !gp.payments) { _status.payments = 'local'; return false; }
+  if (!gp || !gp.payments) {
+    _status.payments = 'local';
+    return false;
+  }
   try {
     if (typeof gp.payments.isAvailable === 'boolean') {
       _status.payments = gp.payments.isAvailable ? 'ready' : 'unavailable';
@@ -254,10 +313,6 @@ function isPaymentsAvailable() {
   }
 }
 
-/**
- * Purchase product by tag. Local stub: confirm → success.
- * @returns {Promise<{ok:boolean, product?:object, error?:string}>}
- */
 async function purchase(tag) {
   await waitForGp();
   if (!tag) return { ok: false, error: 'no_tag' };
@@ -277,18 +332,12 @@ async function purchase(tag) {
     }
   }
 
-  // GP loaded but no payments API — do not offer free confirm stub
   if (gp) return { ok: false, error: 'payments_unavailable' };
 
-  const ok = window.confirm(
-    'Режим без платежей GamePush.\nСимулировать покупку «' + tag + '»?'
-  );
+  const ok = await askConfirm('Локальный режим — симулировать покупку «' + tag + '»?');
   return ok ? { ok: true, product: { tag, stub: true } } : { ok: false, error: 'cancelled' };
 }
 
-/**
- * Check ownership (permanent products). Also checks local stub map if provided via window.
- */
 async function hasPurchase(tag) {
   await waitForGp();
   const gp = getGp();
@@ -303,9 +352,6 @@ async function hasPurchase(tag) {
   return false;
 }
 
-/**
- * Consume a consumable purchase after grant.
- */
 async function consume(tag) {
   await waitForGp();
   const gp = getGp();
@@ -318,7 +364,7 @@ async function consume(tag) {
       return false;
     }
   }
-  return true; // local stub: always ok
+  return true;
 }
 
 async function fetchProducts() {
@@ -335,7 +381,6 @@ async function fetchProducts() {
   return [];
 }
 
-/** Best-effort hide sticky banner (NO_ADS). */
 function hideSticky() {
   const gp = getGp();
   if (!gp || !gp.ads) return;
@@ -361,10 +406,38 @@ function getProjectConfig() {
   };
 }
 
-window.GPBridge = {
+function exportSaveRaw() {
+  try {
+    return localStorage.getItem(LOCAL_KEY) || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function importSaveRaw(raw) {
+  if (!raw || typeof raw !== 'string') return false;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return false;
+    return writeLocalRaw(JSON.stringify(parsed));
+  } catch (_) {
+    return false;
+  }
+}
+
+function clearSaves() {
+  try {
+    localStorage.removeItem(LOCAL_KEY);
+    localStorage.removeItem(BACKUP_KEY);
+    localStorage.removeItem(LEGACY_LOCAL_KEY);
+  } catch (_) {}
+}
+
+const GPBridge = {
   PROJECT_ID,
   PUBLIC_TOKEN,
   LOCAL_KEY,
+  BACKUP_KEY,
   waitForGp,
   loadCloudSave,
   saveCloudSave,
@@ -380,4 +453,10 @@ window.GPBridge = {
   isGpConnected,
   getStatus,
   getProjectConfig,
+  exportSaveRaw,
+  importSaveRaw,
+  clearSaves,
 };
+
+if (typeof window !== 'undefined') window.GPBridge = GPBridge;
+

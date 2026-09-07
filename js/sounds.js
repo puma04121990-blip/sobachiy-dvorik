@@ -12,7 +12,9 @@
   let muted = false;
 
   try {
-    muted = localStorage.getItem(MUTE_KEY) === '1';
+    if (typeof localStorage !== "undefined") {
+      muted = localStorage.getItem(MUTE_KEY) === '1';
+    }
   } catch (_) {}
 
   function getCtx() {
@@ -206,10 +208,12 @@
     global.addEventListener('keydown', once, true);
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', bindUnlock);
-  } else {
-    bindUnlock();
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", bindUnlock);
+    } else {
+      bindUnlock();
+    }
   }
 
   global.Sounds = {
@@ -229,4 +233,5 @@
     setMuted: setMuted,
     toggleMute: toggleMute,
   };
+  if (typeof module === 'object' && module.exports) module.exports = global.Sounds;
 })(typeof window !== 'undefined' ? window : globalThis);
