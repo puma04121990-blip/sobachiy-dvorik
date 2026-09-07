@@ -19,6 +19,10 @@ assert.equal(Game.SHOP_CATS.join(','), 'paws,tails,cozy');
 assert.equal(Game.defaultLevels().pickaxe, 0);
 assert.equal(Game.TRAINING_ORDER.length, Game.TRAINING.length);
 assert.equal(Game.defaultTrainingLevels().sit, 0);
+Game.TRAINING.forEach(function (t) {
+  assert.equal(t.maxLevel, 20, t.id + ' max');
+  assert.ok(t.costMult >= 1.22 && t.costMult <= 1.35, t.id + ' cost curve');
+});
 assert.equal(Game.SKILL_CARDS.length, 18);
 assert.equal(Game.CARD_CATS.join(','), 'crew,district,special');
 assert.equal(Game.defaultCardLevels().neighbor, 0);
