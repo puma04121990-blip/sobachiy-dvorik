@@ -767,7 +767,7 @@ header h1 {
   margin: 0 0 10px;
 }
 .card-cat {
-  min-height: 40px;
+  min-height: 52px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg-card);
@@ -776,13 +776,91 @@ header h1 {
   font-weight: 700;
   cursor: pointer;
   touch-action: manipulation;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 4px;
+  line-height: 1.15;
 }
+.card-cat-name { font-weight: 800; color: inherit; }
+.card-cat-meta {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--ore);
+  letter-spacing: -0.01em;
+}
+.card-cat.locked {
+  background: #fff7ef;
+}
+.card-cat.locked .card-cat-meta { color: #b56a3a; }
 .card-cat.active {
   color: var(--accent);
   border-color: rgba(232, 145, 106, 0.55);
   background: linear-gradient(180deg, #fffaf5, #ffe8d6);
   box-shadow: inset 0 -2px 0 var(--accent);
 }
+.pack-branch-offer { margin: 0 0 10px; }
+.pack-offer-card {
+  padding: 12px;
+  border: 1px solid rgba(232, 145, 106, 0.45);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fffaf4, #ffe9d4);
+  box-shadow: 0 4px 14px rgba(196, 120, 74, 0.1);
+}
+.pack-offer-kicker {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #b56a3a;
+  margin: 0 0 4px;
+}
+.pack-offer-card h3 {
+  margin: 0 0 4px;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--text);
+}
+.pack-offer-max {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ore);
+}
+.pack-reward-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pack-reward-list li {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  padding: 4px 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.7);
+}
+.pack-reward-ico { font-size: 1rem; }
+.pack-reward-name { font-weight: 700; color: var(--text); }
+.pack-reward-val { font-weight: 800; color: var(--ore); white-space: nowrap; }
+.pack-buy-btn {
+  width: 100%;
+  min-height: 44px;
+  font-weight: 800;
+}
+.skill-card.preview {
+  opacity: 1;
+  background: #fffaf5;
+  cursor: pointer;
+}
+.skill-card.preview .skill-card-cost { color: #b56a3a; }
 .card-combo {
   display: flex;
   flex-wrap: wrap;

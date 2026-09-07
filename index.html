@@ -165,10 +165,20 @@
   <section class="panel-section" id="panel-cards" data-panel="cards" hidden>
     <h2 data-i18n="cards_h">Стая дворика</h2>
     <div class="card-cats" id="card-cats" role="tablist" aria-label="Ветки стаи">
-      <button type="button" class="card-cat active" data-card-cat="crew" data-i18n="cat_crew">Команда</button>
-      <button type="button" class="card-cat" data-card-cat="district" data-i18n="cat_district">Район</button>
-      <button type="button" class="card-cat" data-card-cat="special" data-i18n="cat_special">Особые</button>
+      <button type="button" class="card-cat active" data-card-cat="crew">
+        <span class="card-cat-name" data-i18n="cat_crew">Команда</span>
+        <span class="card-cat-meta" data-pack-meta="crew"></span>
+      </button>
+      <button type="button" class="card-cat" data-card-cat="district">
+        <span class="card-cat-name" data-i18n="cat_district">Район</span>
+        <span class="card-cat-meta" data-pack-meta="district"></span>
+      </button>
+      <button type="button" class="card-cat" data-card-cat="special">
+        <span class="card-cat-name" data-i18n="cat_special">Особые</span>
+        <span class="card-cat-meta" data-pack-meta="special"></span>
+      </button>
     </div>
+    <div id="pack-branch-offer" class="pack-branch-offer"></div>
     <div id="skill-cards" class="skill-card-grid"></div>
   </section>
 

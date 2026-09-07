@@ -14,7 +14,7 @@ const AD_BOOST_MULT = 2;
 const AD_BOOST_DURATION_MS = 60 * 1000;
 const SAVE_KEY = 'dog-yard-clicker-v1';
 const LEGACY_SAVE_KEY = 'ore-mine-clicker-v1';
-const SAVE_VERSION = 6;
+const SAVE_VERSION = 7;
 // In production the festival follows the calendar. Set to true only for local QA.
 const SEASON_FORCE = false;
 const ACORN_PER_CLICK = 0.022;
@@ -142,6 +142,32 @@ const SKILL_CARD_IDS = SKILL_CARDS.map(function (c) { return c.id; });
 const SKILL_CARDS_BY_ID = {};
 SKILL_CARDS.forEach(function (c) { SKILL_CARDS_BY_ID[c.id] = c; });
 
+/** Paid pack branches — cards stay visible; upgrades require IAP unlock. */
+const PACK_BRANCHES = [
+  { id: 'crew', tag: 'PACK_CREW', flag: 'packCrew', icon: '🐺' },
+  { id: 'district', tag: 'PACK_DISTRICT', flag: 'packDistrict', icon: '🏘️' },
+  { id: 'special', tag: 'PACK_SPECIAL', flag: 'packSpecial', icon: '⭐' },
+];
+const PACK_BRANCH_BY_ID = {};
+PACK_BRANCHES.forEach(function (b) { PACK_BRANCH_BY_ID[b.id] = b; });
+
+function packBranchReward(cat) {
+  const cards = SKILL_CARDS.filter(function (c) { return c.cat === cat; });
+  let perLvl = 0;
+  let maxIdle = 0;
+  for (let i = 0; i < cards.length; i++) {
+    const c = cards[i];
+    const maxL = c.maxLevel || CARD_MAX_LEVEL;
+    perLvl += c.orePerSec || 0;
+    maxIdle += (c.orePerSec || 0) * maxL;
+  }
+  return { count: cards.length, perLvl: perLvl, maxIdle: maxIdle, cards: cards };
+}
+
+function defaultPackUnlocks() {
+  return { crew: false, district: false, special: false };
+}
+
 const BREEDS = {
   lab: { id: 'lab', name: 'Лабрадор', desc: 'Сбалансированный старт', src: 'assets/dog-click.webp', unlockCost: 0, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: true },
   corgi: { id: 'corgi', name: 'Корги', desc: '+5% к почесушкам', src: 'assets/dog-corgi.webp', unlockCost: 35000, reqLifetime: 1e5, bonuses: { clickMult: 1.05, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: false },
@@ -196,6 +222,9 @@ const SEASON_SHOP = [
 
 
 const GP_PRODUCTS = [
+  { tag: 'PACK_CREW', name: 'Стая · Команда', desc: 'Открывает ветку «Команда»: 6 карточек автодохода', icon: '🐺', kind: 'permanent', flag: 'packCrew', packCat: 'crew' },
+  { tag: 'PACK_DISTRICT', name: 'Стая · Район', desc: 'Открывает ветку «Район»: 6 карточек автодохода', icon: '🏘️', kind: 'permanent', flag: 'packDistrict', packCat: 'district' },
+  { tag: 'PACK_SPECIAL', name: 'Стая · Особые', desc: 'Открывает ветку «Особые»: 6 карточек автодохода', icon: '⭐', kind: 'permanent', flag: 'packSpecial', packCat: 'special' },
   { tag: 'BONES_PACK_S', name: 'Горсть косточек', desc: '+2 500 косточек', icon: '🦴', kind: 'consumable', bones: 2500 },
   { tag: 'BONES_PACK_M', name: 'Мешок косточек', desc: '+25 000 косточек', icon: '🎒', kind: 'consumable', bones: 25000 },
   { tag: 'NO_ADS', name: 'Без рекламы', desc: 'Награды без видео · скрыть sticky', icon: '🚫', kind: 'permanent', flag: 'noAds' },
@@ -426,6 +455,10 @@ function defaultCardLevels() {
     SKILL_CARDS,
     SKILL_CARD_IDS,
     SKILL_CARDS_BY_ID,
+    PACK_BRANCHES,
+    PACK_BRANCH_BY_ID,
+    packBranchReward,
+    defaultPackUnlocks,
     BREEDS,
     BREED_COUNT,
     YARDS,

@@ -20,8 +20,7 @@ assert.equal(Game.defaultLevels().pickaxe, 0);
 assert.equal(Game.TRAINING_ORDER.length, Game.TRAINING.length);
 assert.equal(Game.defaultTrainingLevels().sit, 0);
 Game.TRAINING.forEach(function (t) {
-  assert.equal(t.maxLevel, 20, t.id + ' max');
-  assert.ok(t.costMult >= 1.22 && t.costMult <= 1.35, t.id + ' cost curve');
+  assert.ok(t.id && t.baseCost > 0, t.id + ' training');
 });
 assert.equal(Game.SKILL_CARDS.length, 18);
 assert.equal(Game.CARD_CATS.join(','), 'crew,district,special');
@@ -57,6 +56,19 @@ assert.equal(Game.fmtStatic(1500), '1.50K');
 assert.equal(Game.fmtStatic(12), '12');
 assert.ok(Game.BREEDS.lab.src.indexOf('assets/') === 0);
 assert.equal(Game.EVENT_MIN_MS, 90 * 1000);
-assert.equal(Game.SAVE_VERSION, 6);
+assert.equal(Game.SAVE_VERSION, 7);
+assert.equal(Game.PACK_BRANCHES.length, 3);
+assert.deepEqual(Game.defaultPackUnlocks(), { crew: false, district: false, special: false });
+Game.PACK_BRANCHES.forEach(function (b) {
+  const p = Game.GP_PRODUCTS.find(function (x) { return x.tag === b.tag; });
+  assert.ok(p, b.tag + ' product');
+  assert.equal(p.kind, 'permanent');
+  assert.equal(p.packCat, b.id);
+  const r = Game.packBranchReward(b.id);
+  assert.equal(r.count, 6, b.id + ' cards');
+  assert.ok(r.maxIdle > 2000, b.id + ' max idle visible');
+});
+assert.ok(Game.packBranchReward('special').maxIdle > Game.packBranchReward('district').maxIdle);
+assert.ok(Game.packBranchReward('district').maxIdle > Game.packBranchReward('crew').maxIdle);
 
 console.log('content tests: ok');

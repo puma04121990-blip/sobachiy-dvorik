@@ -320,10 +320,7 @@ async function purchase(tag) {
   if (!tag) return { ok: false, error: 'no_tag' };
 
   const gp = getGp();
-  if (gp && gp.payments && typeof gp.payments.purchase === 'function') {
-    if (!isPaymentsAvailable()) {
-      return { ok: false, error: 'payments_unavailable' };
-    }
+  if (gp && gp.payments && typeof gp.payments.purchase === 'function' && isPaymentsAvailable()) {
     try {
       const result = await gp.payments.purchase({ tag });
       if (result === false) return { ok: false, error: 'cancelled' };
@@ -333,8 +330,6 @@ async function purchase(tag) {
       return { ok: false, error: (e && e.message) || 'purchase_failed' };
     }
   }
-
-  if (gp) return { ok: false, error: 'payments_unavailable' };
 
   const ok = await askConfirm(
     (window.I18n && window.I18n.t)
