@@ -12,14 +12,12 @@
   </style>
 </head>
 <body class="dvorik">
-
   <div id="boot-overlay" class="boot-overlay" hidden>
     <div class="boot-card">
       <h2 data-i18n="title">Собачий дворик</h2>
       <p class="panel-hint" data-i18n="boot">Будим хвостики…</p>
     </div>
   </div>
-
   <header class="app-header">
     <h1 data-i18n="title">Собачий дворик</h1>
     <div class="header-right">
@@ -31,5 +29,33 @@
       <span id="gp-status" class="gp-chip gp-off" aria-live="polite">Локально</span>
     </div>
   </header>
+  <section class="panel-section" id="panel-shop" data-panel="shop">
+    <h2 data-i18n="shop_h">Магазин</h2>
+    <div class="card-cats" id="shop-cats" role="tablist">
+      <button type="button" class="card-cat active" data-shop-cat="paws" data-i18n="shop_cat_paws">Лапы</button>
+      <button type="button" class="card-cat" data-shop-cat="tails" data-i18n="shop_cat_tails">Хвостики</button>
+      <button type="button" class="card-cat" data-shop-cat="cozy" data-i18n="shop_cat_cozy">Уют</button>
+    </div>
+    <div id="shop" class="skill-card-grid"></div>
+  </section>
+  <section class="panel-section" id="panel-cards" data-panel="cards" hidden>
+    <h2 data-i18n="cards_h">Стая дворика</h2>
+    <div class="card-cats" id="card-cats" role="tablist">
+      <button type="button" class="card-cat active" data-card-cat="crew" data-i18n="cat_crew">Команда</button>
+      <button type="button" class="card-cat" data-card-cat="district" data-i18n="cat_district">Район</button>
+      <button type="button" class="card-cat" data-card-cat="special" data-i18n="cat_special">Особые</button>
+    </div>
+    <div id="skill-cards" class="skill-card-grid"></div>
+  </section>
+  <section class="panel-section" id="panel-training" data-panel="training" hidden>
+    <h2 data-i18n="training_h">Дрессировка</h2>
+    <div id="training" class="skill-card-grid"></div>
+  </section>
+  <script src="js/i18n.js"></script>
+  <script src="js/gp-bridge.js"></script>
+  <script src="js/sounds.js"></script>
+  <script src="js/game-core.js"></script>
+  <script src="js/content.js"></script>
+  <script src="js/game.js"></script>
 </body>
 </html>
