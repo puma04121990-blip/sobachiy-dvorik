@@ -14,7 +14,7 @@ const AD_BOOST_MULT = 2;
 const AD_BOOST_DURATION_MS = 60 * 1000;
 const SAVE_KEY = 'dog-yard-clicker-v1';
 const LEGACY_SAVE_KEY = 'ore-mine-clicker-v1';
-const SAVE_VERSION = 5;
+const SAVE_VERSION = 6;
 // In production the festival follows the calendar. Set to true only for local QA.
 const SEASON_FORCE = false;
 const ACORN_PER_CLICK = 0.022;
@@ -42,9 +42,10 @@ const PRESTIGE_MEDAL_INCOME = 0.02;
 const BASE_CLICK = 0.85;
 const VIP_INCOME_MULT = 1.15;
 
-const CLICK_SOFTCAP = 180;
-const IDLE_SOFTCAP = 70;
-const SOFTCAP_POWER = 0.5;
+const CLICK_SOFTCAP = 400;
+const IDLE_SOFTCAP = 0;
+const SOFTCAP_POWER = 0.7;
+const CARD_MAX_LEVEL = 20;
 
 const ENERGY_MAX_BASE = 100;
 const ENERGY_PER_CLICK = 1.6;
@@ -60,47 +61,94 @@ const TOY_REWARD_PER_TAP = 2.2;
 const EVENT_REWARD_MULT = 1.05;
 
 const UPGRADES = {
-  pickaxe: { id: 'pickaxe', name: 'Лакомство', desc: '+0.7 к почесушкам', baseCost: 18, costMult: 1.22, clickPower: 0.7, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦴', unlock: null },
-  miner: { id: 'miner', name: 'Щенок-помощник', desc: '+0.35 кост./сек', baseCost: 55, costMult: 1.22, clickPower: 0, orePerSec: 0.35, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🐕', unlock: null },
-  ball: { id: 'ball', name: 'Мячик', desc: '+2.5 к почесушкам', baseCost: 220, costMult: 1.24, clickPower: 2.5, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🎾', unlock: { upgradeId: 'pickaxe', level: 3, text: 'Нужно Лакомство ур. 3' } },
-  drill: { id: 'drill', name: 'Дрессировщик', desc: '+3.5 кост./сек', baseCost: 1400, costMult: 1.25, clickPower: 0, orePerSec: 3.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🧤', unlock: { upgradeId: 'miner', level: 2, text: 'Нужен Щенок-помощник ур. 2' } },
-  walk: { id: 'walk', name: 'Выгул', desc: '+12 кост./сек', baseCost: 18000, costMult: 1.30, clickPower: 0, orePerSec: 12, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦮', unlock: { upgradeId: 'drill', level: 1, text: 'Нужен Дрессировщик ур. 1' } },
-  warehouse: { id: 'warehouse', name: 'Будка', desc: '+7% к idle · офлайн', baseCost: 4800, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0.07, clickPct: 0, comboBonusMs: 0, icon: '🏠', unlock: { upgradeId: 'miner', level: 5, text: 'Нужен Щенок-помощник ур. 5' } },
-  groomer: { id: 'groomer', name: 'Грумер', desc: '+10% к idle', baseCost: 70000, costMult: 1.32, clickPower: 0, orePerSec: 0, idleMult: 0.10, clickPct: 0, comboBonusMs: 0, icon: '✂️', unlock: { upgradeId: 'warehouse', level: 2, text: 'Нужна Будка ур. 2' } },
-  kennel: { id: 'kennel', name: 'Питомник', desc: '+55 кост./сек', baseCost: 350000, costMult: 1.35, clickPower: 0, orePerSec: 55, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🏡', unlock: { upgradeId: 'walk', level: 2, text: 'Нужен Выгул ур. 2' } },
-  collar: { id: 'collar', name: 'Ошейник', desc: '+2% к почесушкам', baseCost: 400, costMult: 1.23, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.02, comboBonusMs: 0, icon: '📿', unlock: { upgradeId: 'pickaxe', level: 2, text: 'Нужно Лакомство ур. 2' } },
-  frisbee: { id: 'frisbee', name: 'Фрисби', desc: '+2.5 кост./сек', baseCost: 2500, costMult: 1.25, clickPower: 0, orePerSec: 2.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🥏', unlock: { upgradeId: 'miner', level: 3, text: 'Нужен Щенок-помощник ур. 3' } },
-  bed: { id: 'bed', name: 'Лежанка', desc: '+30 мин офлайн-капа · офлайн %', baseCost: 10000, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0.02, clickPct: 0, comboBonusMs: 0, icon: '🛏️', unlock: { upgradeId: 'warehouse', level: 1, text: 'Нужна Будка ур. 1' } },
-  whistle: { id: 'whistle', name: 'Свисток', desc: '+40 мс к окну комбо', baseCost: 5500, costMult: 1.27, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: WHISTLE_COMBO_MS, icon: '📣', unlock: { upgradeId: 'ball', level: 2, text: 'Нужен Мячик ур. 2' } },
+  pickaxe: { id: 'pickaxe', name: 'Лакомство', desc: '+0.7 к почесушкам за уровень', baseCost: 18, costMult: 1.22, clickPower: 0.7, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦴', unlock: null },
+  miner: { id: 'miner', name: 'Щенок-помощник', desc: '+0.30 кост./сек за уровень', baseCost: 55, costMult: 1.22, clickPower: 0, orePerSec: 0.30, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🐕', unlock: null },
+  ball: { id: 'ball', name: 'Мячик', desc: '+2.5 к почесушкам за уровень', baseCost: 220, costMult: 1.24, clickPower: 2.5, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🎾', unlock: { upgradeId: 'pickaxe', level: 3, text: 'Нужно Лакомство ур. 3' } },
+  drill: { id: 'drill', name: 'Дрессировщик', desc: '+1.8 кост./сек за уровень', baseCost: 1400, costMult: 1.25, clickPower: 0, orePerSec: 1.8, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🧤', unlock: { upgradeId: 'miner', level: 2, text: 'Нужен Щенок-помощник ур. 2' } },
+  walk: { id: 'walk', name: 'Выгул', desc: '+7 кост./сек за уровень', baseCost: 22000, costMult: 1.28, clickPower: 0, orePerSec: 7, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🦮', unlock: { upgradeId: 'drill', level: 1, text: 'Нужен Дрессировщик ур. 1' } },
+  warehouse: { id: 'warehouse', name: 'Будка', desc: '+7% к автодоходу за уровень · офлайн', baseCost: 4800, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0.07, clickPct: 0, comboBonusMs: 0, icon: '🏠', unlock: { upgradeId: 'miner', level: 5, text: 'Нужен Щенок-помощник ур. 5' } },
+  groomer: { id: 'groomer', name: 'Грумер', desc: '+10% к автодоходу за уровень', baseCost: 70000, costMult: 1.32, clickPower: 0, orePerSec: 0, idleMult: 0.10, clickPct: 0, comboBonusMs: 0, icon: '✂️', unlock: { upgradeId: 'warehouse', level: 2, text: 'Нужна Будка ур. 2' } },
+  kennel: { id: 'kennel', name: 'Питомник', desc: '+20 кост./сек за уровень', baseCost: 400000, costMult: 1.32, clickPower: 0, orePerSec: 20, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🏡', unlock: { upgradeId: 'walk', level: 2, text: 'Нужен Выгул ур. 2' } },
+  collar: { id: 'collar', name: 'Ошейник', desc: '+2% к почесушкам за уровень', baseCost: 400, costMult: 1.23, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.02, comboBonusMs: 0, icon: '📿', unlock: { upgradeId: 'pickaxe', level: 2, text: 'Нужно Лакомство ур. 2' } },
+  frisbee: { id: 'frisbee', name: 'Фрисби', desc: '+1.2 кост./сек за уровень', baseCost: 2500, costMult: 1.25, clickPower: 0, orePerSec: 1.2, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🥏', unlock: { upgradeId: 'miner', level: 3, text: 'Нужен Щенок-помощник ур. 3' } },
+  bed: { id: 'bed', name: 'Лежанка', desc: '+30 мин офлайн-капа за уровень · офлайн %', baseCost: 10000, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0.02, clickPct: 0, comboBonusMs: 0, icon: '🛏️', unlock: { upgradeId: 'warehouse', level: 1, text: 'Нужна Будка ур. 1' } },
+  whistle: { id: 'whistle', name: 'Свисток', desc: '+40 мс к окну комбо за уровень', baseCost: 5500, costMult: 1.27, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: WHISTLE_COMBO_MS, icon: '📣', unlock: { upgradeId: 'ball', level: 2, text: 'Нужен Мячик ур. 2' } },
   /* —— new gated chain —— */
-  clickWhistle: { id: 'clickWhistle', name: 'Свисток клика', desc: '+3% к почесушкам', baseCost: 3200, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.03, comboBonusMs: 0, icon: '🎵', unlock: { upgradeId: 'pickaxe', level: 5, text: 'Нужно Лакомство ур. 5' } },
-  treatBag: { id: 'treatBag', name: 'Запас лакомств', desc: '+4.5 к почесушкам', baseCost: 14000, costMult: 1.30, clickPower: 4.5, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🍖', unlock: { upgradeId: 'clickWhistle', level: 2, text: 'Нужен Свисток клика ур. 2' } },
-  volunteers: { id: 'volunteers', name: 'Волонтёры', desc: '+4.5 кост./сек', baseCost: 12000, costMult: 1.29, clickPower: 0, orePerSec: 4.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🤝', unlock: { upgradeId: 'miner', level: 6, text: 'Нужен Щенок-помощник ур. 6' } },
-  autofeeder: { id: 'autofeeder', name: 'Автокормушка', desc: '+8% к idle', baseCost: 95000, costMult: 1.32, clickPower: 0, orePerSec: 0, idleMult: 0.08, clickPct: 0, comboBonusMs: 0, icon: '🤖', unlock: { upgradeId: 'drill', level: 3, text: 'Нужен Дрессировщик ур. 3' } },
-  kennelPlus: { id: 'kennelPlus', name: 'Питомник+', desc: '+90 кост./сек', baseCost: 2.8e6, costMult: 1.38, clickPower: 0, orePerSec: 90, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🏰', unlock: { upgradeId: 'kennel', level: 4, lifetimeBones: 8e7, text: 'Нужен Питомник ур. 4 и 80M 🦴 за жизнь' } },
+  clickWhistle: { id: 'clickWhistle', name: 'Свисток клика', desc: '+3% к почесушкам за уровень', baseCost: 3200, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.03, comboBonusMs: 0, icon: '🎵', unlock: { upgradeId: 'pickaxe', level: 5, text: 'Нужно Лакомство ур. 5' } },
+  treatBag: { id: 'treatBag', name: 'Запас лакомств', desc: '+4.5 к почесушкам за уровень', baseCost: 14000, costMult: 1.30, clickPower: 4.5, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🍖', unlock: { upgradeId: 'clickWhistle', level: 2, text: 'Нужен Свисток клика ур. 2' } },
+  volunteers: { id: 'volunteers', name: 'Волонтёры', desc: '+3.5 кост./сек за уровень', baseCost: 12000, costMult: 1.29, clickPower: 0, orePerSec: 3.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🤝', unlock: { upgradeId: 'miner', level: 6, text: 'Нужен Щенок-помощник ур. 6' } },
+  autofeeder: { id: 'autofeeder', name: 'Автокормушка', desc: '+8% к автодоходу за уровень', baseCost: 95000, costMult: 1.32, clickPower: 0, orePerSec: 0, idleMult: 0.08, clickPct: 0, comboBonusMs: 0, icon: '🤖', unlock: { upgradeId: 'drill', level: 3, text: 'Нужен Дрессировщик ур. 3' } },
+  kennelPlus: { id: 'kennelPlus', name: 'Питомник+', desc: '+45 кост./сек за уровень', baseCost: 3e6, costMult: 1.35, clickPower: 0, orePerSec: 45, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🏰', unlock: { upgradeId: 'kennel', level: 4, lifetimeBones: 8e7, text: 'Нужен Питомник ур. 4 и 80M 🦴 за жизнь' } },
+  squeaky: { id: 'squeaky', name: 'Пищалка', desc: '+1.4 к почесушкам за уровень', baseCost: 70, costMult: 1.23, clickPower: 1.4, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🧸', unlock: { upgradeId: 'pickaxe', level: 1, text: 'Нужно Лакомство ур. 1' } },
+  bandana: { id: 'bandana', name: 'Бандана', desc: '+2.5% к почесушкам за уровень', baseCost: 900, costMult: 1.25, clickPower: 0, orePerSec: 0, idleMult: 0, clickPct: 0.025, comboBonusMs: 0, icon: '🧣', unlock: { upgradeId: 'collar', level: 2, text: 'Нужен Ошейник ур. 2' } },
+  leash: { id: 'leash', name: 'Поводок', desc: '+3.6 к почесушкам за уровень', baseCost: 2500, costMult: 1.26, clickPower: 3.6, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🪢', unlock: { upgradeId: 'ball', level: 2, text: 'Нужен Мячик ур. 2' } },
+  rubber: { id: 'rubber', name: 'Резиновая кость', desc: '+8 к почесушкам за уровень', baseCost: 48000, costMult: 1.30, clickPower: 8, orePerSec: 0, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🪀', unlock: { upgradeId: 'treatBag', level: 2, text: 'Нужен Запас лакомств ур. 2' } },
+  bowls: { id: 'bowls', name: 'Миски', desc: '+0.55 кост./сек за уровень', baseCost: 160, costMult: 1.23, clickPower: 0, orePerSec: 0.55, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🥣', unlock: { upgradeId: 'miner', level: 1, text: 'Нужен Щенок-помощник ур. 1' } },
+  kids: { id: 'kids', name: 'Ребята двора', desc: '+2.4 кост./сек за уровень', baseCost: 3800, costMult: 1.26, clickPower: 0, orePerSec: 2.4, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🧒', unlock: { upgradeId: 'frisbee', level: 1, text: 'Нужно Фрисби ур. 1' } },
+  mailman: { id: 'mailman', name: 'Почтальон', desc: '+5.5 кост./сек за уровень', baseCost: 16000, costMult: 1.28, clickPower: 0, orePerSec: 5.5, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '📬', unlock: { upgradeId: 'drill', level: 2, text: 'Нужен Дрессировщик ур. 2' } },
+  night: { id: 'night', name: 'Ночной двор', desc: '+11 кост./сек за уровень', baseCost: 75000, costMult: 1.30, clickPower: 0, orePerSec: 11, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🌙', unlock: { upgradeId: 'walk', level: 1, text: 'Нужен Выгул ур. 1' } },
+  park: { id: 'park', name: 'Площадка', desc: '+30 кост./сек за уровень', baseCost: 9e5, costMult: 1.33, clickPower: 0, orePerSec: 30, idleMult: 0, clickPct: 0, comboBonusMs: 0, icon: '🛝', unlock: { upgradeId: 'kennel', level: 1, text: 'Нужен Питомник ур. 1' } },
+  heater: { id: 'heater', name: 'Грелка', desc: '+4% к автодоходу за уровень', baseCost: 900, costMult: 1.25, clickPower: 0, orePerSec: 0, idleMult: 0.04, clickPct: 0, comboBonusMs: 0, icon: '🔥', unlock: { upgradeId: 'miner', level: 2, text: 'Нужен Щенок-помощник ур. 2' } },
+  blanket: { id: 'blanket', name: 'Плед', desc: '+5% к автодоходу за уровень', baseCost: 14000, costMult: 1.28, clickPower: 0, orePerSec: 0, idleMult: 0.05, clickPct: 0, comboBonusMs: 0, icon: '🧺', unlock: { upgradeId: 'bed', level: 1, text: 'Нужна Лежанка ур. 1' } },
+  lamp: { id: 'lamp', name: 'Фонарик', desc: '+6% к автодоходу за уровень', baseCost: 36000, costMult: 1.30, clickPower: 0, orePerSec: 0, idleMult: 0.06, clickPct: 0, comboBonusMs: 0, icon: '🏮', unlock: { upgradeId: 'warehouse', level: 2, text: 'Нужна Будка ур. 2' } },
+  radio: { id: 'radio', name: 'Радио', desc: '+9% к автодоходу за уровень', baseCost: 160000, costMult: 1.32, clickPower: 0, orePerSec: 0, idleMult: 0.09, clickPct: 0, comboBonusMs: 0, icon: '📻', unlock: { upgradeId: 'groomer', level: 1, text: 'Нужен Грумер ур. 1' } },
 };
 
-const UPGRADE_ORDER = ['pickaxe','miner','collar','ball','frisbee','drill','warehouse','whistle','clickWhistle','bed','volunteers','treatBag','walk','groomer','autofeeder','kennel','kennelPlus'];
+const UPGRADE_ORDER = ['pickaxe','squeaky','miner','bowls','collar','ball','bandana','frisbee','drill','heater','warehouse','whistle','clickWhistle','leash','bed','blanket','kids','volunteers','treatBag','mailman','walk','lamp','groomer','night','autofeeder','radio','rubber','kennel','park','kennelPlus'];
+const SHOP_CATS = ['paws', 'tails', 'cozy'];
+const SHOP_CAT_IDS = {
+  paws: ['pickaxe', 'squeaky', 'collar', 'ball', 'bandana', 'clickWhistle', 'leash', 'whistle', 'treatBag', 'rubber'],
+  tails: ['miner', 'bowls', 'frisbee', 'drill', 'kids', 'volunteers', 'mailman', 'walk', 'night', 'kennel', 'park', 'kennelPlus'],
+  cozy: ['heater', 'warehouse', 'bed', 'blanket', 'lamp', 'groomer', 'autofeeder', 'radio']
+};
 
 /** Progressive training tree (Дрессировка) — buy previous to unlock next */
 const TRAINING = [
-  { id: 'sit', name: 'Сит', desc: '+2.5% к почесушкам', baseCost: 1500, costMult: 1.45, clickPct: 0.025, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '🪑' },
-  { id: 'heel', name: 'Рядом', desc: '+7% реген энергии', baseCost: 6000, costMult: 1.47, clickPct: 0, energyRegen: 0.07, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '👣' },
-  { id: 'paw', name: 'Лапу', desc: '+35 мс к окну комбо', baseCost: 22000, costMult: 1.48, clickPct: 0, energyRegen: 0, comboBonusMs: 35, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '🐾' },
-  { id: 'voice', name: 'Голос', desc: '+6% награда прогулки', baseCost: 90000, costMult: 1.50, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0.06, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '📣' },
-  { id: 'fetch', name: 'Апорт', desc: '+4% к idle', baseCost: 320000, costMult: 1.52, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0.04, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '🦴' },
-  { id: 'trick', name: 'Трюк', desc: '+3% офлайн · +12% медалек выставки', baseCost: 1.4e6, costMult: 1.55, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0.03, medalYield: 0.12, allIncome: 0, icon: '🎪' },
-  { id: 'champ', name: 'Чемпион', desc: '+1.5% ко всем доходам', baseCost: 6e6, costMult: 1.58, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0.015, icon: '🏆' },
+  { id: 'sit', name: 'Сит', desc: '+2.5% к почесушкам за уровень', baseCost: 1500, costMult: 1.45, clickPct: 0.025, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '🪑' },
+  { id: 'heel', name: 'Рядом', desc: '+7% реген энергии за уровень', baseCost: 6000, costMult: 1.47, clickPct: 0, energyRegen: 0.07, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '👣' },
+  { id: 'paw', name: 'Лапу', desc: '+35 мс к окну комбо за уровень', baseCost: 22000, costMult: 1.48, clickPct: 0, energyRegen: 0, comboBonusMs: 35, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '🐾' },
+  { id: 'voice', name: 'Голос', desc: '+6% награда прогулки за уровень', baseCost: 90000, costMult: 1.50, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0.06, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '📣' },
+  { id: 'fetch', name: 'Апорт', desc: '+4% к автодоходу за уровень', baseCost: 320000, costMult: 1.52, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0.04, offlineBonus: 0, medalYield: 0, allIncome: 0, icon: '🦴' },
+  { id: 'trick', name: 'Трюк', desc: '+3% офлайн · +12% медалек выставки за уровень', baseCost: 1.4e6, costMult: 1.55, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0.03, medalYield: 0.12, allIncome: 0, icon: '🎪' },
+  { id: 'champ', name: 'Чемпион', desc: '+1.5% ко всем доходам за уровень', baseCost: 6e6, costMult: 1.58, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0.015, icon: '🏆' },
 ];
 const TRAINING_ORDER = TRAINING.map(function (t) { return t.id; });
+
+/** Hamster-style unique cards: 3 menus, cross-gates between trees. */
+const CARD_CATS = ['crew', 'district', 'special'];
+const SKILL_CARDS = [
+  { id: 'neighbor', cat: 'crew', name: 'Сосед', desc: '+0.25 кост./сек за уровень', icon: '🏡', baseCost: 50, costMult: 1.18, orePerSec: 0.25, clickPct: 0.004, maxLevel: 20, unlock: null },
+  { id: 'walker', cat: 'crew', name: 'Выгульщик', desc: '+0.80 кост./сек за уровень', icon: '🦮', baseCost: 200, costMult: 1.18, orePerSec: 0.80, clickPct: 0, maxLevel: 20, unlock: { cardId: 'neighbor', level: 2 } },
+  { id: 'sitter', cat: 'crew', name: 'Няня', desc: '+2.5 кост./сек за уровень', icon: '🧸', baseCost: 800, costMult: 1.19, orePerSec: 2.5, clickPct: 0, maxLevel: 20, unlock: { cardId: 'walker', level: 3 } },
+  { id: 'groom_team', cat: 'crew', name: 'Бригада грумеров', desc: '+8 кост./сек за уровень', icon: '✂️', baseCost: 3200, costMult: 1.20, orePerSec: 8, clickPct: 0, maxLevel: 20, unlock: { cardId: 'sitter', level: 2 } },
+  { id: 'rescue', cat: 'crew', name: 'Спасатели двора', desc: '+26 кост./сек за уровень', icon: '🚑', baseCost: 14000, costMult: 1.21, orePerSec: 26, clickPct: 0, maxLevel: 20, unlock: { cardId: 'groom_team', level: 3 } },
+  { id: 'pack_leader', cat: 'crew', name: 'Вожак стаи', desc: '+90 кост./сек за уровень', icon: '🐺', baseCost: 65000, costMult: 1.22, orePerSec: 90, clickPct: 0.01, maxLevel: 20, unlock: { need: [{ cardId: 'rescue', level: 4 }, { cardId: 'kiosk', level: 2 }] } },
+
+  { id: 'kiosk', cat: 'district', name: 'Ларьёк', desc: '+0.32 кост./сек за уровень', icon: '🏪', baseCost: 70, costMult: 1.18, orePerSec: 0.32, clickPct: 0, maxLevel: 20, unlock: null },
+  { id: 'skver', cat: 'district', name: 'Сквер', desc: '+1.0 кост./сек за уровень', icon: '🌳', baseCost: 280, costMult: 1.18, orePerSec: 1.0, clickPct: 0, maxLevel: 20, unlock: { cardId: 'kiosk', level: 2 } },
+  { id: 'vet', cat: 'district', name: 'Ветеринар', desc: '+3.2 кост./сек за уровень', icon: '💉', baseCost: 1100, costMult: 1.19, orePerSec: 3.2, clickPct: 0, maxLevel: 20, unlock: { need: [{ cardId: 'skver', level: 2 }, { cardId: 'walker', level: 2 }] } },
+  { id: 'cafe', cat: 'district', name: 'Кафе для лап', desc: '+10 кост./сек за уровень', icon: '☕', baseCost: 4500, costMult: 1.20, orePerSec: 10, clickPct: 0, maxLevel: 20, unlock: { cardId: 'vet', level: 3 } },
+  { id: 'stadium', cat: 'district', name: 'Площадка', desc: '+34 кост./сек за уровень', icon: '🏟️', baseCost: 20000, costMult: 1.21, orePerSec: 34, clickPct: 0, maxLevel: 20, unlock: { cardId: 'cafe', level: 3 } },
+  { id: 'mayor', cat: 'district', name: 'Мэр района', desc: '+120 кост./сек за уровень', icon: '🎩', baseCost: 90000, costMult: 1.22, orePerSec: 120, clickPct: 0, maxLevel: 20, unlock: { need: [{ cardId: 'stadium', level: 4 }, { cardId: 'poster', level: 2 }] } },
+
+  { id: 'poster', cat: 'special', name: 'Афиша двора', desc: '+0.40 кост./сек за уровень', icon: '🪧', baseCost: 120, costMult: 1.18, orePerSec: 0.40, clickPct: 0.008, maxLevel: 20, unlock: { upgradeId: 'pickaxe', level: 2 } },
+  { id: 'mascot', cat: 'special', name: 'Талисман', desc: '+1.4 кост./сек за уровень', icon: '🎀', baseCost: 500, costMult: 1.19, orePerSec: 1.4, clickPct: 0, maxLevel: 20, unlock: { cardId: 'poster', level: 3 } },
+  { id: 'cup', cat: 'special', name: 'Кубок двора', desc: '+4.5 кост./сек за уровень', icon: '🏆', baseCost: 2000, costMult: 1.20, orePerSec: 4.5, clickPct: 0, maxLevel: 20, unlock: { need: [{ cardId: 'mascot', level: 2 }, { cardId: 'sitter', level: 3 }] } },
+  { id: 'legend', cat: 'special', name: 'Легенда района', desc: '+15 кост./сек за уровень', icon: '⭐', baseCost: 9000, costMult: 1.21, orePerSec: 15, clickPct: 0, maxLevel: 20, unlock: { cardId: 'cup', level: 4 } },
+  { id: 'dynasty', cat: 'special', name: 'Династия', desc: '+50 кост./сек за уровень', icon: '👑', baseCost: 40000, costMult: 1.22, orePerSec: 50, clickPct: 0.015, maxLevel: 20, unlock: { need: [{ cardId: 'legend', level: 3 }, { cardId: 'pack_leader', level: 2 }] } },
+  { id: 'throne', cat: 'special', name: 'Трон дворика', desc: '+180 кост./сек за уровень', icon: '🪑', baseCost: 220000, costMult: 1.24, orePerSec: 180, clickPct: 0, maxLevel: 20, unlock: { need: [{ cardId: 'dynasty', level: 5 }, { cardId: 'mayor', level: 3 }] } },
+];
+const SKILL_CARD_IDS = SKILL_CARDS.map(function (c) { return c.id; });
+const SKILL_CARDS_BY_ID = {};
+SKILL_CARDS.forEach(function (c) { SKILL_CARDS_BY_ID[c.id] = c; });
 
 const BREEDS = {
   lab: { id: 'lab', name: 'Лабрадор', desc: 'Сбалансированный старт', src: 'assets/dog-click.webp', unlockCost: 0, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: true },
   corgi: { id: 'corgi', name: 'Корги', desc: '+5% к почесушкам', src: 'assets/dog-corgi.webp', unlockCost: 35000, reqLifetime: 1e5, bonuses: { clickMult: 1.05, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: false },
-  husky: { id: 'husky', name: 'Хаски', desc: '+5% к idle', src: 'assets/dog-husky.webp', unlockCost: 140000, reqLifetime: 5e5, bonuses: { clickMult: 1, idleMult: 1.05, comboWindowBonus: 0 }, startUnlocked: false },
+  husky: { id: 'husky', name: 'Хаски', desc: '+5% к автодоходу', src: 'assets/dog-husky.webp', unlockCost: 140000, reqLifetime: 5e5, bonuses: { clickMult: 1, idleMult: 1.05, comboWindowBonus: 0 }, startUnlocked: false },
   dachshund: { id: 'dachshund', name: 'Такса', desc: '+200 мс к окну комбо', src: 'assets/dog-dachshund.webp', unlockCost: 450000, reqLifetime: 2.5e6, reqMedals: 1, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 200 }, startUnlocked: false },
-  shiba: { id: 'shiba', name: 'Сиба', desc: '+4% к почесушкам и +2% idle', src: 'assets/dog-shiba.webp', unlockCost: 1.2e6, reqLifetime: 6e6, reqMedals: 2, bonuses: { clickMult: 1.04, idleMult: 1.02, comboWindowBonus: 0 }, startUnlocked: false },
-  poodle: { id: 'poodle', name: 'Пудель', desc: '+8% к idle', src: 'assets/dog-poodle.webp', unlockCost: 2.8e6, reqLifetime: 2.5e7, reqMedals: 3, bonuses: { clickMult: 1, idleMult: 1.08, comboWindowBonus: 0 }, startUnlocked: false },
+  shiba: { id: 'shiba', name: 'Сиба', desc: '+4% к почесушкам и +2% к автодоходу', src: 'assets/dog-shiba.webp', unlockCost: 1.2e6, reqLifetime: 6e6, reqMedals: 2, bonuses: { clickMult: 1.04, idleMult: 1.02, comboWindowBonus: 0 }, startUnlocked: false },
+  poodle: { id: 'poodle', name: 'Пудель', desc: '+8% к автодоходу', src: 'assets/dog-poodle.webp', unlockCost: 2.8e6, reqLifetime: 2.5e7, reqMedals: 3, bonuses: { clickMult: 1, idleMult: 1.08, comboWindowBonus: 0 }, startUnlocked: false },
   beagle: { id: 'beagle', name: 'Бигль', desc: '+6% к почесушкам · +80 мс комбо', src: 'assets/dog-beagle.webp', unlockCost: 7e6, reqLifetime: 8e7, reqMedals: 5, bonuses: { clickMult: 1.06, idleMult: 1, comboWindowBonus: 80 }, startUnlocked: false },
 };
 const BREED_COUNT = Object.keys(BREEDS).length;
@@ -114,8 +162,8 @@ const YARDS = {
 
 const FRIENDS = {
   cat: { id: 'cat', name: 'Котик', desc: '+3% к почесушкам', src: 'assets/pet-cat.webp', unlockCost: 70000, reqLifetime: 2.5e5, bonuses: { clickMult: 1.03, idleMult: 1 } },
-  rabbit: { id: 'rabbit', name: 'Кролик', desc: '+3% к idle', src: 'assets/pet-rabbit.webp', unlockCost: 180000, reqLifetime: 7e5, bonuses: { clickMult: 1, idleMult: 1.03 } },
-  hamster: { id: 'hamster', name: 'Хомячок', desc: '+2% клик · +2% idle', src: 'assets/pet-hamster.webp', unlockCost: 450000, reqLifetime: 2.5e6, reqMedals: 1, bonuses: { clickMult: 1.02, idleMult: 1.02 } },
+  rabbit: { id: 'rabbit', name: 'Кролик', desc: '+3% к автодоходу', src: 'assets/pet-rabbit.webp', unlockCost: 180000, reqLifetime: 7e5, bonuses: { clickMult: 1, idleMult: 1.03 } },
+  hamster: { id: 'hamster', name: 'Хомячок', desc: '+2% к почесушкам · +2% к автодоходу', src: 'assets/pet-hamster.webp', unlockCost: 450000, reqLifetime: 2.5e6, reqMedals: 1, bonuses: { clickMult: 1.02, idleMult: 1.02 } },
 };
 
 const STICKERS = [
@@ -266,7 +314,7 @@ const QUEST_POOL = [
 
 const MEDAL_SHOP = [
   { id: 'm_click', name: 'Лапки чемпиона', desc: '+6% к почесушкам за уровень', icon: '✋', maxLevel: 12, baseCost: 2, costMult: 1.75, clickMult: 0.06 },
-  { id: 'm_idle', name: 'Спокойный двор', desc: '+6% к idle за уровень', icon: '😴', maxLevel: 12, baseCost: 2, costMult: 1.75, idleMult: 0.06 },
+  { id: 'm_idle', name: 'Спокойный двор', desc: '+6% к автодоходу за уровень', icon: '😴', maxLevel: 12, baseCost: 2, costMult: 1.75, idleMult: 0.06 },
   { id: 'm_energy', name: 'Выносливость', desc: '+8 макс. энергии · +8% реген', icon: '⚡', maxLevel: 8, baseCost: 2, costMult: 1.9, energyMax: 8, energyRegen: 0.08 },
   { id: 'm_offline', name: 'Сторож двора', desc: '+8% эффективности офлайна', icon: '🌙', maxLevel: 10, baseCost: 2, costMult: 1.8, offlineBonus: 0.08 },
 ];
@@ -314,6 +362,11 @@ function defaultTrainingLevels() {
   for (let i = 0; i < TRAINING_ORDER.length; i++) levels[TRAINING_ORDER[i]] = 0;
   return levels;
 }
+function defaultCardLevels() {
+  const levels = {};
+  for (let i = 0; i < SKILL_CARD_IDS.length; i++) levels[SKILL_CARD_IDS[i]] = 0;
+  return levels;
+}
 
 
   return {
@@ -351,6 +404,7 @@ function defaultTrainingLevels() {
     CLICK_SOFTCAP,
     IDLE_SOFTCAP,
     SOFTCAP_POWER,
+    CARD_MAX_LEVEL,
     ENERGY_MAX_BASE,
     ENERGY_PER_CLICK,
     ENERGY_REGEN_PER_SEC,
@@ -364,8 +418,14 @@ function defaultTrainingLevels() {
     EVENT_REWARD_MULT,
     UPGRADES,
     UPGRADE_ORDER,
+    SHOP_CATS,
+    SHOP_CAT_IDS,
     TRAINING,
     TRAINING_ORDER,
+    CARD_CATS,
+    SKILL_CARDS,
+    SKILL_CARD_IDS,
+    SKILL_CARDS_BY_ID,
     BREEDS,
     BREED_COUNT,
     YARDS,
@@ -384,6 +444,7 @@ function defaultTrainingLevels() {
     DAILY_GOAL_POOL,
     fmtStatic,
     defaultLevels,
-    defaultTrainingLevels
+    defaultTrainingLevels,
+    defaultCardLevels
   };
 });

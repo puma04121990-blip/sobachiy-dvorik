@@ -10,12 +10,11 @@
  * Собачий дворик — idle/clicker (cute dogs theme) · content pack v5 (retention)
  *
  * ——— BALANCE CONSTANTS (документация) ———
- * Early fun ~5–10 мин; then steep walls; first prestige ~3–6 ч engaged.
- * Cost growth ~1.22–1.35 by tier; mid/late bases ×2–4; soft walls hourly.
- * Softcap click @180 / idle @70, power ~0.5; prestige 2e8 × 2.2^level.
- * Medals: flat +2%/medal + spendable shop (дороже) in Выставка.
- * Energy drains harder; walks longer/weaker; yard stages / unlocks ×2–3.
- * Offline base ~20%; events CD ~10–15 мин, rewards tempered.
+ * Hamster-style cards: linear +X/sec per level, geometric cost, max 20.
+ * Later cards in a tree pay more; first-buy payback stays ~3–12 min.
+ * Shop is early click + small helpers; cards are the idle engine.
+ * No idle softcap. Click softcap is a gentle curve @400 / 0.7.
+ * Prestige 2e8 × 2.2^level. Medals +2%/medal + shop in Выставка.
  */
 function startGame() {
   'use strict';
@@ -39,20 +38,22 @@ function startGame() {
     COMBO_WINDOW_MS, COMBO_MAX, COMBO_STEP, COMBO_DECAY_PER_SEC, WHISTLE_COMBO_MS,
     JOY_MULT, JOY_DURATION_MS, JOY_COOLDOWN_MS,
     PRESTIGE_REQ_BASE, PRESTIGE_REQ_SCALE, PRESTIGE_MEDAL_INCOME, BASE_CLICK, VIP_INCOME_MULT,
-    CLICK_SOFTCAP, IDLE_SOFTCAP, SOFTCAP_POWER,
+    CLICK_SOFTCAP, IDLE_SOFTCAP, SOFTCAP_POWER, CARD_MAX_LEVEL,
     ENERGY_MAX_BASE, ENERGY_PER_CLICK, ENERGY_REGEN_PER_SEC, ENERGY_TIRED_MULT,
     ENERGY_REST_GAIN, ENERGY_REST_COOLDOWN_MS,
     EVENT_MIN_MS, EVENT_MAX_MS, TOY_DURATION_MS, TOY_REWARD_PER_TAP, EVENT_REWARD_MULT,
-    UPGRADES, UPGRADE_ORDER, TRAINING, TRAINING_ORDER, BREEDS, BREED_COUNT,
+    UPGRADES, UPGRADE_ORDER, SHOP_CATS, SHOP_CAT_IDS, TRAINING, TRAINING_ORDER, BREEDS, BREED_COUNT,
     YARDS, FRIENDS, STICKERS, STICKER_SETS, SEASON_SHOP, GP_PRODUCTS, CONSUMABLES,
     ACHIEVEMENTS, STORY, QUEST_POOL, MEDAL_SHOP, WALK_TIERS, YARD_STAGES, DAILY_GOAL_POOL,
-    defaultLevels, defaultTrainingLevels, fmtStatic,
+    CARD_CATS, SKILL_CARDS, SKILL_CARD_IDS, SKILL_CARDS_BY_ID,
+    defaultLevels, defaultTrainingLevels, defaultCardLevels, fmtStatic,
   } = Game;
 
   const state = {
     ore: 0,
     levels: defaultLevels(),
     levelsTraining: defaultTrainingLevels(),
+    levelsCards: defaultCardLevels(),
     lastSaveAt: Date.now(),
     adBoostUntil: 0,
     pendingClickMult: 1,
@@ -95,11 +96,16 @@ function startGame() {
     dailyDayKey: '',
     dailyStreak: 0,
     dailyLastClearDay: '',
+    cardComboDay: '',
+    cardComboHits: {},
+    cardComboClaimed: false,
   };
 
   let lastTick = performance.now();
   let toastTimer = null;
   let activeTab = 'shop';
+  let activeCardCat = 'crew';
+  let activeShopCat = 'paws';
   let lastComboMilestone = 1;
   let toyActive = false;
   let toyTaps = 0;
@@ -136,7 +142,7 @@ function startGame() {
     state.stickers.push(id);
     if (!silent) {
       const st = STICKERS.find(function (x) { return x.id === id; });
-      showToast('Наклейка: ' + ((st && st.icon) || '') + ' ' + ((st && st.name) || id) + '!');
+      showToast(tr('sticker_got', { icon: (st && st.icon) || '', name: locn(st) || id }));
       if (window.Sounds) window.Sounds.playBuy();
     }
     maybeGrantLeafSticker();
@@ -213,6 +219,17 @@ function startGame() {
   function getTrainingAllIncomeMult() {
     return 1 + getTrainingSum('allIncome');
   }
+  function getCardSum(field) {
+    let s = 0;
+    for (let i = 0; i < SKILL_CARDS.length; i++) {
+      const c = SKILL_CARDS[i];
+      s += (state.levelsCards[c.id] || 0) * (c[field] || 0);
+    }
+    return s;
+  }
+  function getCardOrePerSec() {
+    return getCardSum('orePerSec');
+  }
   function getComboWindow() {
     return COMBO_WINDOW_MS + (getBreed().bonuses.comboWindowBonus || 0) + getWhistleBonus() + getTrainingSum('comboBonusMs');
   }
@@ -227,6 +244,7 @@ function startGame() {
     let m = 1;
     for (const u of Object.values(UPGRADES)) m += (state.levels[u.id] || 0) * (u.clickPct || 0);
     m += getTrainingSum('clickPct');
+    m += getCardSum('clickPct');
     return m;
   }
   function getEnergyClickMult() {
@@ -277,7 +295,7 @@ function startGame() {
   function getOrePerSec() {
     let r = 0;
     for (const u of Object.values(UPGRADES)) r += (state.levels[u.id] || 0) * u.orePerSec;
-    r = softcapValue(r, IDLE_SOFTCAP, SOFTCAP_POWER);
+    r += getCardOrePerSec();
     const out = r * getIdleMult();
     return isFinite(out) && out > 0 ? out : 0;
   }
@@ -301,11 +319,11 @@ function startGame() {
   function contentGateText(req) {
     if (!req) return '';
     const parts = [];
-    if (req.reqLifetime) parts.push('жизнь 🦴 ' + fmtStatic(req.reqLifetime));
+    if (req.reqLifetime) parts.push(tr('gate_life', { n: fmtStatic(req.reqLifetime) }));
     if (req.reqMedals) parts.push('🏅 ' + req.reqMedals);
-    if (req.reqPrestige) parts.push('выставок ' + req.reqPrestige);
-    if (req.unlockStage) parts.push('этап двора ' + req.unlockStage);
-    return parts.length ? 'Нужно: ' + parts.join(' · ') : '';
+    if (req.reqPrestige) parts.push(tr('gate_shows', { n: req.reqPrestige }));
+    if (req.unlockStage) parts.push(tr('gate_stage', { n: req.unlockStage }));
+    return parts.length ? tr('need_colon', { parts: parts.join(' · ') }) : '';
   }
   function localDayKey() {
     try {
@@ -322,14 +340,13 @@ function startGame() {
     return Math.floor(u.baseCost * Math.pow(u.costMult, state.levels[id] || 0));
   }
   function unlockReqText(unlock) {
-    if (!unlock) return 'Закрыто';
-    if (unlock.text) return unlock.text;
+    if (!unlock) return tr('locked');
     const parts = [];
     const uid = unlock.upgradeId || (unlock.type === 'level' ? unlock.id : null);
     const min = unlock.level != null ? unlock.level : unlock.min;
-    if (uid && UPGRADES[uid] && min != null) parts.push(UPGRADES[uid].name + ' ур. ' + min);
-    if (unlock.lifetimeBones) parts.push(fmtStatic(unlock.lifetimeBones) + ' 🦴 за жизнь');
-    return parts.length ? 'Нужно: ' + parts.join(' · ') : 'Закрыто';
+    if (uid && UPGRADES[uid] && min != null) parts.push(locn(UPGRADES[uid]) + ' ' + tr('lvl') + ' ' + min);
+    if (unlock.lifetimeBones) parts.push(fmtStatic(unlock.lifetimeBones) + ' 🦴 ' + tr('lifetime'));
+    return parts.length ? tr('need') + ': ' + parts.join(' · ') : tr('locked');
   }
   function isUpgradeUnlocked(id) {
     const u = UPGRADES[id];
@@ -358,7 +375,70 @@ function startGame() {
     const idx = TRAINING_ORDER.indexOf(id);
     if (idx <= 0) return '';
     const prev = TRAINING[idx - 1];
-    return 'Нужно: «' + prev.name + '» ур. 1';
+    return tr('need') + ': «' + locn(prev) + '» ' + tr('lvl') + ' 1';
+  }
+  function cardNeedList(card) {
+    const un = card && card.unlock;
+    if (!un) return [];
+    if (Array.isArray(un.need)) return un.need;
+    const list = [];
+    if (un.cardId) list.push({ cardId: un.cardId, level: un.level || 1 });
+    if (un.upgradeId) list.push({ upgradeId: un.upgradeId, level: un.level || 1 });
+    return list;
+  }
+  function isCardUnlocked(card) {
+    const need = cardNeedList(card);
+    for (let i = 0; i < need.length; i++) {
+      const n = need[i];
+      if (n.cardId && (state.levelsCards[n.cardId] || 0) < (n.level || 1)) return false;
+      if (n.upgradeId && (state.levels[n.upgradeId] || 0) < (n.level || 1)) return false;
+    }
+    return true;
+  }
+  function cardUnlockText(card) {
+    const need = cardNeedList(card);
+    if (!need.length) return '';
+    const parts = [];
+    for (let i = 0; i < need.length; i++) {
+      const n = need[i];
+      if (n.cardId && SKILL_CARDS_BY_ID[n.cardId]) parts.push(locn(SKILL_CARDS_BY_ID[n.cardId]) + ' ' + tr('lvl') + ' ' + n.level);
+      else if (n.upgradeId && UPGRADES[n.upgradeId]) parts.push(locn(UPGRADES[n.upgradeId]) + ' ' + tr('lvl') + ' ' + n.level);
+    }
+    return parts.length ? tr('need') + ': ' + parts.join(' · ') : tr('locked');
+  }
+  function cardCost(id) {
+    const c = SKILL_CARDS_BY_ID[id];
+    if (!c) return Infinity;
+    if (window.GameCore && window.GameCore.geometricCost) return window.GameCore.geometricCost(c.baseCost, c.costMult, state.levelsCards[id] || 0);
+    return Math.floor(c.baseCost * Math.pow(c.costMult, state.levelsCards[id] || 0));
+  }
+  function cardMaxLevel(c) {
+    const n = c && c.maxLevel;
+    return isFinite(n) && n > 0 ? Math.floor(n) : (CARD_MAX_LEVEL || 20);
+  }
+  function fmtPayback(sec) {
+    const s = Math.max(0, Number(sec) || 0);
+    if (s < 90) return tr('payback_s', { n: Math.max(1, Math.ceil(s)) });
+    if (s < 3600) return tr('payback_m', { n: Math.max(1, Math.round(s / 60)) });
+    return tr('payback_h', { n: (s / 3600).toFixed(1) });
+  }
+  function pickDailyCardCombo(seed) {
+    const ids = SKILL_CARD_IDS.slice();
+    const out = [];
+    for (let i = 0; i < 3 && ids.length; i++) {
+      const idx = Math.floor(seededRand(seed, 40 + i) * ids.length);
+      out.push(ids.splice(idx, 1)[0]);
+    }
+    return out;
+  }
+  function ensureCardCombo() {
+    const key = localDayKey();
+    if (state.cardComboDay !== key) {
+      state.cardComboDay = key;
+      state.cardComboHits = {};
+      state.cardComboClaimed = false;
+    }
+    if (!state.cardComboHits || typeof state.cardComboHits !== 'object') state.cardComboHits = {};
   }
   function fmt(n) {
     if (!isFinite(n)) return '0';
@@ -379,6 +459,33 @@ function startGame() {
   }
 
   const $ = (sel) => document.querySelector(sel);
+
+  function tr(key, vars) {
+    return (window.I18n && window.I18n.t) ? window.I18n.t(key, vars) : key;
+  }
+  function locn(item) {
+    return (window.I18n && window.I18n.itemName) ? window.I18n.itemName(item) : (item && item.name) || '';
+  }
+  function locd(item) {
+    return (window.I18n && window.I18n.itemDesc) ? window.I18n.itemDesc(item) : (item && item.desc) || '';
+  }
+  function locStageTitle(st) {
+    return (window.I18n && window.I18n.stageTitle) ? window.I18n.stageTitle(st) : ((st && st.title) || '');
+  }
+  function locStageHook(st) {
+    return (window.I18n && window.I18n.stageHook) ? window.I18n.stageHook(st) : ((st && st.hook) || '');
+  }
+  function qLabel(item) {
+    if (!item) return '';
+    if (window.I18n && window.I18n.questLabel) return window.I18n.questLabel(item.type, item.target);
+    return item.label || '';
+  }
+  function dLabel(item) {
+    if (!item) return '';
+    if (window.I18n && window.I18n.dailyLabel) return window.I18n.dailyLabel(item.type, item.target);
+    return item.label || '';
+  }
+
 
   const ac = new AbortController();
   cleanups.push(function () { try { ac.abort(); } catch (_) {} });
@@ -446,19 +553,20 @@ function startGame() {
     }
   }
 
-  var SECONDARY_TAB_LABELS = {
-    gpshop: 'Покупки',
-    friends: 'Друзья',
-    album: 'Альбом',
-    season: 'Сезон',
-    quests: 'Квесты',
-    achievements: 'Достиж.',
-    story: 'История',
-    prestige: 'Выставка'
-  };
+  function secondaryTabLabels() {
+    return {
+      breeds: tr('tab_breeds'),
+      friends: tr('tab_friends'),
+      album: tr('tab_album'),
+      season: tr('tab_season'),
+      quests: tr('tab_quests'),
+      achievements: tr('tab_ach_short'),
+      prestige: tr('tab_prestige')
+    };
+  }
 
   function isSecondaryTab(tab) {
-    return !!SECONDARY_TAB_LABELS[tab];
+    return !!secondaryTabLabels()[tab];
   }
 
   function closeMoreSheet() {
@@ -489,11 +597,13 @@ function startGame() {
     });
     var moreLabel = $('#tab-more-label');
     if (moreLabel) {
-      moreLabel.textContent = secondary ? (SECONDARY_TAB_LABELS[tab] || 'Ещё') : 'Ещё';
+      moreLabel.textContent = secondary ? (secondaryTabLabels()[tab] || tr('tab_more')) : tr('tab_more');
     }
   }
 
   function setTab(tab) {
+    if (tab === 'gpshop') tab = 'shop';
+    if (tab === 'story') tab = 'shop';
     if (!tab || tab === 'more') return;
     if (tab !== activeTab && window.Sounds && window.Sounds.playUi) window.Sounds.playUi();
     activeTab = tab;
@@ -515,7 +625,8 @@ function startGame() {
   }
 
   function renderActivePanel() {
-    if (activeTab === 'shop') { renderShop(); renderConsumables(); }
+    if (activeTab === 'shop') { renderShop(); }
+    else if (activeTab === 'cards') renderSkillCards();
     else if (activeTab === 'training') renderTraining();
     else if (activeTab === 'breeds') renderBreeds();
     else if (activeTab === 'friends') renderFriends();
@@ -524,33 +635,79 @@ function startGame() {
     else if (activeTab === 'season') renderSeason();
     else if (activeTab === 'quests') renderQuests();
     else if (activeTab === 'achievements') renderAchievements();
-    else if (activeTab === 'story') renderStory();
     else if (activeTab === 'prestige') renderPrestige();
-    else if (activeTab === 'gpshop') renderGpShop();
+  }
+
+  function fmtPct(frac) {
+    const n = (Number(frac) || 0) * 100;
+    const r = Math.round(n * 10) / 10;
+    return (Math.abs(r - Math.round(r)) < 0.05) ? String(Math.round(r)) : r.toFixed(1);
+  }
+  function shopStatHtml(u, lvl, cost) {
+    const lines = [];
+    function arrow(a, b) {
+      lines.push('<span class="skill-card-arrow">' + a + ' → ' + b + '</span>');
+    }
+    function extra(txt) {
+      if (txt) lines.push('<span class="skill-card-next">' + txt + '</span>');
+    }
+    if (u.clickPower) {
+      arrow(fmt(lvl * u.clickPower), fmt((lvl + 1) * u.clickPower));
+      extra(tr('plus_pets_lvl', { n: fmt(u.clickPower) }));
+    }
+    if (u.orePerSec) {
+      arrow(fmt(lvl * u.orePerSec) + tr('per_sec'), fmt((lvl + 1) * u.orePerSec) + tr('per_sec'));
+      extra(tr('plus_ops_lvl', { n: fmt(u.orePerSec) }) + ' · ' + fmtPayback(cost / u.orePerSec));
+    }
+    if (u.clickPct) {
+      arrow('+' + fmtPct(lvl * u.clickPct) + '%', '+' + fmtPct((lvl + 1) * u.clickPct) + '%');
+      extra(tr('plus_pct_pets_lvl', { n: fmtPct(u.clickPct) }));
+    }
+    if (u.idleMult) {
+      arrow('+' + fmtPct(lvl * u.idleMult) + '%', '+' + fmtPct((lvl + 1) * u.idleMult) + '%');
+      extra(tr('plus_pct_idle_lvl', { n: fmtPct(u.idleMult) }));
+    }
+    if (u.comboBonusMs) {
+      arrow('+' + (lvl * u.comboBonusMs) + ' ' + tr('ms'), '+' + ((lvl + 1) * u.comboBonusMs) + ' ' + tr('ms'));
+      extra(tr('plus_combo_lvl', { n: u.comboBonusMs }));
+    }
+    return lines.join('') || locd(u);
   }
 
   function renderShop() {
     const shop = $('#shop');
     if (!shop) return;
+    const cats = $('#shop-cats');
+    if (cats) {
+      cats.querySelectorAll('.card-cat').forEach(function (btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-shop-cat') === activeShopCat);
+      });
+    }
     shop.innerHTML = '';
-    for (let i = 0; i < UPGRADE_ORDER.length; i++) {
-      const id = UPGRADE_ORDER[i];
+    const ids = (SHOP_CAT_IDS && SHOP_CAT_IDS[activeShopCat]) || UPGRADE_ORDER;
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
       const u = UPGRADES[id];
+      if (!u) continue;
       const unlocked = isUpgradeUnlocked(id);
       const lvl = state.levels[id] || 0;
       const cost = upgradeCost(id);
       const canBuy = unlocked && state.ore >= cost;
       const card = document.createElement('button');
       card.type = 'button';
-      card.className = 'upgrade' + (canBuy ? '' : ' disabled') + (unlocked ? '' : ' locked');
+      card.className = 'skill-card' + (canBuy ? '' : ' disabled') + (unlocked ? '' : ' locked');
       card.dataset.id = id;
+      let desc;
       if (!unlocked) {
-        card.innerHTML = '<span class="up-icon">🔒</span><span class="up-body"><span class="up-name">' + u.name + '</span><span class="up-desc">' + unlockReqText(u.unlock) + '</span></span><span class="up-cost">—</span>';
-        card.addEventListener('click', function () { showToast(unlockReqText(u.unlock) || 'Ещё закрыто'); });
+        desc = unlockReqText(u.unlock);
       } else {
-        card.innerHTML = '<span class="up-icon">' + u.icon + '</span><span class="up-body"><span class="up-name">' + u.name + ' <em>ур.' + lvl + '</em></span><span class="up-desc">' + u.desc + '</span></span><span class="up-cost">🦴 ' + fmt(cost) + '</span>';
-        card.addEventListener('click', function () { buyUpgrade(id); });
+        desc = shopStatHtml(u, lvl, cost);
       }
+      card.innerHTML = '<div class="skill-card-top"><span class="skill-card-ico">' + (unlocked ? u.icon : '🔒') + '</span><span class="skill-card-lvl">' + tr('lvl') + lvl + '</span></div><div class="skill-card-name">' + locn(u) + '</div><div class="skill-card-desc">' + desc + '</div><div class="skill-card-cost">' + (unlocked ? '🦴 ' + fmt(cost) : '—') + '</div>';
+      card.addEventListener('click', function () {
+        if (!unlocked) { showToast(unlockReqText(u.unlock) || tr('locked')); return; }
+        buyUpgrade(id);
+      });
       shop.appendChild(card);
     }
   }
@@ -570,67 +727,132 @@ function startGame() {
       card.className = 'upgrade' + (canBuy ? '' : ' disabled') + (unlocked ? '' : ' locked');
       card.dataset.trainingId = t.id;
       if (!unlocked) {
-        card.innerHTML = '<span class="up-icon">🔒</span><span class="up-body"><span class="up-name">' + t.name + '</span><span class="up-desc">' + trainingUnlockText(t.id) + '</span></span><span class="up-cost">—</span>';
-        card.addEventListener('click', function () { showToast(trainingUnlockText(t.id) || 'Ещё закрыто'); });
+        card.innerHTML = '<span class="up-icon">🔒</span><span class="up-body"><span class="up-name">' + locn(t) + '</span><span class="up-desc">' + trainingUnlockText(t.id) + '</span></span><span class="up-cost">—</span>';
+        card.addEventListener('click', function () { showToast(trainingUnlockText(t.id) || tr('locked')); });
       } else {
-        card.innerHTML = '<span class="up-icon">' + t.icon + '</span><span class="up-body"><span class="up-name">' + t.name + ' <em>ур.' + lvl + '</em></span><span class="up-desc">' + t.desc + '</span></span><span class="up-cost">🦴 ' + fmt(cost) + '</span>';
+        card.innerHTML = '<span class="up-icon">' + t.icon + '</span><span class="up-body"><span class="up-name">' + locn(t) + ' <em>' + tr('lvl') + lvl + '</em></span><span class="up-desc">' + locd(t) + '</span></span><span class="up-cost">🦴 ' + fmt(cost) + '</span>';
         card.addEventListener('click', function () { buyTraining(t.id); });
       }
       root.appendChild(card);
     }
   }
 
+  function renderSkillCards() {
+    ensureCardCombo();
+    const comboRoot = $('#card-combo');
+    const grid = $('#skill-cards');
+    const cats = $('#card-cats');
+    if (cats) {
+      cats.querySelectorAll('.card-cat').forEach(function (btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-card-cat') === activeCardCat);
+      });
+    }
+    if (comboRoot) {
+      const ids = pickDailyCardCombo(state.cardComboDay || localDayKey());
+      const hits = state.cardComboHits || {};
+      const allHit = ids.every(function (id) { return !!hits[id]; });
+      let chips = '';
+      ids.forEach(function (id) {
+        const c = SKILL_CARDS_BY_ID[id];
+        chips += '<span class="card-combo-chip' + (hits[id] ? ' hit' : '') + '">' + ((c && c.icon) || '🃏') + ' ' + locn(c) + '</span>';
+      });
+      let action = '';
+      if (state.cardComboClaimed) action = '<span class="breed-active">' + tr('combo_done') + '</span>';
+      else if (allHit) action = '<button type="button" class="btn btn-sm" id="btn-combo-claim">' + tr('combo_claim') + '</button>';
+      comboRoot.innerHTML = '<strong>' + tr('combo_h') + '</strong> ' + chips + (action ? ' ' + action : '<span class="panel-hint" style="margin:0">' + tr('combo_go') + '</span>');
+      const claim = $('#btn-combo-claim');
+      if (claim) claim.addEventListener('click', claimCardCombo);
+    }
+    if (!grid) return;
+    grid.innerHTML = '';
+    SKILL_CARDS.forEach(function (c) {
+      if (c.cat !== activeCardCat) return;
+      const unlocked = isCardUnlocked(c);
+      const lvl = state.levelsCards[c.id] || 0;
+      const maxL = cardMaxLevel(c);
+      const maxed = unlocked && lvl >= maxL;
+      const cost = cardCost(c.id);
+      const can = unlocked && !maxed && state.ore >= cost;
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'skill-card' + (can ? '' : ' disabled') + (unlocked ? '' : ' locked') + (maxed ? ' maxed' : '');
+      let desc;
+      if (!unlocked) {
+        desc = cardUnlockText(c);
+      } else {
+        const now = lvl * c.orePerSec;
+        desc = '<span class="skill-card-now">' + tr('card_now', { n: fmt(now) }) + '</span>';
+        if (!maxed) desc += '<span class="skill-card-next">' + tr('plus_ops_lvl', { n: fmt(c.orePerSec) }) + ' · ' + fmtPayback(cost / c.orePerSec) + '</span>';
+        else desc += '<span class="skill-card-next">' + tr('maxed') + '</span>';
+      }
+      const costHtml = !unlocked ? '—' : (maxed ? tr('maxed') : '🦴 ' + fmt(cost));
+      card.innerHTML = '<div class="skill-card-top"><span class="skill-card-ico">' + (unlocked ? c.icon : '🔒') + '</span><span class="skill-card-lvl">' + tr('lvl') + lvl + (maxed ? '' : '/' + maxL) + '</span></div><div class="skill-card-name">' + locn(c) + '</div><div class="skill-card-desc">' + desc + '</div><div class="skill-card-cost">' + costHtml + '</div>';
+      card.addEventListener('click', function () {
+        if (!unlocked) { showToast(cardUnlockText(c) || tr('locked')); return; }
+        if (maxed) { showToast(tr('max_lvl')); return; }
+        buySkillCard(c.id);
+      });
+      grid.appendChild(card);
+    });
+  }
+  function buySkillCard(id) {
+    const c = SKILL_CARDS_BY_ID[id];
+    if (!c) return;
+    if (!isCardUnlocked(c)) { showToast(cardUnlockText(c) || tr('locked')); return; }
+    if ((state.levelsCards[id] || 0) >= cardMaxLevel(c)) { showToast(tr('max_lvl')); return; }
+    const cost = cardCost(id);
+    if (state.ore < cost) { showToast(tr('need') + ' 🦴'); return; }
+    state.ore -= cost;
+    state.levelsCards[id] = (state.levelsCards[id] || 0) + 1;
+    state.stats.upgradesBought += 1;
+    bumpQuest('buy', 1);
+    ensureCardCombo();
+    const comboIds = pickDailyCardCombo(state.cardComboDay || localDayKey());
+    if (comboIds.indexOf(id) !== -1) state.cardComboHits[id] = true;
+    if (window.Sounds) window.Sounds.playBuy();
+    checkAchievements(); maybeUnlockStory(); renderAll(); scheduleSave();
+  }
+  function claimCardCombo() {
+    ensureCardCombo();
+    if (state.cardComboClaimed) return;
+    const ids = pickDailyCardCombo(state.cardComboDay || localDayKey());
+    if (!ids.every(function (id) { return state.cardComboHits && state.cardComboHits[id]; })) return;
+    const reward = Math.max(80, Math.floor(getOrePerSec() * 90 + getClickPower() * 40));
+    state.cardComboClaimed = true;
+    state.ore += reward;
+    state.stats.lifetimeBones += reward;
+    bumpQuest('earn', reward);
+    if (window.Sounds) window.Sounds.playBuy();
+    showToast(tr('quest_done', { n: fmt(reward) }));
+    renderSkillCards(); renderStats(); scheduleSave();
+  }
+
   function renderConsumables() {
-    const root = $('#consumables');
-    if (!root) return;
-    root.innerHTML = '';
-    Object.values(CONSUMABLES).forEach(function (c) {
-      const qty = (state.inventory && state.inventory[c.id]) || 0;
-      const card = document.createElement('div');
-      card.className = 'item-card';
-      const canBuy = state.ore >= c.cost;
-      const active = state.activeItem && state.activeItem.id === c.id && Date.now() < state.activeItem.until;
-      let actions = '<button type="button" class="btn btn-sm' + (canBuy ? '' : ' disabled') + '" data-buy-item="' + c.id + '">Купить · 🦴 ' + fmt(c.cost) + '</button>';
-      if (qty > 0 && !active) {
-        actions += '<button type="button" class="btn btn-sm" data-use-item="' + c.id + '">Использовать</button>';
-      }
-      if (active) {
-        const sec = Math.ceil((state.activeItem.until - Date.now()) / 1000);
-        actions = '<span class="breed-active">Активно · ' + sec + 'с</span>';
-      }
-      card.innerHTML = '<span class="item-icon">' + c.icon + '</span><div class="item-body"><div class="item-name">' + c.name + '</div><div class="item-desc">' + c.desc + '</div>' + actions + '</div><span class="item-qty">×' + qty + '</span>';
-      root.appendChild(card);
-    });
-    root.querySelectorAll('[data-buy-item]').forEach(function (btn) {
-      btn.addEventListener('click', function () { buyConsumable(btn.getAttribute('data-buy-item')); });
-    });
-    root.querySelectorAll('[data-use-item]').forEach(function (btn) {
-      btn.addEventListener('click', function () { useConsumable(btn.getAttribute('data-use-item')); });
-    });
+    return;
   }
 
   function buyConsumable(id) {
     const c = CONSUMABLES[id];
     if (!c) return;
-    if (state.ore < c.cost) { showToast('Маловато косточек 🐾'); return; }
+    if (state.ore < c.cost) { showToast(tr('need') + ' 🦴'); return; }
     state.ore -= c.cost;
     if (!state.inventory) state.inventory = {};
     state.inventory[id] = (state.inventory[id] || 0) + 1;
     if (window.Sounds) window.Sounds.playBuy();
-    showToast(c.name + ' в инвентаре! 🍀');
+    showToast(tr('item_inv', { name: locn(c) }));
     renderConsumables(); renderStats(); scheduleSave();
   }
 
   function useConsumable(id) {
     const c = CONSUMABLES[id];
     if (!c) return;
-    if (state.activeItem && Date.now() < state.activeItem.until) { showToast('Уже есть активный предмет 🐾'); return; }
+    if (state.activeItem && Date.now() < state.activeItem.until) { showToast(tr('active') + ' 🐾'); return; }
     const qty = (state.inventory && state.inventory[id]) || 0;
-    if (qty <= 0) { showToast('Нет в инвентаре'); return; }
+    if (qty <= 0) { showToast(tr('locked')); return; }
     state.inventory[id] = qty - 1;
     state.activeItem = { id: id, until: Date.now() + c.durationMs };
     if (window.Sounds) window.Sounds.playBuy();
-    showToast(c.name + ' активна! x' + c.mult + ' на ' + Math.round(c.durationMs / 1000) + 'с ✨');
+    showToast(tr('item_on', { name: locn(c), mult: c.mult, n: Math.round(c.durationMs / 1000) }));
     renderConsumables(); renderStats(); scheduleSave();
   }
 
@@ -650,7 +872,7 @@ function startGame() {
     const fr = getFriend();
     if (fr) {
       img.src = fr.src;
-      img.alt = fr.name;
+      img.alt = locn(fr);
       img.hidden = false;
     } else {
       img.hidden = true;
@@ -683,13 +905,13 @@ function startGame() {
         const gated = contentGateOk(b);
         const can = gated && state.ore >= b.unlockCost;
         const gate = contentGateText(b);
-        actionHtml = (gate ? '<div class="gate-hint">' + gate + '</div>' : '') + '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-unlock="' + b.id + '">Открыть · 🦴 ' + fmt(b.unlockCost) + '</button>';
+        actionHtml = (gate ? '<div class="gate-hint">' + gate + '</div>' : '') + '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-unlock="' + b.id + '">' + tr('unlock_cost', { n: fmt(b.unlockCost) }) + '</button>';
       } else if (!selected) {
-        actionHtml = '<button type="button" class="btn btn-sm" data-select="' + b.id + '">Выбрать</button>';
+        actionHtml = '<button type="button" class="btn btn-sm" data-select="' + b.id + '">' + tr('choose') + '</button>';
       } else {
-        actionHtml = '<span class="breed-active">Активна 🐾</span>';
+        actionHtml = '<span class="breed-active">' + tr('breed_on') + '</span>';
       }
-      card.innerHTML = '<img class="breed-thumb" src="' + b.src + '" alt="' + b.name + '" /><div class="breed-body"><div class="breed-name">' + b.name + '</div><div class="breed-desc">' + b.desc + '</div>' + actionHtml + '</div>';
+      card.innerHTML = '<img class="breed-thumb" src="' + b.src + '" alt="' + locn(b) + '" /><div class="breed-body"><div class="breed-name">' + locn(b) + '</div><div class="breed-desc">' + locd(b) + '</div>' + actionHtml + '</div>';
       root.appendChild(card);
     });
     root.querySelectorAll('[data-unlock]').forEach(function (btn) {
@@ -703,15 +925,15 @@ function startGame() {
   function unlockBreed(id) {
     const b = BREEDS[id];
     if (!b || state.unlockedBreeds.indexOf(id) !== -1) return;
-    if (!contentGateOk(b)) { showToast(contentGateText(b) || 'Ещё закрыто'); return; }
-    if (state.ore < b.unlockCost) { showToast('Маловато косточек 🐾'); return; }
+    if (!contentGateOk(b)) { showToast(contentGateText(b) || tr('locked')); return; }
+    if (state.ore < b.unlockCost) { showToast(tr('need') + ' 🦴'); return; }
     state.ore -= b.unlockCost;
     state.unlockedBreeds.push(id);
     if (state.unlockedBreeds.filter(function (x) { return x !== 'lab'; }).length === 1) {
       grantSticker('heart', true);
     }
     if (window.Sounds) window.Sounds.playBuy();
-    showToast(b.name + ' теперь в дворике! 🐕');
+    showToast(tr('breed_in', { name: locn(b) }));
     checkAchievements(); maybeUnlockStory(); renderBreeds(); renderStats(); scheduleSave();
   }
 
@@ -719,7 +941,7 @@ function startGame() {
     if (state.unlockedBreeds.indexOf(id) === -1) return;
     state.selectedBreed = id;
     applyBreedArt();
-    showToast('Порода: ' + (BREEDS[id] && BREEDS[id].name) + ' 🐾');
+    showToast(tr('breed_set', { name: locn(BREEDS[id]) }));
     renderBreeds(); renderStats(); scheduleSave();
   }
 
@@ -737,13 +959,13 @@ function startGame() {
         const gated = contentGateOk(f);
         const can = gated && state.ore >= f.unlockCost;
         const gate = contentGateText(f);
-        actionHtml = (gate ? '<div class="gate-hint">' + gate + '</div>' : '') + '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-unlock-friend="' + f.id + '">Открыть · 🦴 ' + fmt(f.unlockCost) + '</button>';
+        actionHtml = (gate ? '<div class="gate-hint">' + gate + '</div>' : '') + '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-unlock-friend="' + f.id + '">' + tr('unlock_cost', { n: fmt(f.unlockCost) }) + '</button>';
       } else if (!selected) {
-        actionHtml = '<button type="button" class="btn btn-sm" data-select-friend="' + f.id + '">Активировать</button>';
+        actionHtml = '<button type="button" class="btn btn-sm" data-select-friend="' + f.id + '">' + tr('activate') + '</button>';
       } else {
-        actionHtml = '<button type="button" class="btn btn-sm btn-ghost" data-clear-friend="1">Снять</button> <span class="breed-active">Рядом 🐾</span>';
+        actionHtml = '<button type="button" class="btn btn-sm btn-ghost" data-clear-friend="1">' + tr('unequip') + '</button> <span class="breed-active">' + tr('nearby') + '</span>';
       }
-      card.innerHTML = '<img class="breed-thumb" src="' + f.src + '" alt="' + f.name + '" /><div class="breed-body"><div class="breed-name">' + f.name + '</div><div class="breed-desc">' + f.desc + '</div>' + actionHtml + '</div>';
+      card.innerHTML = '<img class="breed-thumb" src="' + f.src + '" alt="' + locn(f) + '" /><div class="breed-body"><div class="breed-name">' + locn(f) + '</div><div class="breed-desc">' + locd(f) + '</div>' + actionHtml + '</div>';
       root.appendChild(card);
     });
     root.querySelectorAll('[data-unlock-friend]').forEach(function (btn) {
@@ -760,8 +982,8 @@ function startGame() {
   function unlockFriend(id) {
     const f = FRIENDS[id];
     if (!f || (state.unlockedFriends || []).indexOf(id) !== -1) return;
-    if (!contentGateOk(f)) { showToast(contentGateText(f) || 'Ещё закрыто'); return; }
-    if (state.ore < f.unlockCost) { showToast('Маловато косточек 🐾'); return; }
+    if (!contentGateOk(f)) { showToast(contentGateText(f) || tr('locked')); return; }
+    if (state.ore < f.unlockCost) { showToast(tr('need') + ' 🦴'); return; }
     state.ore -= f.unlockCost;
     if (!state.unlockedFriends) state.unlockedFriends = [];
     state.unlockedFriends.push(id);
@@ -769,7 +991,7 @@ function startGame() {
     if (!state.activeFriend) state.activeFriend = id;
     applyFriendArt();
     if (window.Sounds) window.Sounds.playBuy();
-    showToast(f.name + ' теперь друг дворика! 🐾');
+    showToast(tr('friend_now', { name: locn(f) }));
     checkAchievements(); maybeUnlockStory(); renderFriends(); renderStats(); scheduleSave();
   }
 
@@ -777,14 +999,14 @@ function startGame() {
     if (id == null) {
       state.activeFriend = null;
       applyFriendArt();
-      showToast('Друг отдыхает 🐾');
+      showToast(tr('friend_rest'));
       renderFriends(); renderStats(); scheduleSave();
       return;
     }
     if ((state.unlockedFriends || []).indexOf(id) === -1) return;
     state.activeFriend = id;
     applyFriendArt();
-    showToast('С вами: ' + (FRIENDS[id] && FRIENDS[id].name));
+    showToast(tr('with_you', { name: locn(FRIENDS[id]) }));
     renderFriends(); renderStats(); scheduleSave();
   }
 
@@ -800,9 +1022,9 @@ function startGame() {
         const card = document.createElement('div');
         card.className = 'album-set';
         let btn = '';
-        if (complete && !claimed) btn = '<button type="button" class="btn btn-sm" data-claim-set="' + set.id + '">Забрать · 🦴 ' + fmt(set.reward) + '</button>';
-        else if (claimed) btn = '<span class="breed-active">Награда получена ✓</span>';
-        card.innerHTML = '<div class="album-set-title">' + set.name + '</div><div class="album-set-meta">' + owned + '/' + set.stickers.length + ' · награда 🦴 ' + fmt(set.reward) + '</div>' + btn;
+        if (complete && !claimed) btn = '<button type="button" class="btn btn-sm" data-claim-set="' + set.id + '">' + tr('claim_cost', { n: fmt(set.reward) }) + '</button>';
+        else if (claimed) btn = '<span class="breed-active">' + tr('reward_got') + '</span>';
+        card.innerHTML = '<div class="album-set-title">' + locn(set) + '</div><div class="album-set-meta">' + owned + '/' + set.stickers.length + ' · ' + tr('reward_bones', { n: fmt(set.reward) }) + '</div>' + btn;
         setsRoot.appendChild(card);
       });
       setsRoot.querySelectorAll('[data-claim-set]').forEach(function (btn) {
@@ -815,15 +1037,15 @@ function startGame() {
       const empty = document.createElement('p');
       empty.className = 'panel-hint';
       empty.style.gridColumn = '1 / -1';
-      empty.textContent = 'Пока пусто — открывайте наклейки в достижениях, событиях, истории и у друзей.';
+      empty.textContent = tr('album_empty');
       grid.appendChild(empty);
     }
     STICKERS.forEach(function (st) {
       const owned = hasSticker(st.id);
       const cell = document.createElement('div');
       cell.className = 'sticker-cell' + (owned ? ' owned' : ' locked');
-      cell.innerHTML = '<span class="sticker-ico">' + (owned ? st.icon : '❔') + '</span><span>' + (owned ? st.name : '???') + '</span>';
-      cell.title = owned ? st.how : 'Ещё не открыто';
+      cell.innerHTML = '<span class="sticker-ico">' + (owned ? st.icon : '❔') + '</span><span>' + (owned ? locn(st) : '???') + '</span>';
+      cell.title = owned ? ((window.I18n && I18n.stickerHow) ? I18n.stickerHow(st) : st.how) : tr('not_open');
       grid.appendChild(cell);
     });
   }
@@ -834,13 +1056,13 @@ function startGame() {
     if (!state.stickerSetsClaimed || typeof state.stickerSetsClaimed !== 'object' || Array.isArray(state.stickerSetsClaimed)) state.stickerSetsClaimed = {};
     if (state.stickerSetsClaimed[id]) return;
     const ok = set.stickers.every(function (sid) { return hasSticker(sid); });
-    if (!ok) { showToast('Набор ещё неполный 🐾'); return; }
+    if (!ok) { showToast(tr('set_incomplete')); return; }
     state.stickerSetsClaimed[id] = true;
     const reward = Math.max(0, Number(set.reward) || 0);
     state.ore += reward;
     state.stats.lifetimeBones += reward;
     if (window.Sounds) window.Sounds.playBuy();
-    showToast('Набор «' + set.name + '»! +' + fmt(reward) + ' 🦴');
+    showToast(tr('set_done', { name: locn(set), n: fmt(reward) }));
     renderAlbum(); renderStats(); maybeUnlockStory(); scheduleSave();
   }
 
@@ -848,12 +1070,12 @@ function startGame() {
     const root = $('#season-shop');
     const hint = $('#season-hint');
     if (hint) hint.textContent = isSeasonActive()
-      ? ('Жёлудей: ' + fmt(isFinite(state.acorns) ? state.acorns : 0) + '. Клики и события дают жёлуди.')
-      : 'Осенний фестиваль закрыт. Загляните с сентября по ноябрь — жёлуди, гонки и сезонный двор.';
+      ? tr('season_acorns', { n: fmt(isFinite(state.acorns) ? state.acorns : 0) })
+      : tr('season_closed');
     if (!root) return;
     root.innerHTML = '';
     if (!isSeasonActive()) {
-      root.innerHTML = '<p class="panel-hint">Фестиваль спит до осени. Собирайте косточки — и возвращайтесь в сентябре за желудями.</p>';
+      root.innerHTML = '<p class="panel-hint">' + tr('season_sleep') + '</p>';
       return;
     }
     SEASON_SHOP.forEach(function (item) {
@@ -863,18 +1085,18 @@ function startGame() {
       let action = '';
       if (item.kind === 'boost') {
         const active = Date.now() < (state.seasonBoostUntil || 0);
-        if (active) action = '<span class="breed-active">' + Math.ceil((state.seasonBoostUntil - Date.now()) / 1000) + 'с</span>';
+        if (active) action = '<span class="breed-active">' + tr('n_sec', { n: Math.ceil((state.seasonBoostUntil - Date.now()) / 1000) }) + '</span>';
         else {
           const can = (isFinite(state.acorns) ? state.acorns : 0) >= item.costAcorns;
           action = '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-season="' + item.id + '">🌰 ' + item.costAcorns + '</button>';
         }
       } else if (bought || (item.kind === 'yard' && state.unlockedYards.indexOf('autumn') !== -1) || (item.kind === 'sticker' && hasSticker(item.stickerId))) {
-        action = '<span class="breed-active">Есть ✓</span>';
+        action = '<span class="breed-active">' + tr('owned_ok') + '</span>';
       } else {
         const can = (isFinite(state.acorns) ? state.acorns : 0) >= item.costAcorns;
         action = '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-season="' + item.id + '">🌰 ' + item.costAcorns + '</button>';
       }
-      card.innerHTML = '<span class="item-icon">' + item.icon + '</span><div class="item-body"><div class="item-name">' + item.name + '</div><div class="item-desc">' + item.desc + '</div></div>' + action;
+      card.innerHTML = '<span class="item-icon">' + item.icon + '</span><div class="item-body"><div class="item-name">' + locn(item) + '</div><div class="item-desc">' + locd(item) + '</div></div>' + action;
       root.appendChild(card);
     });
     root.querySelectorAll('[data-season]').forEach(function (btn) {
@@ -886,7 +1108,7 @@ function startGame() {
     const item = SEASON_SHOP.find(function (x) { return x.id === id; });
     if (!item || !isSeasonActive()) return;
     const acorns = isFinite(state.acorns) ? state.acorns : 0;
-    if (acorns < item.costAcorns) { showToast('Маловато желудей 🍂'); return; }
+    if (acorns < item.costAcorns) { showToast(tr('need') + ' 🌰'); return; }
     if (item.kind === 'yard') {
       if (state.unlockedYards.indexOf('autumn') !== -1) return;
       state.acorns = acorns - item.costAcorns;
@@ -894,7 +1116,7 @@ function startGame() {
       if (!state.seasonPurchases) state.seasonPurchases = {};
       state.seasonPurchases[id] = true;
       grantSticker('leaf');
-      showToast('Осенний двор открыт! 🍂');
+      showToast(tr('autumn_yard'));
     } else if (item.kind === 'sticker') {
       if (hasSticker(item.stickerId)) return;
       state.acorns = acorns - item.costAcorns;
@@ -905,7 +1127,7 @@ function startGame() {
       if (Date.now() < (state.seasonBoostUntil || 0)) return;
       state.acorns = acorns - item.costAcorns;
       state.seasonBoostUntil = Date.now() + SEASON_BOOST_MS;
-      showToast('Осенний заряд x1.25 на 60с! ⚡');
+      showToast(tr('autumn_charge'));
     } else {
       return;
     }
@@ -926,19 +1148,19 @@ function startGame() {
       let actionHtml = '';
       if (!unlocked) {
         if (y.seasonOnly) {
-          actionHtml = '<span class="breed-active">Только в сезоне 🍂</span>';
+          actionHtml = '<span class="breed-active">' + tr('season_only') + '</span>';
         } else {
           const gated = contentGateOk(y);
           const can = gated && state.ore >= y.unlockCost;
           const gate = contentGateText(y);
-          actionHtml = (gate ? '<div class="gate-hint">' + gate + '</div>' : '') + '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-unlock-yard="' + y.id + '">Открыть · 🦴 ' + fmt(y.unlockCost) + '</button>';
+          actionHtml = (gate ? '<div class="gate-hint">' + gate + '</div>' : '') + '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-unlock-yard="' + y.id + '">' + tr('unlock_cost', { n: fmt(y.unlockCost) }) + '</button>';
         }
       } else if (!selected) {
-        actionHtml = '<button type="button" class="btn btn-sm" data-select-yard="' + y.id + '">Выбрать</button>';
+        actionHtml = '<button type="button" class="btn btn-sm" data-select-yard="' + y.id + '">' + tr('choose') + '</button>';
       } else {
-        actionHtml = '<span class="breed-active">Активен 🌅</span>';
+        actionHtml = '<span class="breed-active">' + tr('yard_on') + '</span>';
       }
-      card.innerHTML = '<img class="yard-thumb" src="' + y.src + '" alt="' + y.name + '" /><div class="yard-body"><div class="yard-name">' + y.name + '</div><div class="yard-desc">' + y.desc + '</div>' + actionHtml + '</div>';
+      card.innerHTML = '<img class="yard-thumb" src="' + y.src + '" alt="' + locn(y) + '" /><div class="yard-body"><div class="yard-name">' + locn(y) + '</div><div class="yard-desc">' + locd(y) + '</div>' + actionHtml + '</div>';
       root.appendChild(card);
     });
     root.querySelectorAll('[data-unlock-yard]').forEach(function (btn) {
@@ -955,13 +1177,13 @@ function startGame() {
   function unlockYard(id) {
     const y = YARDS[id];
     if (!y || state.unlockedYards.indexOf(id) !== -1) return;
-    if (y.seasonOnly) { showToast('Откройте во вкладке «Сезон» 🍂'); return; }
-    if (!contentGateOk(y)) { showToast(contentGateText(y) || 'Ещё закрыто'); return; }
-    if (state.ore < y.unlockCost) { showToast('Маловато косточек 🐾'); return; }
+    if (y.seasonOnly) { showToast(tr('open_in_season')); return; }
+    if (!contentGateOk(y)) { showToast(contentGateText(y) || tr('locked')); return; }
+    if (state.ore < y.unlockCost) { showToast(tr('need') + ' 🦴'); return; }
     state.ore -= y.unlockCost;
     state.unlockedYards.push(id);
     if (window.Sounds) window.Sounds.playBuy();
-    showToast('Двор «' + y.name + '» открыт! 🌄');
+    showToast(tr('yard_open', { name: locn(y) }));
     checkAchievements(); maybeUnlockStory(); renderYards(); renderStats(); scheduleSave();
   }
 
@@ -969,7 +1191,7 @@ function startGame() {
     if (state.unlockedYards.indexOf(id) === -1) return;
     state.selectedYard = id;
     applyYardArt();
-    showToast('Двор: ' + (YARDS[id] && YARDS[id].name));
+    showToast(tr('yard_set', { name: locn(YARDS[id]) }));
     renderYards(); scheduleSave();
   }
 
@@ -1052,10 +1274,10 @@ function startGame() {
     if (state.questClaimsToday === 3 && state.questLastClearDay !== daySeed()) {
       state.questStreak = (state.questStreak || 0) + 1;
       state.questLastClearDay = daySeed();
-      showToast('Серия квестов: ' + state.questStreak + ' дн.! 🔥');
+      showToast(tr('quest_streak', { n: state.questStreak }));
     }
     if (window.Sounds) window.Sounds.playBuy();
-    showToast('Квест выполнен! +' + fmt(reward) + ' 🦴');
+    showToast(tr('quest_done', { n: fmt(reward) }));
     const tpl = QUEST_POOL.find(function (t) { return t.type === q.type; }) || QUEST_POOL[0];
     const ti = Math.floor(Math.random() * tpl.targets.length);
     const target = tpl.targets[ti];
@@ -1078,7 +1300,7 @@ function startGame() {
     const meta = card.querySelector('.quest-meta');
     if (meta) {
       const rewardBit = kind === 'quest'
-        ? ' · награда 🦴 ' + fmt(item.reward)
+        ? ' · ' + tr('reward_bones', { n: fmt(item.reward) })
         : ' · 🦴 ' + fmt(item.reward);
       meta.textContent = fmt(Math.min(item.progress || 0, item.target)) + ' / ' + fmt(item.target) + rewardBit;
     }
@@ -1088,7 +1310,7 @@ function startGame() {
         if (btn) btn.remove();
         const mark = document.createElement('span');
         mark.className = 'breed-active';
-        mark.textContent = 'Получено ✓';
+        mark.textContent = tr('claimed');
         card.appendChild(mark);
       }
       return;
@@ -1099,7 +1321,7 @@ function startGame() {
       btn.className = 'btn btn-sm';
       if (kind === 'quest') btn.setAttribute('data-claim', item.id);
       else btn.setAttribute('data-claim-daily', item.id);
-      btn.textContent = 'Забрать';
+      btn.textContent = tr('claim');
       card.appendChild(btn);
     }
   }
@@ -1129,7 +1351,7 @@ function startGame() {
     root.innerHTML = '';
     const dailyHead = document.createElement('div');
     dailyHead.className = 'section-subhead';
-    dailyHead.innerHTML = '<strong>Ежедневные цели</strong> · серия ' + (state.dailyStreak || 0) + ' дн.';
+    dailyHead.innerHTML = '<strong>' + tr('daily_h') + '</strong> · ' + (state.dailyStreak || 0);
     root.appendChild(dailyHead);
     (state.dailyGoals || []).forEach(function (g) {
       const done = !g.claimed && g.progress >= g.target;
@@ -1138,14 +1360,14 @@ function startGame() {
       card.setAttribute('data-daily-id', g.id);
       const pct = questBarPct(g);
       let btn = '';
-      if (g.claimed) btn = '<span class="breed-active">Получено ✓</span>';
-      else if (done) btn = '<button type="button" class="btn btn-sm" data-claim-daily="' + escapeHtml(g.id) + '">Забрать</button>';
-      card.innerHTML = '<div class="quest-title">' + escapeHtml(g.label) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(g.progress, g.target)) + ' / ' + fmt(g.target) + ' · 🦴 ' + fmt(g.reward) + '</div>' + btn;
+      if (g.claimed) btn = '<span class="breed-active">' + tr('claimed') + '</span>';
+      else if (done) btn = '<button type="button" class="btn btn-sm" data-claim-daily="' + escapeHtml(g.id) + '">' + tr('claim') + '</button>';
+      card.innerHTML = '<div class="quest-title">' + escapeHtml(dLabel(g)) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(g.progress, g.target)) + ' / ' + fmt(g.target) + ' · 🦴 ' + fmt(g.reward) + '</div>' + btn;
       root.appendChild(card);
     });
     const qHead = document.createElement('div');
     qHead.className = 'section-subhead';
-    qHead.innerHTML = '<strong>Квесты дня</strong> · серия ' + (state.questStreak || 0) + ' дн. · сложнее цели';
+    qHead.innerHTML = '<strong>' + tr('tab_quests') + '</strong> · ' + (state.questStreak || 0);
     root.appendChild(qHead);
     state.quests.forEach(function (q) {
       const done = !q.claimed && q.progress >= q.target;
@@ -1153,7 +1375,7 @@ function startGame() {
       card.className = 'quest-card' + (done ? ' done' : '');
       card.setAttribute('data-quest-id', q.id);
       const pct = questBarPct(q);
-      card.innerHTML = '<div class="quest-title">' + escapeHtml(q.label) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(q.progress, q.target)) + ' / ' + fmt(q.target) + ' · награда 🦴 ' + fmt(q.reward) + '</div>' + (done ? '<button type="button" class="btn btn-sm" data-claim="' + escapeHtml(q.id) + '">Забрать</button>' : '');
+      card.innerHTML = '<div class="quest-title">' + escapeHtml(qLabel(q)) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(q.progress, q.target)) + ' / ' + fmt(q.target) + ' · ' + tr('reward_bones', { n: fmt(q.reward) }) + '</div>' + (done ? '<button type="button" class="btn btn-sm" data-claim="' + escapeHtml(q.id) + '">' + tr('claim') + '</button>' : '');
       root.appendChild(card);
     });
   }
@@ -1178,7 +1400,7 @@ function startGame() {
     if (id === 'story_3') grantSticker('heart');
     if (id === 'prestige_1') grantSticker('medal');
     if (window.Sounds) window.Sounds.playBuy();
-    showToast('Достижение! +' + fmt(a.reward) + ' 🦴');
+    showToast(tr('ach_done', { n: fmt(a.reward) }));
     renderAchievements(); renderStats(); maybeUnlockStory(); scheduleSave();
   }
   function renderAchievements() {
@@ -1190,7 +1412,7 @@ function startGame() {
       const ready = !claimed && a.check(state);
       const card = document.createElement('div');
       card.className = 'ach-card' + (claimed ? ' claimed' : '') + (ready ? ' ready' : '');
-      card.innerHTML = '<div class="ach-body"><div class="ach-name">' + a.name + '</div><div class="ach-desc">' + a.desc + '</div><div class="ach-reward">🦴 ' + fmt(a.reward) + '</div></div>' + (claimed ? '<span class="ach-status">✓</span>' : ready ? '<button type="button" class="btn btn-sm" data-ach="' + a.id + '">Забрать</button>' : '<span class="ach-status">…</span>');
+      card.innerHTML = '<div class="ach-body"><div class="ach-name">' + locn(a) + '</div><div class="ach-desc">' + locd(a) + '</div><div class="ach-reward">🦴 ' + fmt(a.reward) + '</div></div>' + (claimed ? '<span class="ach-status">✓</span>' : ready ? '<button type="button" class="btn btn-sm" data-ach="' + a.id + '">' + tr('claim') + '</button>' : '<span class="ach-status">…</span>');
       root.appendChild(card);
     });
     root.querySelectorAll('[data-ach]').forEach(function (btn) {
@@ -1212,8 +1434,8 @@ function startGame() {
       const read = !!state.storyRead[ch.id];
       const card = document.createElement('div');
       card.className = 'story-card' + (unlocked ? '' : ' locked') + (unlocked && !read ? ' unread' : '') + (read ? ' read' : '');
-      let badge = !unlocked ? '<span class="story-badge">🔒</span>' : (!read ? '<span class="story-badge">Новое</span>' : '<span class="story-badge">✓</span>');
-      card.innerHTML = '<span class="item-icon">' + (idx + 1) + '</span><div class="story-body"><div class="story-name">' + ch.title + '</div><div class="story-desc">' + (unlocked ? (read ? 'Прочитано — можно снова' : 'Нажмите, чтобы прочитать') : 'Ещё закрыто') + '</div>' + (unlocked ? '<button type="button" class="btn btn-sm" data-story="' + ch.id + '">' + (read ? 'Перечитать' : 'Читать') + '</button>' : '') + '</div>' + badge;
+      let badge = !unlocked ? '<span class="story-badge">🔒</span>' : (!read ? '<span class="story-badge">' + tr('story_new') + '</span>' : '<span class="story-badge">✓</span>');
+      card.innerHTML = '<span class="item-icon">' + (idx + 1) + '</span><div class="story-body"><div class="story-name">' + ((window.I18n && I18n.storyOf) ? I18n.storyOf(ch).title : ch.title) + '</div><div class="story-desc">' + (unlocked ? (read ? tr('story_reread') : tr('story_tap')) : tr('story_locked')) + '</div>' + (unlocked ? '<button type="button" class="btn btn-sm" data-story="' + ch.id + '">' + (read ? tr('story_reread_btn') : tr('story_read_btn')) + '</button>' : '') + '</div>' + badge;
       root.appendChild(card);
     });
     root.querySelectorAll('[data-story]').forEach(function (btn) {
@@ -1224,11 +1446,11 @@ function startGame() {
   function openStory(id) {
     const ch = STORY.find(function (x) { return x.id === id; });
     if (!ch || !isChapterUnlocked(ch)) return;
-    storyPlaying = ch;
+    storyPlaying = (window.I18n && window.I18n.storyOf) ? window.I18n.storyOf(ch) : ch;
     storyLineIndex = 0;
     const modal = $('#story-modal');
     const title = $('#story-modal-title');
-    if (title) title.textContent = ch.title;
+    if (title) title.textContent = storyPlaying.title || ch.title;
     renderStoryLines();
     if (modal) modal.hidden = false;
   }
@@ -1244,13 +1466,13 @@ function startGame() {
       div.className = 'story-line ' + (line.who === 'dog' ? 'dog' : 'narrator');
       const who = document.createElement('span');
       who.className = 'who';
-      who.textContent = line.who === 'dog' ? 'Пёсик' : 'Рассказчик';
+      who.textContent = line.who === 'dog' ? tr('who_dog') : tr('who_narr');
       div.appendChild(who);
       div.appendChild(document.createTextNode(String(line.text == null ? '' : line.text)));
       box.appendChild(div);
     }
     box.scrollTop = box.scrollHeight;
-    if (nextBtn) nextBtn.textContent = storyLineIndex >= storyPlaying.lines.length - 1 ? 'Готово 🐾' : 'Далее';
+    if (nextBtn) nextBtn.textContent = storyLineIndex >= storyPlaying.lines.length - 1 ? tr('help_ok') : tr('next');
   }
   function advanceStory() {
     if (!storyPlaying) return;
@@ -1263,7 +1485,7 @@ function startGame() {
     if (modal) modal.hidden = true;
     if (wasNew) {
       if (window.Sounds) window.Sounds.playBuy();
-      showToast('Глава прочитана 📖');
+      showToast(tr('chapter_read'));
       if (Object.keys(state.storyRead).length >= 3) grantSticker('heart', true);
       checkAchievements();
     }
@@ -1282,11 +1504,11 @@ function startGame() {
     return pool[Math.floor(Math.random() * pool.length)];
   }
   function eventTitle(type) {
-    if (type === 'toy') return '🧸 Пропала игрушка!';
-    if (type === 'train') return '🎓 Дрессировка!';
-    if (type === 'hide') return '🃏 Прятки!';
-    if (type === 'race') return '🐿️ Гонка за белкой!';
-    return 'Событие!';
+    if (type === 'toy') return '🧸 ' + tr('toy_title');
+    if (type === 'train') return '🎓 ' + tr('train_title') + '!';
+    if (type === 'hide') return '🃏 ' + tr('hide_title') + '!';
+    if (type === 'race') return '🐿️ ' + tr('race_title') + '!';
+    return tr('event_bang');
   }
   function showEventBanner(type) {
     state.eventReadyType = type || pickEventType();
@@ -1305,15 +1527,15 @@ function startGame() {
   function updateEventBtn() {
     const btn = $('#btn-event');
     if (!btn) return;
-    if (toyActive || trainActive || hideActive || raceActive) { btn.disabled = true; btn.textContent = 'Идёт событие…'; return; }
-    if (state.eventReadyType) { btn.disabled = false; btn.textContent = 'Событие готово!'; return; }
+    if (toyActive || trainActive || hideActive || raceActive) { btn.disabled = true; btn.textContent = tr('event_running'); return; }
+    if (state.eventReadyType) { btn.disabled = false; btn.textContent = tr('event_ready'); return; }
     const left = Math.max(0, (state.nextEventAt || 0) - Date.now());
     if (left > 0) {
       btn.disabled = true;
-      btn.textContent = 'Событие ~' + Math.ceil(left / 60000) + 'м';
+      btn.textContent = tr('event_cd', { n: Math.ceil(left / 60000) });
     } else {
       btn.disabled = false;
-      btn.textContent = 'Событие';
+      btn.textContent = tr('event');
     }
   }
   function startEvent(forcedType) {
@@ -1334,7 +1556,7 @@ function startGame() {
       startEvent(pickEventType());
       return;
     }
-    showToast('Событие ещё не готово 🐾');
+    showToast(tr('event_not_ready'));
   }
 
   function startToyGame() {
@@ -1383,11 +1605,11 @@ function startGame() {
       grantSticker('ball', true);
       addEventAcorns(0.8);
       if (window.Sounds) window.Sounds.playOffline();
-      showToast('Игрушка найдена! +' + fmt(reward) + ' 🦴 (' + taps + ' тапов)');
+      showToast(tr('toy_found', { n: fmt(reward), taps: taps }));
       checkAchievements(); maybeUnlockStory();
       maybeOfferFullscreen('event');
     } else {
-      showToast('Игрушка укатилась… 🐾');
+      showToast(tr('toy_miss'));
     }
     scheduleNextEvent();
     renderStats(); updateEventBtn(); scheduleSave();
@@ -1403,10 +1625,10 @@ function startGame() {
   }
 
   const TRAIN_CMDS = [
-    { id: 'sit', label: 'Сидеть 🪑' },
-    { id: 'paw', label: 'Лапу 🐾' },
-    { id: 'spin', label: 'Крутись 🔄' },
-    { id: 'speak', label: 'Голос 📣' },
+    { id: 'sit', key: 'cmd_sit' },
+    { id: 'paw', key: 'cmd_paw' },
+    { id: 'spin', key: 'cmd_spin' },
+    { id: 'speak', key: 'cmd_speak' },
   ];
 
   function startTrainGame() {
@@ -1425,16 +1647,16 @@ function startGame() {
     const prompt = $('#train-prompt');
     const btns = $('#train-btns');
     const status = $('#train-status');
-    if (stepEl) stepEl.textContent = 'Шаг ' + (trainIndex + 1) + '/5';
-    if (status) status.textContent = 'Смотрите команду…';
+    if (stepEl) stepEl.textContent = tr('train_step', { n: trainIndex + 1 });
+    if (status) status.textContent = tr('train_watch');
     trainShowing = true;
     const cmd = TRAIN_CMDS.find(function (c) { return c.id === trainSeq[trainIndex]; });
-    if (prompt) prompt.textContent = cmd ? cmd.label : '?';
+    if (prompt) prompt.textContent = cmd ? tr(cmd.key) : '?';
     if (btns) btns.innerHTML = '';
     setTimeout(function () {
       if (!trainActive) return;
-      if (prompt) prompt.textContent = 'Ваш ход!';
-      if (status) status.textContent = 'Выберите правильную команду';
+      if (prompt) prompt.textContent = tr('train_turn');
+      if (status) status.textContent = tr('train_pick');
       trainShowing = false;
       if (!btns) return;
       btns.innerHTML = '';
@@ -1443,7 +1665,7 @@ function startGame() {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'btn';
-        b.textContent = c.label;
+        b.textContent = tr(c.key);
         b.addEventListener('click', function () { answerTrain(c.id); });
         btns.appendChild(b);
       });
@@ -1453,7 +1675,7 @@ function startGame() {
     if (!trainActive || trainShowing) return;
     if (id !== trainSeq[trainIndex]) {
       if (window.Sounds) window.Sounds.playPet();
-      showToast('Мимо! Попробуем ещё раз 🐾');
+      showToast(tr('train_miss'));
       showTrainStep();
       return;
     }
@@ -1475,7 +1697,7 @@ function startGame() {
       grantSticker('star', true);
       addEventAcorns(1);
       if (window.Sounds) window.Sounds.playOffline();
-      showToast('Дрессировка на ура! +' + fmt(reward) + ' 🦴');
+      showToast(tr('train_win', { n: fmt(reward) }));
       maybeOfferFullscreen('event');
     }
     scheduleNextEvent();
@@ -1491,8 +1713,8 @@ function startGame() {
     const status = $('#hide-status');
     const tries = $('#hide-tries');
     const cards = $('#hide-cards');
-    if (status) status.textContent = 'Выберите карточку';
-    if (tries) tries.textContent = 'Попыток: ' + hideTriesLeft;
+    if (status) status.textContent = tr('hide_pick');
+    if (tries) tries.textContent = tr('hide_tries_n', { n: hideTriesLeft });
     if (cards) {
       cards.innerHTML = '';
       for (let i = 0; i < hideCardCount; i++) {
@@ -1522,7 +1744,7 @@ function startGame() {
     btn.classList.add('wrong');
     hideTriesLeft -= 1;
     const tries = $('#hide-tries');
-    if (tries) tries.textContent = 'Попыток: ' + hideTriesLeft;
+    if (tries) tries.textContent = tr('hide_tries_n', { n: hideTriesLeft });
     if (window.Sounds) window.Sounds.playPet();
     if (hideTriesLeft <= 0) {
       const cards = $('#hide-cards');
@@ -1547,10 +1769,10 @@ function startGame() {
       grantSticker('hide');
       const ac = addEventAcorns(1.1);
       if (window.Sounds) window.Sounds.playOffline();
-      showToast('Нашли косточку! +' + fmt(reward) + ' 🦴' + (ac ? ' · 🌰+' + ac : ''));
+      showToast(tr('hide_win', { n: fmt(reward) }) + (ac ? ' · 🌰+' + ac : ''));
       maybeOfferFullscreen('event');
     } else {
-      showToast('Косточка спряталась… 🐾');
+      showToast(tr('hide_miss'));
     }
     scheduleNextEvent();
     checkAchievements(); maybeUnlockStory(); renderStats(); updateEventBtn(); scheduleSave();
@@ -1614,11 +1836,11 @@ function startGame() {
       bumpDailyGoal('events', 1);
       const ac = addEventAcorns(0.9 + pct / 100);
       if (window.Sounds) window.Sounds.playOffline();
-      showToast('Догнали белку! +' + fmt(reward) + ' 🦴 (' + Math.floor(pct) + '%)' + (ac ? ' · 🌰+' + ac : ''));
+      showToast(tr('race_win', { n: fmt(reward), pct: Math.floor(pct) }) + (ac ? ' · 🌰+' + ac : ''));
       checkAchievements(); maybeUnlockStory();
       maybeOfferFullscreen('event');
     } else {
-      showToast('Белка ускакала… ' + Math.floor(pct) + '% 🐾');
+      showToast(tr('race_miss', { pct: Math.floor(pct) }));
     }
     scheduleNextEvent();
     renderStats(); updateEventBtn(); scheduleSave();
@@ -1637,11 +1859,11 @@ function startGame() {
     const btn = $('#btn-ad');
     if (btn) {
       if (state.noAds) {
-        btn.textContent = 'Бонус без рекламы (NO_ADS)';
+        btn.textContent = tr('ad_noads');
         btn.classList.add('no-ads');
       } else {
         btn.classList.remove('no-ads');
-        if (!btn.disabled) btn.textContent = 'Видео: двойные косточки';
+        if (!btn.disabled) btn.textContent = tr('ad_video');
       }
     }
     if (state.noAds && window.GPBridge && window.GPBridge.hideSticky) {
@@ -1659,36 +1881,23 @@ function startGame() {
     }, reason === 'prestige' ? 900 : 600);
   }
 
-  function renderGpShop() {
-    const root = $('#gp-shop');
-    if (!root) return;
-    const bridge = window.GPBridge;
-    const payOk = bridge && bridge.isPaymentsAvailable && bridge.isPaymentsAvailable();
-    const gpOn = bridge && bridge.isGpConnected && bridge.isGpConnected();
-    let payHint;
-    if (payOk) payHint = 'Платежи GamePush доступны.';
-    else if (gpOn) payHint = 'GamePush подключён, но платежи на этой платформе недоступны.';
-    else payHint = 'Локальный режим: покупка через подтверждение.';
-    const flags = [];
-    if (state.noAds) flags.push('NO_ADS ✓');
-    if (state.vipTreats) flags.push('VIP ✓');
-    root.innerHTML = '<p class="panel-hint">' + payHint + (flags.length ? ' · ' + flags.join(' · ') : '') + '</p>';
-    GP_PRODUCTS.forEach(function (p) {
-      const card = document.createElement('div');
-      card.className = 'upgrade gp-product';
-      let owned = false;
-      if (p.kind === 'permanent') {
-        owned = p.flag === 'noAds' ? !!state.noAds : !!state.vipTreats;
-      }
-      let action;
-      if (owned) action = '<span class="breed-active">Куплено ✓</span>';
-      else action = '<button type="button" class="btn btn-sm" data-gp-buy="' + p.tag + '">Купить</button>';
-      card.innerHTML = '<span class="up-icon">' + p.icon + '</span><span class="up-body"><span class="up-name">' + p.name + '</span><span class="up-desc">' + p.desc + '</span><span class="up-desc gp-tag">' + p.tag + '</span></span><span class="up-cost">' + action + '</span>';
-      root.appendChild(card);
-    });
-    root.querySelectorAll('[data-gp-buy]').forEach(function (btn) {
-      btn.addEventListener('click', function () { buyGpProduct(btn.getAttribute('data-gp-buy')); });
-    });
+  function gpProductOwned(p) {
+    if (!p || p.kind !== 'permanent') return false;
+    if (p.flag === 'noAds') return !!state.noAds;
+    if (p.flag === 'vipTreats') return !!state.vipTreats;
+    return false;
+  }
+
+  function appendGpSkillCard(root, p) {
+    if (!root || !p) return;
+    const owned = gpProductOwned(p);
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'upgrade gp-skill' + (owned ? ' owned' : '');
+    card.innerHTML = '<span class="up-icon">' + p.icon + '</span><span class="up-body"><span class="up-name">' + locn(p) + '</span><span class="up-desc">' + locd(p) + '</span></span><span class="up-cost iap">' + (owned ? tr('bought') : tr('iap_cost')) + '</span>';
+    if (owned) card.disabled = true;
+    else card.addEventListener('click', function () { buyGpProduct(p.tag); });
+    root.appendChild(card);
   }
 
   let gpBuyBusy = false;
@@ -1696,14 +1905,14 @@ function startGame() {
   async function buyGpProduct(tag) {
     const product = GP_PRODUCTS.find(function (p) { return p.tag === tag; });
     if (!product) return;
-    if (gpBuyBusy) { showToast('Подождите…'); return; }
+    if (gpBuyBusy) { showToast(tr('wait')); return; }
     if (product.kind === 'permanent') {
-      if (product.flag === 'noAds' && state.noAds) { showToast('Уже куплено 🐾'); return; }
-      if (product.flag === 'vipTreats' && state.vipTreats) { showToast('Уже куплено 🐾'); return; }
+      if (product.flag === 'noAds' && state.noAds) { showToast(tr('bought')); return; }
+      if (product.flag === 'vipTreats' && state.vipTreats) { showToast(tr('bought')); return; }
     }
     const bridge = window.GPBridge;
     if (!bridge || typeof bridge.purchase !== 'function') {
-      showToast('Платежи недоступны');
+      showToast(tr('gpshop_hint'));
       if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
       return;
     }
@@ -1712,9 +1921,9 @@ function startGame() {
       const res = await bridge.purchase(tag);
       if (!res || !res.ok) {
         const err = res && res.error;
-        let msg = 'Не удалось купить';
-        if (err === 'cancelled') msg = 'Покупка отменена';
-        else if (err === 'payments_unavailable') msg = 'Платежи сейчас недоступны';
+        let msg = tr('buy_fail');
+        if (err === 'cancelled') msg = tr('buy_cancel');
+        else if (err === 'payments_unavailable') msg = tr('pay_now_na');
         showToast(msg);
         if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
         return;
@@ -1729,7 +1938,7 @@ function startGame() {
         if (typeof bridge.consume === 'function') await bridge.consume(tag);
         if (window.Sounds && window.Sounds.playPurchase) window.Sounds.playPurchase();
         else if (window.Sounds) window.Sounds.playBuy();
-        showToast('+' + fmt(gain) + ' косточек! 🦴');
+        showToast(tr('bones_plus', { n: fmt(gain) }));
       } else {
         if (product.flag === 'noAds') state.noAds = true;
         if (product.flag === 'vipTreats') state.vipTreats = true;
@@ -1737,7 +1946,7 @@ function startGame() {
         await persist();
         if (window.Sounds && window.Sounds.playPurchase) window.Sounds.playPurchase();
         else if (window.Sounds) window.Sounds.playBuy();
-        showToast(product.name + ' активировано! ✨');
+        showToast(tr('product_on', { name: locn(product) }));
       }
       checkAchievements();
       renderAll();
@@ -1786,16 +1995,16 @@ function startGame() {
       const now = Date.now();
       if (state.activeWalk) {
         restBtn.disabled = true;
-        restBtn.textContent = state.activeWalk.endsAt > now ? 'Отдых после прогулки' : 'Заберите прогулку';
+        restBtn.textContent = state.activeWalk.endsAt > now ? tr('rest_after') : tr('claim_walk');
       } else if (now < (state.energyRestReadyAt || 0)) {
         restBtn.disabled = true;
-        restBtn.textContent = 'Отдых ' + Math.ceil((state.energyRestReadyAt - now) / 1000) + 'с';
+        restBtn.textContent = tr('rest_cd', { n: Math.ceil((state.energyRestReadyAt - now) / 1000) });
       } else if (state.energy >= max - 0.5) {
         restBtn.disabled = true;
-        restBtn.textContent = 'Отдых';
+        restBtn.textContent = tr('rest');
       } else {
         restBtn.disabled = false;
-        restBtn.textContent = 'Отдых +' + ENERGY_REST_GAIN;
+        restBtn.textContent = tr('rest_plus', { n: ENERGY_REST_GAIN });
       }
     }
     updateWalkUI();
@@ -1803,16 +2012,16 @@ function startGame() {
   function doRest() {
     const now = Date.now();
     if (state.activeWalk) {
-      showToast(state.activeWalk.endsAt > now ? 'Пёсик ещё на прогулке 🐕‍🦺' : 'Сначала заберите прогулку 🐾');
+      showToast(state.activeWalk.endsAt > now ? tr('walk_busy') : tr('claim_walk_first'));
       return;
     }
-    if (now < (state.energyRestReadyAt || 0)) { showToast('Пёсик ещё отдыхает 🐾'); return; }
+    if (now < (state.energyRestReadyAt || 0)) { showToast(tr('rest_busy')); return; }
     const max = getEnergyMax();
-    if (state.energy >= max - 0.5) { showToast('Энергия полная!'); return; }
+    if (state.energy >= max - 0.5) { showToast(tr('energy_full')); return; }
     state.energy = Math.min(max, state.energy + ENERGY_REST_GAIN);
     state.energyRestReadyAt = now + ENERGY_REST_COOLDOWN_MS;
     if (window.Sounds) window.Sounds.playBuy();
-    showToast('Отдых! Энергия +' + ENERGY_REST_GAIN + ' 😴');
+    showToast(tr('rest_toast', { n: ENERGY_REST_GAIN }));
     updateEnergyUI(); scheduleSave();
   }
 
@@ -1823,7 +2032,7 @@ function startGame() {
   }
   function startWalk(tierId) {
     if (state.activeWalk && state.activeWalk.endsAt > Date.now()) {
-      showToast('Уже на прогулке…'); return;
+      showToast(tr('already_walk')); return;
     }
     // claim finished walk first
     if (state.activeWalk && state.activeWalk.endsAt <= Date.now()) {
@@ -1831,17 +2040,17 @@ function startGame() {
     }
     const tier = WALK_TIERS.find(function (t) { return t.id === tierId; }) || WALK_TIERS[0];
     if (!isWalkUnlocked(tier)) {
-      showToast('Нужен этап двора ' + tier.unlockStage + (tier.unlockPrestige ? ' и выставка' : ''));
+      showToast(tier.unlockPrestige ? tr('need_stage_show', { n: tier.unlockStage }) : tr('need_stage', { n: tier.unlockStage }));
       return;
     }
-    if (state.energy < tier.energy) { showToast('Мало энергии ⚡'); return; }
-    if (state.ore < tier.boneCost) { showToast('Маловато косточек 🐾'); return; }
+    if (state.energy < tier.energy) { showToast(tr('low_energy')); return; }
+    if (state.ore < tier.boneCost) { showToast(tr('need') + ' 🦴'); return; }
     state.energy -= tier.energy;
     state.ore -= tier.boneCost;
     state.activeWalk = { tierId: tier.id, endsAt: Date.now() + tier.durationMs, startedAt: Date.now() };
     if (window.Sounds && window.Sounds.playWalkStart) window.Sounds.playWalkStart();
     else if (window.Sounds) window.Sounds.playUi();
-    showToast(tier.icon + ' Прогулка «' + tier.name + '» · ' + (tier.durationMs % 60000 ? (tier.durationMs / 60000).toFixed(1) : String(Math.round(tier.durationMs / 60000))) + ' мин');
+    showToast(tr('walk_start', { icon: tier.icon, name: locn(tier), mins: (tier.durationMs % 60000 ? (tier.durationMs / 60000).toFixed(1) : String(Math.round(tier.durationMs / 60000))) }));
     updateEnergyUI(); renderStats(); scheduleSave();
   }
   function walkRewardBones(tier) {
@@ -1865,7 +2074,7 @@ function startGame() {
     if (Math.random() < tier.stickerChance) {
       const pool = ['paw', 'bone', 'leaf', 'ball'];
       const sid = pool[Math.floor(Math.random() * pool.length)];
-      if (grantSticker(sid, true)) extra += ' · наклейка!';
+      if (grantSticker(sid, true)) extra += ' · ' + tr('sticker_bang');
     }
     if (isSeasonActive() && Math.random() < tier.acornChance) {
       const ac = 2 + Math.floor(Math.random() * 5);
@@ -1876,7 +2085,7 @@ function startGame() {
     state.energy = Math.min(getEnergyMax(), state.energy + 12 + tier.energy * 0.25);
     if (window.Sounds && window.Sounds.playWalkDone) window.Sounds.playWalkDone();
     else if (window.Sounds) window.Sounds.playOffline();
-    showToast('Вернулись с прогулки! +' + fmt(reward) + ' 🦴' + extra);
+    showToast(tr('walk_back', { n: fmt(reward) }) + extra);
     checkAchievements(); maybeUnlockStory(); updateEnergyUI(); renderStats();
     if (activeTab === 'quests') renderQuests();
     scheduleSave();
@@ -1889,35 +2098,35 @@ function startGame() {
       const left = state.activeWalk.endsAt - Date.now();
       if (left <= 0) {
         btn.disabled = false;
-        btn.textContent = 'Забрать прогулку!';
+        btn.textContent = tr('claim') + '!';
         btn.dataset.walkAction = 'claim';
-        if (meta) meta.textContent = 'Пёсик у калитки 🐾';
+        if (meta) meta.textContent = tr('walk');
       } else {
         btn.disabled = true;
         const m = Math.floor(left / 60000);
         const s = Math.ceil((left % 60000) / 1000);
-        btn.textContent = 'На прогулке… ' + m + ':' + String(s).padStart(2, '0');
+        btn.textContent = tr('walking', { clock: m + ':' + String(s).padStart(2, '0') });
         btn.dataset.walkAction = 'busy';
         if (meta) {
           const tier = WALK_TIERS.find(function (t) { return t.id === state.activeWalk.tierId; });
           const total = (tier && tier.durationMs) || 1;
           const started = state.activeWalk.startedAt || (state.activeWalk.endsAt - total);
           const pct = Math.max(0, Math.min(100, ((Date.now() - started) / total) * 100));
-          meta.textContent = (tier ? tier.icon + ' ' + tier.name : 'Прогулка') + ' · ' + Math.floor(pct) + '%';
+          meta.textContent = (tier ? tier.icon + ' ' + locn(tier) : tr('walk')) + ' · ' + Math.floor(pct) + '%';
         }
       }
       return;
     }
     btn.disabled = false;
-    btn.textContent = 'Прогулка';
+    btn.textContent = tr('walk');
     btn.dataset.walkAction = 'menu';
-    if (meta) meta.textContent = '1–4 мин · энергия';
+    if (meta) meta.textContent = tr('walk_meta');
   }
   function onWalkButton() {
     if (state.activeWalk && state.activeWalk.endsAt <= Date.now()) {
       completeWalk(true); return;
     }
-    if (state.activeWalk) { showToast('Ещё гуляем…'); return; }
+    if (state.activeWalk) { showToast(tr('still_walk')); return; }
     openWalkSheet();
   }
   function openWalkSheet() {
@@ -1935,7 +2144,7 @@ function startGame() {
       row.className = 'walk-tier-btn' + (unlocked ? '' : ' locked');
       row.disabled = !unlocked;
       const mins = (t.durationMs / 60000).toFixed(t.durationMs % 60000 ? 1 : 0);
-      row.innerHTML = '<span class="walk-tier-ico">' + t.icon + '</span><span class="walk-tier-body"><strong>' + t.name + '</strong><small>' + mins + ' мин · ⚡' + t.energy + ' · 🦴 ' + fmt(t.boneCost) + (!unlocked ? ' · этап ' + t.unlockStage : '') + '</small></span>';
+      row.innerHTML = '<span class="walk-tier-ico">' + t.icon + '</span><span class="walk-tier-body"><strong>' + locn(t) + '</strong><small>' + tr('walk_row', { mins: mins, energy: t.energy, cost: fmt(t.boneCost) }) + (!unlocked ? ' · ' + tr('walk_stage', { n: t.unlockStage }) : '') + '</small></span>';
       if (unlocked) row.addEventListener('click', function () { sheet.hidden = true; startWalk(t.id); });
       list.appendChild(row);
     });
@@ -1955,27 +2164,27 @@ function startGame() {
     const cur = currentYardStageDef();
     const next = nextYardStageDef();
     let pct = 100;
-    let meta = 'Макс. этап';
+    let meta = tr('stage_max');
     let can = false;
     if (next) {
       const lifeNeed = next.reqLifetime || 1;
       const lifePct = Math.min(100, Math.floor(((state.stats.lifetimeBones || 0) / lifeNeed) * 100));
       pct = lifePct;
-      meta = 'До этапа ' + next.level + ': жизнь 🦴 ' + fmt(state.stats.lifetimeBones) + ' / ' + fmt(next.reqLifetime);
-      if (next.reqPrestige) meta += ' · выставок ' + (state.prestigeLevel || 0) + '/' + next.reqPrestige;
+      meta = tr('stage_to', { n: next.level, have: fmt(state.stats.lifetimeBones), need: fmt(next.reqLifetime) });
+      if (next.reqPrestige) meta += ' · ' + tr('stage_shows', { have: (state.prestigeLevel || 0), need: next.reqPrestige });
       can = (state.stats.lifetimeBones || 0) >= next.reqLifetime && (state.prestigeLevel || 0) >= (next.reqPrestige || 0);
     }
-    wrap.innerHTML = '<div class="yard-stage-title">Этап двора ' + cur.level + ' · ' + cur.title + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="yard-stage-meta">' + meta + '</div><div class="yard-stage-hook">' + cur.hook + ' · бонус дохода x' + cur.incomeMult.toFixed(2) + '</div>' + (next ? '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-yard-advance="1">' + (can ? 'Открыть этап ' + next.level : 'Ещё рано') + '</button>' : '');
+    wrap.innerHTML = '<div class="yard-stage-title">' + tr('yard_stage_title', { n: cur.level, title: locStageTitle(cur) }) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="yard-stage-meta">' + meta + '</div><div class="yard-stage-hook">' + locStageHook(cur) + ' · ' + tr('income_bonus', { n: cur.incomeMult.toFixed(2) }) + '</div>' + (next ? '<button type="button" class="btn btn-sm' + (can ? '' : ' disabled') + '" data-yard-advance="1">' + (can ? tr('open_stage', { n: next.level }) : tr('too_soon')) + '</button>' : '');
     return wrap;
   }
   function tryAdvanceYardStage() {
     const next = nextYardStageDef();
-    if (!next) { showToast('Уже максимум!'); return; }
-    if ((state.stats.lifetimeBones || 0) < next.reqLifetime) { showToast('Нужно больше косточек за жизнь'); return; }
-    if ((state.prestigeLevel || 0) < (next.reqPrestige || 0)) { showToast('Нужно больше выставок'); return; }
+    if (!next) { showToast(tr('already_max')); return; }
+    if ((state.stats.lifetimeBones || 0) < next.reqLifetime) { showToast(tr('need_more_bones')); return; }
+    if ((state.prestigeLevel || 0) < (next.reqPrestige || 0)) { showToast(tr('need_more_shows')); return; }
     state.yardStage = next.level;
     if (window.Sounds) window.Sounds.playBuy();
-    showToast('Этап ' + next.level + ': ' + next.title + '! 🏡');
+    showToast(tr('stage_unlock', { n: next.level, title: locStageTitle(next) }));
     checkAchievements(); maybeUnlockStory();
     if (activeTab === 'yard') renderYards();
     if (activeTab === 'prestige') renderPrestige();
@@ -2052,14 +2261,14 @@ function startGame() {
     state.ore += reward;
     state.stats.lifetimeBones += reward;
     if (window.Sounds) window.Sounds.playBuy();
-    showToast('Цель дня! +' + fmt(reward) + ' 🦴');
+    showToast(tr('daily_done', { n: fmt(reward) }));
     const allClaimed = state.dailyGoals.every(function (x) { return x.claimed; });
     if (allClaimed) {
       if (state.dailyLastClearDay !== state.dailyDayKey) {
         state.dailyStreak = (state.dailyStreak || 0) + 1;
         state.dailyLastClearDay = state.dailyDayKey;
       }
-      showToast('Все цели дня! Серия: ' + state.dailyStreak + ' 🔥');
+      showToast(tr('daily_all', { n: state.dailyStreak }));
     }
     checkAchievements(); renderQuests(); renderStats(); scheduleSave();
   }
@@ -2072,14 +2281,14 @@ function startGame() {
     const item = MEDAL_SHOP.find(function (x) { return x.id === id; });
     if (!item) return;
     const lvl = getMedalLevel(id);
-    if (lvl >= item.maxLevel) { showToast('Макс. уровень'); return; }
+    if (lvl >= item.maxLevel) { showToast(tr('max_lvl')); return; }
     const cost = medalUpgradeCost(item);
-    if ((state.medals || 0) < cost) { showToast('Мало медалек 🏅'); return; }
+    if ((state.medals || 0) < cost) { showToast(tr('few_medals')); return; }
     state.medals -= cost;
     if (!state.medalUpgrades) state.medalUpgrades = {};
     state.medalUpgrades[id] = lvl + 1;
     if (window.Sounds) window.Sounds.playBuy();
-    showToast(item.name + ' ур.' + (lvl + 1) + '!');
+    showToast(tr('medal_lvl', { name: locn(item), n: lvl + 1 }));
     clampEnergy();
     renderPrestige(); renderStats(); scheduleSave();
   }
@@ -2098,15 +2307,15 @@ function startGame() {
     const btn = $('#btn-prestige');
     const req = getPrestigeRequirement();
     if (info) {
-      info.innerHTML = 'Медальки: <strong>' + state.medals + '</strong> · выставок: <strong>' + state.prestigeLevel + '</strong><br>Плоский бонус: <strong>+' + Math.round(state.medals * PRESTIGE_MEDAL_INCOME * 100) + '%</strong> + магазин медалек<br>За жизнь: <strong>' + fmt(state.stats.lifetimeBones) + '</strong> / нужно <strong>' + fmt(req) + '</strong><br>Этап двора: <strong>' + (state.yardStage || 1) + '</strong> · офлайн: <strong>' + Math.round(getOfflineEfficiency() * 100) + '%</strong> · кап <strong>' + Math.round(getOfflineCapSec() / 3600) + ' ч</strong>';
+      info.innerHTML = tr('prestige_info', { medals: state.medals, shows: state.prestigeLevel, flat: Math.round(state.medals * PRESTIGE_MEDAL_INCOME * 100), life: fmt(state.stats.lifetimeBones), need: fmt(req), stage: (state.yardStage || 1), off: Math.round(getOfflineEfficiency() * 100), cap: Math.round(getOfflineCapSec() / 3600) });
     }
     if (btn) {
       btn.disabled = !canPrestige();
-      btn.textContent = canPrestige() ? 'Устроить выставку (+' + medalsGainOnPrestige() + ' 🏅)' : 'Нужно ' + fmt(req) + ' косточек за жизнь';
+      btn.textContent = canPrestige() ? tr('hold_show_plus', { n: medalsGainOnPrestige() }) : tr('need_life_bones', { n: fmt(req) });
     }
     const shop = $('#medal-shop');
     if (shop) {
-      shop.innerHTML = '<h3 class="shop-subhead">Магазин медалек</h3><p class="panel-hint">Тратьте 🏅 на постоянные бонусы. Плоский +' + Math.round(PRESTIGE_MEDAL_INCOME * 100) + '% за медальку остаётся.</p>';
+      shop.innerHTML = '<h3 class="shop-subhead">' + tr('medal_shop_h') + '</h3><p class="panel-hint">' + tr('medal_shop_hint', { pct: Math.round(PRESTIGE_MEDAL_INCOME * 100) }) + '</p>';
       MEDAL_SHOP.forEach(function (item) {
         const lvl = getMedalLevel(item.id);
         const maxed = lvl >= item.maxLevel;
@@ -2114,7 +2323,7 @@ function startGame() {
         const can = !maxed && state.medals >= cost;
         const card = document.createElement('div');
         card.className = 'upgrade' + (can ? '' : ' disabled');
-        card.innerHTML = '<span class="up-icon">' + item.icon + '</span><span class="up-body"><span class="up-name">' + item.name + ' <em>ур.' + lvl + '/' + item.maxLevel + '</em></span><span class="up-desc">' + item.desc + '</span></span><span class="up-cost">' + (maxed ? 'MAX' : '🏅 ' + cost) + '</span>';
+        card.innerHTML = '<span class="up-icon">' + item.icon + '</span><span class="up-body"><span class="up-name">' + locn(item) + ' <em>' + tr('lvl') + lvl + '/' + item.maxLevel + '</em></span><span class="up-desc">' + locd(item) + '</span></span><span class="up-cost">' + (maxed ? 'MAX' : '🏅 ' + cost) + '</span>';
         if (can) card.addEventListener('click', function () { buyMedalUpgrade(item.id); });
         shop.appendChild(card);
       });
@@ -2128,12 +2337,12 @@ function startGame() {
     }
   }
   function openPrestigeModal() {
-    if (!canPrestige()) { showToast('Ещё рано для выставки 🐾'); return; }
+    if (!canPrestige()) { showToast(tr('prestige_soon')); return; }
     const modal = $('#prestige-modal');
     const text = $('#prestige-confirm-text');
     const gain = medalsGainOnPrestige();
     if (text) {
-      text.textContent = 'Сбросить апгрейды и текущие косточки, получить +' + gain + ' медальки (+' + Math.round(gain * PRESTIGE_MEDAL_INCOME * 100) + '% плоско + магазин 🏅)? Породы, двор, друзья, альбом, этапы, медаль-апгрейды и достижения сохранятся.';
+      text.textContent = tr('prestige_confirm_text', { gain: gain, pct: Math.round(gain * PRESTIGE_MEDAL_INCOME * 100) });
     }
     if (modal) modal.hidden = false;
   }
@@ -2145,6 +2354,7 @@ function startGame() {
     state.prestigeLevel = (isFinite(state.prestigeLevel) ? state.prestigeLevel : 0) + 1;
     state.ore = 0;
     state.levels = defaultLevels();
+    state.levelsCards = defaultCardLevels();
     state.pendingClickMult = 1;
     state.adBoostUntil = 0;
     state.joyUntil = 0;
@@ -2160,7 +2370,7 @@ function startGame() {
     syncYardStageFromProgress();
     if (window.Sounds && window.Sounds.playPrestige) window.Sounds.playPrestige();
     else if (window.Sounds) window.Sounds.playOffline();
-    showToast('Выставка! +' + gain + ' 🏅 Медальки: ' + state.medals);
+    showToast(tr('prestige_toast', { n: gain, total: state.medals }));
     const modal = $('#prestige-modal');
     if (modal) modal.hidden = true;
     checkAchievements(); maybeUnlockStory(); renderAll(); scheduleSave();
@@ -2179,24 +2389,24 @@ function startGame() {
     const acornsEl = $('#stat-acorns');
     const joyBtn = $('#btn-joy');
     if (oreEl) oreEl.textContent = fmt(state.ore);
-    if (opsEl) opsEl.textContent = fmt(getOrePerSec()) + '/с';
+    if (opsEl) opsEl.textContent = fmt(getOrePerSec()) + tr('per_sec');
     if (clickEl) clickEl.textContent = fmt(getClickPower() * (state.pendingClickMult > 1 ? state.pendingClickMult : 1));
     if (medalsEl) medalsEl.textContent = String(state.medals);
     if (acornsEl) acornsEl.textContent = fmt(isFinite(state.acorns) ? state.acorns : 0);
     updateSeasonUI();
     if (boostEl) {
       const parts = [];
-      if (state.pendingClickMult > 1) parts.push('x2 почесушка готова 🐾');
-      if (Date.now() < state.adBoostUntil) parts.push('x2 idle ' + Math.ceil((state.adBoostUntil - Date.now()) / 1000) + 'с');
-      if (Date.now() < state.joyUntil) parts.push('Радость x2 ' + Math.ceil((state.joyUntil - Date.now()) / 1000) + 'с');
-      if (Date.now() < (state.seasonBoostUntil || 0)) parts.push('Осень x1.25 ' + Math.ceil((state.seasonBoostUntil - Date.now()) / 1000) + 'с');
+      if (state.pendingClickMult > 1) parts.push(tr('click_ready'));
+      if (Date.now() < state.adBoostUntil) parts.push(tr('idle_x2', { n: Math.ceil((state.adBoostUntil - Date.now()) / 1000) }));
+      if (Date.now() < state.joyUntil) parts.push(tr('joy_x2n', { n: Math.ceil((state.joyUntil - Date.now()) / 1000) }));
+      if (Date.now() < (state.seasonBoostUntil || 0)) parts.push(tr('autumn_xn', { n: Math.ceil((state.seasonBoostUntil - Date.now()) / 1000) }));
       boostEl.hidden = parts.length === 0;
       if (parts.length) boostEl.textContent = parts.join(' · ');
     }
     if (itemEl) {
       if (state.activeItem && Date.now() < state.activeItem.until) {
         itemEl.hidden = false;
-        itemEl.textContent = '🍀 x2 · ' + Math.ceil((state.activeItem.until - Date.now()) / 1000) + 'с';
+        itemEl.textContent = tr('item_x2', { n: Math.ceil((state.activeItem.until - Date.now()) / 1000) });
       } else {
         itemEl.hidden = true;
         if (state.activeItem && Date.now() >= state.activeItem.until) state.activeItem = null;
@@ -2206,13 +2416,13 @@ function startGame() {
       const c = Math.min(COMBO_MAX, state.combo);
       const show = c >= 1.15 && Date.now() - state.lastClickAt < getComboWindow() + 400;
       comboEl.hidden = !show;
-      if (show) comboEl.textContent = 'Комбо x' + c.toFixed(1);
+      if (show) comboEl.textContent = tr('combo_x', { n: c.toFixed(1) });
     }
     if (joyBtn) {
       const now = Date.now();
-      if (now < state.joyUntil) { joyBtn.disabled = true; joyBtn.textContent = 'Радость… ' + Math.ceil((state.joyUntil - now) / 1000) + 'с'; }
-      else if (now < state.joyReadyAt) { joyBtn.disabled = true; joyBtn.textContent = 'Радость через ' + Math.ceil((state.joyReadyAt - now) / 1000) + 'с'; }
-      else { joyBtn.disabled = false; joyBtn.textContent = 'Радость x2 · 10с'; }
+      if (now < state.joyUntil) { joyBtn.disabled = true; joyBtn.textContent = tr('joy_on', { n: Math.ceil((state.joyUntil - now) / 1000) }); }
+      else if (now < state.joyReadyAt) { joyBtn.disabled = true; joyBtn.textContent = tr('joy_cd', { n: Math.ceil((state.joyReadyAt - now) / 1000) }); }
+      else { joyBtn.disabled = false; joyBtn.textContent = tr('joy'); }
     }
     updateEnergyUI();
   }
@@ -2265,7 +2475,7 @@ function startGame() {
     }
     bumpQuest('clicks', 1);
     bumpQuest('earn', power);
-    if (state.pendingClickMult > 1) { state.pendingClickMult = 1; showToast('Двойная почесушка использована! 🦴'); }
+    if (state.pendingClickMult > 1) { state.pendingClickMult = 1; showToast(tr('double_used')); }
     const btn = $('#mine-btn');
     if (btn) {
       btn.classList.remove('clicked', 'pulse', 'wag');
@@ -2286,13 +2496,13 @@ function startGame() {
 
   function buyUpgrade(id) {
     if (!isUpgradeUnlocked(id)) {
-      showToast(unlockReqText(UPGRADES[id] && UPGRADES[id].unlock) || 'Ещё закрыто');
+      showToast(unlockReqText(UPGRADES[id] && UPGRADES[id].unlock) || tr('locked'));
       if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
       return;
     }
     const cost = upgradeCost(id);
     if (state.ore < cost) {
-      showToast('Маловато косточек 🐾');
+      showToast(tr('need') + ' 🦴');
       if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
       return;
     }
@@ -2306,13 +2516,13 @@ function startGame() {
 
   function buyTraining(id) {
     if (!isTrainingUnlocked(id)) {
-      showToast(trainingUnlockText(id) || 'Ещё закрыто');
+      showToast(trainingUnlockText(id) || tr('locked'));
       if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
       return;
     }
     const cost = trainingCost(id);
     if (state.ore < cost) {
-      showToast('Маловато косточек 🐾');
+      showToast(tr('need') + ' 🦴');
       if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
       return;
     }
@@ -2326,10 +2536,10 @@ function startGame() {
 
   function activateJoy() {
     const now = Date.now();
-    if (now < state.joyReadyAt || now < state.joyUntil) { showToast('Радость ещё отдыхает 🐾'); return; }
+    if (now < state.joyReadyAt || now < state.joyUntil) { showToast(tr('joy_rest')); return; }
     state.joyUntil = now + JOY_DURATION_MS;
     state.joyReadyAt = state.joyUntil + JOY_COOLDOWN_MS;
-    showToast('Радость! Почесушки x2 на 10 секунд 💖');
+    showToast(tr('joy_toast'));
     if (window.Sounds) window.Sounds.playBuy();
     renderStats(); scheduleSave();
   }
@@ -2350,7 +2560,7 @@ function startGame() {
         ok = await bridge.showRewarded();
       }
       if (!ok) {
-        showToast('Видео не просмотрено');
+        showToast(tr('video_skip'));
         if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
         return;
       }
@@ -2358,7 +2568,7 @@ function startGame() {
       state.adBoostUntil = Date.now() + AD_BOOST_DURATION_MS;
       if (window.Sounds && window.Sounds.playReward) window.Sounds.playReward();
       else if (window.Sounds) window.Sounds.playBuy();
-      showToast(state.noAds ? 'Бонус NO_ADS! x2 почесушка + idle 60с 🐕' : 'Ура! x2 почесушка + idle буст 60с 🐕');
+      showToast(state.noAds ? tr('noads_bonus') : tr('ad_bonus'));
       renderStats(); scheduleSave();
     } finally {
       rewardBusy = false;
@@ -2367,7 +2577,7 @@ function startGame() {
     }
   }
 
-  async function manualSave() { await persist(); showToast('Сохранено 💾'); }
+  async function manualSave() { await persist(); showToast(tr('saved')); }
 
   function serialize() {
     const now = Date.now();
@@ -2382,6 +2592,7 @@ function startGame() {
       ore: state.ore,
       levels: Object.assign(defaultLevels(), state.levels),
       levelsTraining: Object.assign(defaultTrainingLevels(), state.levelsTraining || {}),
+      levelsCards: Object.assign(defaultCardLevels(), state.levelsCards || {}),
       lastSaveAt: now,
       adBoostUntil: adUntil > now ? adUntil : 0,
       pendingClickMult: state.pendingClickMult > 1 ? state.pendingClickMult : 1,
@@ -2429,6 +2640,9 @@ function startGame() {
       dailyDayKey: state.dailyDayKey || '',
       dailyStreak: Number(state.dailyStreak) || 0,
       dailyLastClearDay: state.dailyLastClearDay || '',
+      cardComboDay: state.cardComboDay || '',
+      cardComboHits: Object.assign({}, state.cardComboHits || {}),
+      cardComboClaimed: !!state.cardComboClaimed,
     };
   }
 
@@ -2514,6 +2728,19 @@ function startGame() {
     }
     // New shop upgrades default to 0 via defaultLevels merge (no wipe)
     out.levels = Object.assign(defaultLevels(), out.levels || {});
+    {
+      const baseC = defaultCardLevels();
+      const srcC = (out.levelsCards && typeof out.levelsCards === 'object' && !Array.isArray(out.levelsCards)) ? out.levelsCards : {};
+      out.levelsCards = Object.assign(baseC, srcC);
+      for (let i = 0; i < SKILL_CARD_IDS.length; i++) {
+        const id = SKILL_CARD_IDS[i];
+        const n = Number(out.levelsCards[id]);
+        out.levelsCards[id] = isFinite(n) && n > 0 ? Math.floor(n) : 0;
+      }
+      out.cardComboDay = out.cardComboDay || '';
+      out.cardComboHits = (out.cardComboHits && typeof out.cardComboHits === 'object' && !Array.isArray(out.cardComboHits)) ? out.cardComboHits : {};
+      out.cardComboClaimed = !!out.cardComboClaimed;
+    }
     out.v = SAVE_VERSION;
     return out;
   }
@@ -2538,6 +2765,17 @@ function startGame() {
         state.levelsTraining[id] = isFinite(n) && n > 0 ? Math.floor(n) : 0;
       }
     }
+    state.levelsCards = defaultCardLevels();
+    if (data.levelsCards && typeof data.levelsCards === 'object') {
+      for (let i = 0; i < SKILL_CARD_IDS.length; i++) {
+        const id = SKILL_CARD_IDS[i];
+        const n = Number(data.levelsCards[id]);
+        state.levelsCards[id] = isFinite(n) && n > 0 ? Math.floor(n) : 0;
+      }
+    }
+    state.cardComboDay = data.cardComboDay || '';
+    state.cardComboHits = (data.cardComboHits && typeof data.cardComboHits === 'object' && !Array.isArray(data.cardComboHits)) ? Object.assign({}, data.cardComboHits) : {};
+    state.cardComboClaimed = !!data.cardComboClaimed;
     state.adBoostUntil = Number(data.adBoostUntil) || 0;
     state.pendingClickMult = Number(data.pendingClickMult) || 1;
     state.prestigeLevel = Number(data.prestigeLevel) || 0;
@@ -2578,7 +2816,7 @@ function startGame() {
         target: target,
         progress: Math.min(progress, target),
         reward: reward,
-        label: typeof q.label === 'string' ? q.label : 'Квест',
+        label: typeof q.label === 'string' ? q.label : tr('quest_fallback'),
         claimed: !!q.claimed,
       };
     }).filter(Boolean) : [];
@@ -2645,7 +2883,7 @@ function startGame() {
         target: target,
         progress: Math.min(target, Math.max(0, Number(g.progress) || 0)),
         reward: Math.max(0, Number(g.reward) || 0),
-        label: typeof g.label === 'string' ? g.label : 'Цель',
+        label: typeof g.label === 'string' ? g.label : tr('goal_fallback'),
         claimed: !!g.claimed,
       };
     }).filter(Boolean) : [];
@@ -2752,9 +2990,15 @@ function startGame() {
   function shopSign() {
     const ore = state.ore || 0;
     if (activeTab === 'shop') {
-      return UPGRADE_ORDER.map(function (id) {
+      return activeShopCat + ':' + UPGRADE_ORDER.map(function (id) {
         return (isUpgradeUnlocked(id) ? '1' : '0') + (ore >= upgradeCost(id) ? '1' : '0') + (state.levels[id] || 0);
       }).join('') + '|' + ((state.inventory && state.inventory.boneBoost) || 0) + '|' + (state.activeItem ? state.activeItem.until : 0);
+    }
+    if (activeTab === 'cards') {
+      return activeCardCat + ':' + SKILL_CARD_IDS.map(function (id) {
+        const c = SKILL_CARDS_BY_ID[id];
+        return (isCardUnlocked(c) ? '1' : '0') + (ore >= cardCost(id) ? '1' : '0') + (state.levelsCards[id] || 0);
+      }).join('') + ':' + JSON.stringify(state.cardComboHits || {}) + ':' + (state.cardComboClaimed ? '1' : '0');
     }
     if (activeTab === 'training') {
       return TRAINING_ORDER.map(function (id) {
@@ -2771,13 +3015,14 @@ function startGame() {
   }
   function tickShopThrottle(now) {
     if (destroyed) return;
-    if (ready && (activeTab === 'shop' || activeTab === 'training' || activeTab === 'prestige' || activeTab === 'season')) {
+    if (ready && (activeTab === 'shop' || activeTab === 'cards' || activeTab === 'training' || activeTab === 'prestige' || activeTab === 'season')) {
       const sign = shopSign();
       const minGap = activeTab === 'prestige' ? 800 : 400;
       if (sign !== lastShopSign && now - shopDirtyAt > minGap) {
         shopDirtyAt = now;
         lastShopSign = sign;
-        if (activeTab === 'shop') { renderShop(); renderConsumables(); }
+        if (activeTab === 'shop') { renderShop(); }
+        else if (activeTab === 'cards') renderSkillCards();
         else if (activeTab === 'training') renderTraining();
         else if (activeTab === 'prestige') renderPrestige();
         else if (activeTab === 'season') renderSeason();
@@ -2791,12 +3036,12 @@ function startGame() {
     const text = $('#offline-text');
     const close = $('#offline-close');
     if (!modal || !text) {
-      showToast('Пока вас не было: +' + fmt(gained) + ' косточек 🦴');
+      showToast(tr('offline_toast', { n: fmt(gained) }));
       if (window.Sounds) window.Sounds.playOffline();
       return;
     }
     const hours = Math.round(getOfflineCapSec() / 3600);
-    text.textContent = 'Пока вас не было, хвостики набрали +' + fmt(gained) + ' косточек (макс. ' + hours + ' ч, эффективность офлайна ' + Math.round(getOfflineEfficiency() * 100) + '% — качайте Будку и Лежанку).';
+    text.textContent = tr('offline_body', { n: fmt(gained), hours: hours, pct: Math.round(getOfflineEfficiency() * 100) });
     modal.hidden = false;
     const hide = function () { modal.hidden = true; if (window.Sounds) window.Sounds.playOffline(); };
     close && close.addEventListener('click', hide, { once: true });
@@ -2814,14 +3059,14 @@ function startGame() {
       if (!status) return;
       const bridge = window.GPBridge;
       const info = bridge && bridge.getStatus ? bridge.getStatus() : { connected: false, sdk: 'local', cloudSave: 'local', ads: 'local', payments: 'local' };
-      const label = info.connected ? (info.cloudSave === 'error' ? 'Cloud ошибка' : 'Cloud ок') : 'Локально';
+      const label = info.connected ? (info.cloudSave === 'error' ? tr('cloud_err') : tr('cloud_ok')) : tr('local');
       status.textContent = label;
       status.classList.toggle('gp-on', !!info.connected && info.cloudSave !== 'error');
       status.classList.toggle('gp-off', !info.connected || info.cloudSave === 'error');
-      status.title = 'SDK: ' + info.sdk + ' · сохранение: ' + info.cloudSave + ' · реклама: ' + info.ads + ' · платежи: ' + info.payments + (info.lastError ? ' · ' + info.lastError : '');
+      status.title = tr('gp_title', { sdk: info.sdk, cloud: info.cloudSave, ads: info.ads, pay: info.payments, err: info.lastError ? ' · ' + info.lastError : '' });
       const detail = $('#status-detail');
       if (detail) {
-        detail.textContent = 'Сохранение: ' + (info.cloudSave || 'local') + ' · реклама: ' + (info.ads || 'local') + ' · покупки: ' + (info.payments || 'local');
+        detail.textContent = tr('save_detail', { cloud: info.cloudSave || 'local', ads: info.ads || 'local', pay: info.payments || 'local' });
       }
     }
 
@@ -2830,8 +3075,8 @@ function startGame() {
       if (!btn || !window.Sounds) return;
       const m = window.Sounds.isMuted && window.Sounds.isMuted();
       btn.textContent = m ? '🔇' : '🔊';
-      btn.setAttribute('aria-label', m ? 'Включить звук' : 'Выключить звук');
-      btn.title = m ? 'Звук выкл' : 'Звук вкл';
+      btn.setAttribute('aria-label', m ? tr('sound_off') : tr('sound_on'));
+      btn.title = m ? tr('sound_off_title') : tr('sound_on_title');
     }
 
     let gained = 0;
@@ -2900,6 +3145,24 @@ function startGame() {
     document.querySelectorAll('.more-item').forEach(function (btn) {
       listen(btn, 'click', function () { setTab(btn.dataset.tab); });
     });
+    document.querySelectorAll('[data-card-cat]').forEach(function (btn) {
+      listen(btn, 'click', function () {
+        const cat = btn.getAttribute('data-card-cat');
+        if (CARD_CATS.indexOf(cat) === -1) return;
+        activeCardCat = cat;
+        if (window.Sounds && window.Sounds.playUi) window.Sounds.playUi();
+        renderSkillCards();
+      });
+    });
+    document.querySelectorAll('[data-shop-cat]').forEach(function (btn) {
+      listen(btn, 'click', function () {
+        const cat = btn.getAttribute('data-shop-cat');
+        if (SHOP_CATS.indexOf(cat) === -1) return;
+        activeShopCat = cat;
+        if (window.Sounds && window.Sounds.playUi) window.Sounds.playUi();
+        renderShop();
+      });
+    });
     document.querySelectorAll('[data-more-close]').forEach(function (el) {
       listen(el, 'click', function () { closeMoreSheet(); });
     });
@@ -2944,9 +3207,9 @@ function startGame() {
         a.download = 'sobachiy-dvorik-save.json';
         a.click();
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
-        showToast('Сохранение скачано');
+        showToast(tr('save_dl'));
       } catch (_) {
-        showToast('Не удалось экспортировать');
+        showToast(tr('export_fail'));
       }
     });
     listen($('#btn-import'), 'click', function () {
@@ -2963,9 +3226,9 @@ function startGame() {
           applySave(data);
           persist();
           renderAll();
-          showToast('Сохранение загружено');
+          showToast(tr('save_loaded'));
         } catch (_) {
-          showToast('Файл не подошёл');
+          showToast(tr('file_bad'));
         }
       };
       reader.readAsText(file);
@@ -2973,8 +3236,8 @@ function startGame() {
     });
     listen($('#btn-reset'), 'click', async function () {
       const ok = window.__dvorikConfirm
-        ? await window.__dvorikConfirm('Сбросить весь прогресс? Это нельзя отменить.')
-        : window.confirm('Сбросить весь прогресс? Это нельзя отменить.');
+        ? await window.__dvorikConfirm(tr('reset_q'))
+        : window.confirm(tr('reset_q'));
       if (!ok || destroyed) return;
       try {
         if (window.GPBridge && window.GPBridge.clearSaves) window.GPBridge.clearSaves();
@@ -2987,11 +3250,32 @@ function startGame() {
     applyYardArt();
     applyFriendArt();
     updateSeasonUI();
+    if (window.I18n) {
+      window.I18n.applyDom();
+      window.I18n.onChange(function () {
+        if (destroyed) return;
+        window.I18n.applyDom();
+        renderAll();
+        updateWalkUI();
+        updateEnergyUI();
+        applyNoAdsUi();
+        setGpStatus();
+      });
+    }
+    listen($('#lang-ru'), 'click', function () { if (window.I18n) window.I18n.setLang('ru'); });
+    listen($('#lang-en'), 'click', function () { if (window.I18n) window.I18n.setLang('en'); });
     renderAll();
     lastTick = performance.now();
     ready = true;
     hideBoot();
     window.__dvorikReady = true;
+    try {
+      var gp = window.__gp;
+      if (gp && typeof gp.gameStart === 'function' && !window.__gpGameStarted) {
+        window.__gpGameStarted = true;
+        gp.gameStart();
+      }
+    } catch (_) {}
     rafTick = requestAnimationFrame(tick);
     rafShop = requestAnimationFrame(tickShopThrottle);
     autosaveTimer = setInterval(function () { if (!destroyed) persist(); }, AUTOSAVE_MS);
@@ -3023,9 +3307,10 @@ function startGame() {
 
     const onGpReady = function () {
       if (destroyed) return;
+      if (window.I18n && window.I18n.syncFromGp) window.I18n.syncFromGp();
       setGpStatus();
       restoreGpPurchases();
-      showToast('GamePush подключён');
+      showToast(tr('title'));
     };
     listen(window, 'gp-ready', onGpReady);
 
@@ -3034,9 +3319,9 @@ function startGame() {
     if (firstHint) firstHint.hidden = !isNewbie;
     if (gained > 0.01) showOfflineModal(gained);
     else if (isNewbie) {
-      showToast('Почешите пёсика — косточки сами посыплются');
+      showToast(tr('pet_hint_toast'));
     } else {
-      showToast('Снова в дворике');
+      showToast(tr('back_yard'));
     }
     if (firstHint) {
       const hideHint = function () { firstHint.hidden = true; };

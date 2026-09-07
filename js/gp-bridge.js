@@ -265,7 +265,9 @@ async function showRewarded() {
   if (gp) return false;
 
   return askConfirm(
-    'Локальный режим — без видео.\nПолучить двойные косточки (x2 почесушка + idle 60 с)?'
+    (window.I18n && window.I18n.t)
+      ? window.I18n.t('ad_confirm')
+      : 'Локальный режим — без видео.\nПолучить двойные косточки (x2 почесушка + автодоход 60 с)?'
   );
 }
 
@@ -334,7 +336,11 @@ async function purchase(tag) {
 
   if (gp) return { ok: false, error: 'payments_unavailable' };
 
-  const ok = await askConfirm('Локальный режим — симулировать покупку «' + tag + '»?');
+  const ok = await askConfirm(
+    (window.I18n && window.I18n.t)
+      ? window.I18n.t('buy_sim', { tag: tag })
+      : ('Локальный режим — симулировать покупку «' + tag + '»?')
+  );
   return ok ? { ok: true, product: { tag, stub: true } } : { ok: false, error: 'cancelled' };
 }
 
