@@ -1025,14 +1025,20 @@ function startGame() {
   function bumpQuest(type, amount) {
     ensureQuests();
     ensureDailyGoals();
-    let changed = false;
-    state.quests.forEach(function (q) {
-      if (q.claimed || q.type !== type) return;
-      q.progress = Math.min(q.target, (q.progress || 0) + amount);
-      changed = true;
-    });
-    bumpDailyGoal(type, amount);
-    if (changed && activeTab === 'quests') renderQuests();
+    const apply = (window.GameCore && window.GameCore.applyTrackedProgress)
+      ? window.GameCore.applyTrackedProgress
+      : null;
+    const qRes = apply ? apply(state.quests, type, amount) : { changed: false };
+    const dRes = apply ? apply(state.dailyGoals, type, amount) : { changed: false };
+    if (!apply) {
+      state.quests.forEach(function (q) {
+        if (q.claimed || q.type !== type) return;
+        if ((q.progress || 0) >= q.target) return;
+        q.progress = Math.min(q.target, (q.progress || 0) + amount);
+      });
+      bumpDailyGoal(type, amount);
+    }
+    if (activeTab === 'quests' && (qRes.changed || dRes.changed)) paintQuestProgress();
   }
   function claimQuest(id) {
     const q = state.quests.find(function (x) { return x.id === id; });
@@ -1057,6 +1063,64 @@ function startGame() {
     state.quests[idx] = { id: daySeed() + '-r-' + Date.now() + '-' + tpl.type, type: tpl.type, target: target, progress: 0, reward: makeQuestReward(tpl.type, target), label: tpl.label(target), claimed: false };
     renderQuests(); renderStats(); checkAchievements(); maybeUnlockStory(); scheduleSave();
   }
+  function questBarPct(item) {
+    const target = item && item.target > 0 ? item.target : 0;
+    if (!target) return 0;
+    return Math.min(100, Math.floor(((item.progress || 0) / target) * 100));
+  }
+  function paintOneProgressCard(card, item, kind) {
+    if (!card || !item) return;
+    const done = !item.claimed && (item.progress || 0) >= item.target;
+    card.classList.toggle('done', done);
+    card.classList.toggle('claimed', !!item.claimed);
+    const bar = card.querySelector('.quest-bar > span');
+    if (bar) bar.style.width = questBarPct(item) + '%';
+    const meta = card.querySelector('.quest-meta');
+    if (meta) {
+      const rewardBit = kind === 'quest'
+        ? ' · награда 🦴 ' + fmt(item.reward)
+        : ' · 🦴 ' + fmt(item.reward);
+      meta.textContent = fmt(Math.min(item.progress || 0, item.target)) + ' / ' + fmt(item.target) + rewardBit;
+    }
+    if (item.claimed) {
+      if (!card.querySelector('.breed-active')) {
+        const btn = card.querySelector('button');
+        if (btn) btn.remove();
+        const mark = document.createElement('span');
+        mark.className = 'breed-active';
+        mark.textContent = 'Получено ✓';
+        card.appendChild(mark);
+      }
+      return;
+    }
+    if (done && !card.querySelector('button')) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-sm';
+      if (kind === 'quest') btn.setAttribute('data-claim', item.id);
+      else btn.setAttribute('data-claim-daily', item.id);
+      btn.textContent = 'Забрать';
+      card.appendChild(btn);
+    }
+  }
+  function paintQuestProgress() {
+    const root = $('#quests');
+    if (!root) return;
+    (state.dailyGoals || []).forEach(function (g) {
+      paintOneProgressCard(root.querySelector('[data-daily-id="' + String(g.id).replace(/"/g, '') + '"]'), g, 'daily');
+    });
+    (state.quests || []).forEach(function (q) {
+      paintOneProgressCard(root.querySelector('[data-quest-id="' + String(q.id).replace(/"/g, '') + '"]'), q, 'quest');
+    });
+  }
+  function onQuestsClick(e) {
+    const btn = e.target && e.target.closest ? e.target.closest('button') : null;
+    if (!btn) return;
+    const dailyId = btn.getAttribute('data-claim-daily');
+    if (dailyId) { claimDailyGoal(dailyId); return; }
+    const questId = btn.getAttribute('data-claim');
+    if (questId) claimQuest(questId);
+  }
   function renderQuests() {
     ensureQuests();
     ensureDailyGoals();
@@ -1071,7 +1135,8 @@ function startGame() {
       const done = !g.claimed && g.progress >= g.target;
       const card = document.createElement('div');
       card.className = 'quest-card daily-goal' + (done ? ' done' : '') + (g.claimed ? ' claimed' : '');
-      const pct = g.target > 0 ? Math.min(100, Math.floor((g.progress / g.target) * 100)) : 0;
+      card.setAttribute('data-daily-id', g.id);
+      const pct = questBarPct(g);
       let btn = '';
       if (g.claimed) btn = '<span class="breed-active">Получено ✓</span>';
       else if (done) btn = '<button type="button" class="btn btn-sm" data-claim-daily="' + escapeHtml(g.id) + '">Забрать</button>';
@@ -1086,15 +1151,10 @@ function startGame() {
       const done = !q.claimed && q.progress >= q.target;
       const card = document.createElement('div');
       card.className = 'quest-card' + (done ? ' done' : '');
-      const pct = q.target > 0 ? Math.min(100, Math.floor((q.progress / q.target) * 100)) : 0;
+      card.setAttribute('data-quest-id', q.id);
+      const pct = questBarPct(q);
       card.innerHTML = '<div class="quest-title">' + escapeHtml(q.label) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(q.progress, q.target)) + ' / ' + fmt(q.target) + ' · награда 🦴 ' + fmt(q.reward) + '</div>' + (done ? '<button type="button" class="btn btn-sm" data-claim="' + escapeHtml(q.id) + '">Забрать</button>' : '');
       root.appendChild(card);
-    });
-    root.querySelectorAll('[data-claim]').forEach(function (btn) {
-      btn.addEventListener('click', function () { claimQuest(btn.getAttribute('data-claim')); });
-    });
-    root.querySelectorAll('[data-claim-daily]').forEach(function (btn) {
-      btn.addEventListener('click', function () { claimDailyGoal(btn.getAttribute('data-claim-daily')); });
     });
   }
 
@@ -1968,13 +2028,19 @@ function startGame() {
   }
   function bumpDailyGoal(type, amount) {
     ensureDailyGoals();
-    let changed = false;
-    (state.dailyGoals || []).forEach(function (g) {
-      if (g.claimed || g.type !== type) return;
-      g.progress = Math.min(g.target, (g.progress || 0) + amount);
-      changed = true;
-    });
-    if (changed && activeTab === 'quests') renderQuests();
+    const apply = window.GameCore && window.GameCore.applyTrackedProgress;
+    const res = apply
+      ? apply(state.dailyGoals, type, amount)
+      : { changed: false };
+    if (!apply) {
+      (state.dailyGoals || []).forEach(function (g) {
+        if (g.claimed || g.type !== type) return;
+        if ((g.progress || 0) >= g.target) return;
+        g.progress = Math.min(g.target, (g.progress || 0) + amount);
+        res.changed = true;
+      });
+    }
+    if (res.changed && activeTab === 'quests') paintQuestProgress();
   }
   function claimDailyGoal(id) {
     ensureDailyGoals();
@@ -2781,6 +2847,7 @@ function startGame() {
     if (destroyed) return;
 
     listen($('#mine-btn'), 'click', mineClick);
+    listen($('#quests'), 'click', onQuestsClick);
     listen($('#btn-ad'), 'click', onRewarded);
     listen($('#btn-save'), 'click', manualSave);
     listen($('#btn-joy'), 'click', activateJoy);

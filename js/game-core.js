@@ -52,5 +52,26 @@ function walkProgress(startedAt, endsAt, now) {
   return Math.max(0, Math.min(1, (t - start) / total));
 }
 
-  return { finiteOr, softcapValue, geometricCost, offlineGain, clampProgress, normalizeSave, walkProgress };
+function applyTrackedProgress(items, type, amount) {
+  let changed = false;
+  let becameReady = false;
+  if (!Array.isArray(items)) return { changed: false, becameReady: false };
+  const add = finiteOr(amount, 0);
+  if (add <= 0) return { changed: false, becameReady: false };
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item || item.claimed || item.type !== type) continue;
+    const target = Math.max(0, finiteOr(item.target, 0));
+    const prev = Math.max(0, finiteOr(item.progress, 0));
+    if (prev >= target) continue;
+    const next = Math.min(target, prev + add);
+    if (next === prev) continue;
+    item.progress = next;
+    changed = true;
+    if (next >= target) becameReady = true;
+  }
+  return { changed: changed, becameReady: becameReady };
+}
+
+  return { finiteOr, softcapValue, geometricCost, offlineGain, clampProgress, normalizeSave, walkProgress, applyTrackedProgress };
 });
