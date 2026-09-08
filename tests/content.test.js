@@ -56,7 +56,7 @@ assert.equal(Game.fmtStatic(1500), '1.50K');
 assert.equal(Game.fmtStatic(12), '12');
 assert.ok(Game.BREEDS.lab.src.indexOf('assets/') === 0);
 assert.equal(Game.EVENT_MIN_MS, 90 * 1000);
-assert.equal(Game.SAVE_VERSION, 7);
+assert.equal(Game.SAVE_VERSION, 8);
 assert.equal(Game.PACK_BRANCHES.length, 3);
 assert.deepEqual(Game.defaultPackUnlocks(), { crew: false, district: false, special: false });
 Game.PACK_BRANCHES.forEach(function (b) {

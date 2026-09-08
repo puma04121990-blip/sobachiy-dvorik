@@ -14,7 +14,7 @@ const AD_BOOST_MULT = 2;
 const AD_BOOST_DURATION_MS = 60 * 1000;
 const SAVE_KEY = 'dog-yard-clicker-v1';
 const LEGACY_SAVE_KEY = 'ore-mine-clicker-v1';
-const SAVE_VERSION = 7;
+const SAVE_VERSION = 8;
 // In production the festival follows the calendar. Set to true only for local QA.
 const SEASON_FORCE = false;
 const ACORN_PER_CLICK = 0.022;

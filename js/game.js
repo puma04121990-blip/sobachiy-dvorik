@@ -56,6 +56,7 @@ function startGame() {
     levelsTraining: defaultTrainingLevels(),
     levelsCards: defaultCardLevels(),
     packUnlocked: defaultPackUnlocks(),
+    packPaid: defaultPackUnlocks(),
     lastSaveAt: Date.now(),
     adBoostUntil: 0,
     pendingClickMult: 1,
@@ -226,14 +227,26 @@ function startGame() {
   }
   function grantPackCat(cat) {
     if (!state.packUnlocked) state.packUnlocked = defaultPackUnlocks();
+    if (!state.packPaid) state.packPaid = defaultPackUnlocks();
     if (CARD_CATS.indexOf(cat) === -1) return;
     state.packUnlocked[cat] = true;
+    state.packPaid[cat] = true;
+  }
+  function packHasPaidProgress(cat, levels, paid) {
+    if (paid && paid[cat]) return true;
+    const src = levels || {};
+    for (let i = 0; i < SKILL_CARDS.length; i++) {
+      const c = SKILL_CARDS[i];
+      if (c.cat !== cat || isPackStarterCard(c)) continue;
+      if ((Number(src[c.id]) || 0) > 0) return true;
+    }
+    return false;
   }
   function grandfatherPackUnlocks() {
     if (!state.packUnlocked) state.packUnlocked = defaultPackUnlocks();
-    SKILL_CARDS.forEach(function (c) {
-      if (isPackStarterCard(c)) return;
-      if ((state.levelsCards[c.id] || 0) > 0) state.packUnlocked[c.cat] = true;
+    if (!state.packPaid) state.packPaid = defaultPackUnlocks();
+    CARD_CATS.forEach(function (cat) {
+      state.packUnlocked[cat] = !!(state.packPaid[cat] || packHasPaidProgress(cat, state.levelsCards, state.packPaid));
     });
   }
   function packProductByCat(cat) {
@@ -818,10 +831,9 @@ function startGame() {
       const now = lvl * (c.orePerSec || 0);
       let desc = '<span class="skill-card-now">' + tr('card_now', { n: fmt(now) }) + '</span>';
       desc += '<span class="skill-card-next">' + tr('plus_ops_lvl', { n: fmt(c.orePerSec) }) + (unlocked && !maxed ? ' · ' + fmtPayback(cost / c.orePerSec) : '') + '</span>';
-      if (!unlocked) desc += '<span class="skill-card-next">' + tr('pack_card_max', { n: fmt((c.orePerSec || 0) * maxL) }) + '</span>';
-      else if (maxed) desc += '<span class="skill-card-next">' + tr('maxed') + '</span>';
+      if (maxed) desc += '<span class="skill-card-next">' + tr('maxed') + '</span>';
       const costHtml = !unlocked ? tr('pack_locked_cta') : (maxed ? tr('maxed') : '🦴 ' + fmt(cost));
-      card.innerHTML = '<div class="skill-card-top"><span class="skill-card-ico">' + c.icon + '</span><span class="skill-card-lvl">' + tr('lvl') + lvl + '/' + maxL + '</span></div><div class="skill-card-name">' + locn(c) + '</div><div class="skill-card-desc">' + desc + '</div><div class="skill-card-cost">' + costHtml + '</div>';
+      card.innerHTML = '<div class="skill-card-top"><span class="skill-card-ico">' + c.icon + '</span><span class="skill-card-lvl">' + tr('lvl') + lvl + '</span></div><div class="skill-card-name">' + locn(c) + '</div><div class="skill-card-desc">' + desc + '</div><div class="skill-card-cost">' + costHtml + '</div>';
       card.addEventListener('click', function () {
         if (!unlocked) {
           if (!branchOwned) { openPackBuyModal(c.cat); return; }
@@ -2661,6 +2673,7 @@ function startGame() {
       levelsTraining: Object.assign(defaultTrainingLevels(), state.levelsTraining || {}),
       levelsCards: Object.assign(defaultCardLevels(), state.levelsCards || {}),
       packUnlocked: Object.assign(defaultPackUnlocks(), state.packUnlocked || {}),
+      packPaid: Object.assign(defaultPackUnlocks(), state.packPaid || {}),
       lastSaveAt: now,
       adBoostUntil: adUntil > now ? adUntil : 0,
       pendingClickMult: state.pendingClickMult > 1 ? state.pendingClickMult : 1,
@@ -2811,12 +2824,14 @@ function startGame() {
     }
     {
       const packs = defaultPackUnlocks();
-      const srcP = (out.packUnlocked && typeof out.packUnlocked === 'object' && !Array.isArray(out.packUnlocked)) ? out.packUnlocked : {};
-      CARD_CATS.forEach(function (cat) { packs[cat] = !!srcP[cat]; });
+      const paid = defaultPackUnlocks();
+      const srcP = (out.packPaid && typeof out.packPaid === 'object' && !Array.isArray(out.packPaid)) ? out.packPaid : {};
       const srcC = (out.levelsCards && typeof out.levelsCards === 'object') ? out.levelsCards : {};
-      SKILL_CARDS.forEach(function (c) {
-        if ((Number(srcC[c.id]) || 0) > 0) packs[c.cat] = true;
+      CARD_CATS.forEach(function (cat) {
+        paid[cat] = !!srcP[cat];
+        packs[cat] = packHasPaidProgress(cat, srcC, paid);
       });
+      out.packPaid = paid;
       out.packUnlocked = packs;
     }
     out.v = SAVE_VERSION;
@@ -2854,12 +2869,13 @@ function startGame() {
     state.cardComboDay = data.cardComboDay || '';
     state.cardComboHits = (data.cardComboHits && typeof data.cardComboHits === 'object' && !Array.isArray(data.cardComboHits)) ? Object.assign({}, data.cardComboHits) : {};
     state.cardComboClaimed = !!data.cardComboClaimed;
-    state.packUnlocked = defaultPackUnlocks();
-    if (data.packUnlocked && typeof data.packUnlocked === 'object') {
+    state.packPaid = defaultPackUnlocks();
+    if (data.packPaid && typeof data.packPaid === 'object') {
       CARD_CATS.forEach(function (cat) {
-        state.packUnlocked[cat] = !!data.packUnlocked[cat];
+        state.packPaid[cat] = !!data.packPaid[cat];
       });
     }
+    state.packUnlocked = defaultPackUnlocks();
     grandfatherPackUnlocks();
     state.adBoostUntil = Number(data.adBoostUntil) || 0;
     state.pendingClickMult = Number(data.pendingClickMult) || 1;
