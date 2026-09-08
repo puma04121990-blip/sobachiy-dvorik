@@ -68,7 +68,10 @@ Game.PACK_BRANCHES.forEach(function (b) {
   assert.equal(r.count, 6, b.id + ' cards');
   assert.ok(r.maxIdle > 2000, b.id + ' max idle visible');
 });
-assert.ok(Game.packBranchReward('special').maxIdle > Game.packBranchReward('district').maxIdle);
-assert.ok(Game.packBranchReward('district').maxIdle > Game.packBranchReward('crew').maxIdle);
+assert.equal(Game.packStarterId('crew'), 'neighbor');
+assert.equal(Game.packStarterId('district'), 'kiosk');
+assert.equal(Game.packStarterId('special'), 'poster');
+assert.ok(Game.isPackStarterCard(Game.SKILL_CARDS_BY_ID.neighbor));
+assert.ok(!Game.isPackStarterCard(Game.SKILL_CARDS_BY_ID.walker));
 
 console.log('content tests: ok');

@@ -46,7 +46,7 @@ function startGame() {
     YARDS, FRIENDS, STICKERS, STICKER_SETS, SEASON_SHOP, GP_PRODUCTS, CONSUMABLES,
     ACHIEVEMENTS, STORY, QUEST_POOL, MEDAL_SHOP, WALK_TIERS, YARD_STAGES, DAILY_GOAL_POOL,
     CARD_CATS, SKILL_CARDS, SKILL_CARD_IDS, SKILL_CARDS_BY_ID,
-    PACK_BRANCHES, PACK_BRANCH_BY_ID, packBranchReward, defaultPackUnlocks,
+    PACK_BRANCHES, PACK_BRANCH_BY_ID, packBranchReward, packStarterId, isPackStarterCard, defaultPackUnlocks,
     defaultLevels, defaultTrainingLevels, defaultCardLevels, fmtStatic,
   } = Game;
 
@@ -232,6 +232,7 @@ function startGame() {
   function grandfatherPackUnlocks() {
     if (!state.packUnlocked) state.packUnlocked = defaultPackUnlocks();
     SKILL_CARDS.forEach(function (c) {
+      if (isPackStarterCard(c)) return;
       if ((state.levelsCards[c.id] || 0) > 0) state.packUnlocked[c.cat] = true;
     });
   }
@@ -247,7 +248,7 @@ function startGame() {
     let s = 0;
     for (let i = 0; i < SKILL_CARDS.length; i++) {
       const c = SKILL_CARDS[i];
-      if (!isPackCatOwned(c.cat)) continue;
+      if (!isPackStarterCard(c) && !isPackCatOwned(c.cat)) continue;
       s += (state.levelsCards[c.id] || 0) * (c[field] || 0);
     }
     return s;
@@ -762,6 +763,31 @@ function startGame() {
     }
   }
 
+  function isPackCardOpen(card) {
+    if (!card) return false;
+    if (isPackStarterCard(card)) return true;
+    return isPackCatOwned(card.cat) && isCardUnlocked(card);
+  }
+  function hidePackBuyModal() {
+    const m = $('#pack-buy-modal');
+    if (m) m.hidden = true;
+  }
+  function openPackBuyModal(cat) {
+    const p = packProductByCat(cat);
+    const modal = $('#pack-buy-modal');
+    const title = $('#pack-buy-title');
+    const text = $('#pack-buy-text');
+    const buy = $('#pack-buy-confirm');
+    if (!modal || !p) { showToast(tr('pack_need_branch')); return; }
+    if (title) title.textContent = tr('pack_buy_h', { name: tr('cat_' + cat) });
+    if (text) text.textContent = tr('pack_buy_p', { name: tr('cat_' + cat) });
+    if (buy) {
+      buy.textContent = packPriceLabel(p.tag);
+      buy.dataset.packTag = p.tag;
+    }
+    modal.hidden = false;
+  }
+
   function renderSkillCards() {
     ensureCardCombo();
     const comboRoot = $('#card-combo');
@@ -771,24 +797,16 @@ function startGame() {
       cats.querySelectorAll('.card-cat').forEach(function (btn) {
         const cat = btn.getAttribute('data-card-cat');
         btn.classList.toggle('active', cat === activeCardCat);
-        btn.classList.toggle('locked', !isPackCatOwned(cat));
-        const meta = btn.querySelector('[data-pack-meta]');
-        if (meta) {
-          const r = packBranchReward(cat);
-          meta.textContent = isPackCatOwned(cat)
-            ? tr('pack_chip_open', { n: fmt(r.maxIdle) })
-            : tr('pack_chip_lock', { n: fmt(r.maxIdle) });
-        }
+        btn.classList.remove('locked');
       });
     }
     if (comboRoot) comboRoot.innerHTML = '';
-    renderPackOffer();
     if (!grid) return;
     grid.innerHTML = '';
     SKILL_CARDS.forEach(function (c) {
       if (c.cat !== activeCardCat) return;
       const branchOwned = isPackCatOwned(c.cat);
-      const unlocked = branchOwned && isCardUnlocked(c);
+      const unlocked = isPackCardOpen(c);
       const lvl = state.levelsCards[c.id] || 0;
       const maxL = cardMaxLevel(c);
       const maxed = unlocked && lvl >= maxL;
@@ -796,74 +814,34 @@ function startGame() {
       const can = unlocked && !maxed && state.ore >= cost;
       const card = document.createElement('button');
       card.type = 'button';
-      card.className = 'skill-card' + (can ? '' : ' disabled') + (unlocked ? '' : ' locked') + (maxed ? ' maxed' : '') + (branchOwned ? '' : ' preview');
-      let desc;
-      let costHtml;
-      if (!branchOwned) {
-        desc = '<span class="skill-card-now">' + tr('plus_ops_lvl', { n: fmt(c.orePerSec) }) + '</span>';
-        desc += '<span class="skill-card-next">' + tr('pack_card_max', { n: fmt((c.orePerSec || 0) * maxL) }) + '</span>';
-        costHtml = tr('pack_preview');
-      } else if (!unlocked) {
-        desc = cardUnlockText(c);
-        costHtml = '—';
-      } else {
-        const now = lvl * c.orePerSec;
-        desc = '<span class="skill-card-now">' + tr('card_now', { n: fmt(now) }) + '</span>';
-        if (!maxed) desc += '<span class="skill-card-next">' + tr('plus_ops_lvl', { n: fmt(c.orePerSec) }) + ' · ' + fmtPayback(cost / c.orePerSec) + '</span>';
-        else desc += '<span class="skill-card-next">' + tr('maxed') + '</span>';
-        costHtml = maxed ? tr('maxed') : '🦴 ' + fmt(cost);
-      }
+      card.className = 'skill-card' + (can ? '' : ' disabled') + (unlocked ? '' : ' pack-locked') + (maxed ? ' maxed' : '');
+      const now = lvl * (c.orePerSec || 0);
+      let desc = '<span class="skill-card-now">' + tr('card_now', { n: fmt(now) }) + '</span>';
+      desc += '<span class="skill-card-next">' + tr('plus_ops_lvl', { n: fmt(c.orePerSec) }) + (unlocked && !maxed ? ' · ' + fmtPayback(cost / c.orePerSec) : '') + '</span>';
+      if (!unlocked) desc += '<span class="skill-card-next">' + tr('pack_card_max', { n: fmt((c.orePerSec || 0) * maxL) }) + '</span>';
+      else if (maxed) desc += '<span class="skill-card-next">' + tr('maxed') + '</span>';
+      const costHtml = !unlocked ? tr('pack_locked_cta') : (maxed ? tr('maxed') : '🦴 ' + fmt(cost));
       card.innerHTML = '<div class="skill-card-top"><span class="skill-card-ico">' + c.icon + '</span><span class="skill-card-lvl">' + tr('lvl') + lvl + '/' + maxL + '</span></div><div class="skill-card-name">' + locn(c) + '</div><div class="skill-card-desc">' + desc + '</div><div class="skill-card-cost">' + costHtml + '</div>';
       card.addEventListener('click', function () {
-        if (!branchOwned) {
-          const p = packProductByCat(c.cat);
-          if (p) buyGpProduct(p.tag);
-          else showToast(tr('pack_need_branch'));
+        if (!unlocked) {
+          if (!branchOwned) { openPackBuyModal(c.cat); return; }
+          showToast(cardUnlockText(c) || tr('locked'));
           return;
         }
-        if (!unlocked) { showToast(cardUnlockText(c) || tr('locked')); return; }
         if (maxed) { showToast(tr('max_lvl')); return; }
         buySkillCard(c.id);
       });
       grid.appendChild(card);
     });
   }
-  function renderPackOffer() {
-    const root = $('#pack-branch-offer');
-    if (!root) return;
-    const owned = isPackCatOwned(activeCardCat);
-    if (owned) {
-      root.hidden = true;
-      root.innerHTML = '';
-      return;
-    }
-    const r = packBranchReward(activeCardCat);
-    const p = packProductByCat(activeCardCat);
-    const catName = tr('cat_' + activeCardCat);
-    const list = SKILL_CARDS.filter(function (c) { return c.cat === activeCardCat; }).map(function (c) {
-      return '<li><span class="pack-reward-ico">' + c.icon + '</span><span class="pack-reward-name">' + locn(c) + '</span><span class="pack-reward-val">' + tr('plus_ops_lvl', { n: fmt(c.orePerSec) }) + '</span></li>';
-    }).join('');
-    root.hidden = false;
-    root.innerHTML = '<div class="pack-offer-card">' +
-      '<div class="pack-offer-kicker">' + tr('pack_kicker') + '</div>' +
-      '<h3>' + tr('pack_offer_h', { name: catName }) + '</h3>' +
-      '<p class="pack-offer-max">' + tr('pack_offer_max', { count: String(r.count), n: fmt(r.maxIdle) }) + '</p>' +
-      '<ul class="pack-reward-list">' + list + '</ul>' +
-      '<button type="button" class="btn pack-buy-btn" id="btn-pack-buy">' + packPriceLabel(p && p.tag) + '</button>' +
-      '</div>';
-    const buy = $('#btn-pack-buy');
-    if (buy && p) buy.addEventListener('click', function () { buyGpProduct(p.tag); });
-  }
   function buySkillCard(id) {
     const c = SKILL_CARDS_BY_ID[id];
     if (!c) return;
-    if (!isPackCatOwned(c.cat)) {
-      const p = packProductByCat(c.cat);
-      if (p) buyGpProduct(p.tag);
-      else showToast(tr('pack_need_branch'));
+    if (!isPackCardOpen(c)) {
+      if (!isPackCatOwned(c.cat)) { openPackBuyModal(c.cat); return; }
+      showToast(cardUnlockText(c) || tr('locked'));
       return;
     }
-    if (!isCardUnlocked(c)) { showToast(cardUnlockText(c) || tr('locked')); return; }
     if ((state.levelsCards[id] || 0) >= cardMaxLevel(c)) { showToast(tr('max_lvl')); return; }
     const cost = cardCost(id);
     if (state.ore < cost) { showToast(tr('need') + ' 🦴'); return; }
@@ -2009,7 +1987,10 @@ function startGame() {
       } else {
         if (product.flag === 'noAds') state.noAds = true;
         if (product.flag === 'vipTreats') state.vipTreats = true;
-        if (product.packCat) grantPackCat(product.packCat);
+        if (product.packCat) {
+          grantPackCat(product.packCat);
+          hidePackBuyModal();
+        }
         applyNoAdsUi();
         await persist();
         if (window.Sounds && window.Sounds.playPurchase) window.Sounds.playPurchase();
@@ -3210,6 +3191,13 @@ function startGame() {
     listen($('#prestige-confirm'), 'click', doPrestige);
     listen($('#prestige-cancel'), 'click', function () { const m = $('#prestige-modal'); if (m) m.hidden = true; });
     listen($('#prestige-modal'), 'click', function (e) { if (e.target === e.currentTarget) e.currentTarget.hidden = true; });
+    listen($('#pack-buy-cancel'), 'click', hidePackBuyModal);
+    listen($('#pack-buy-confirm'), 'click', function () {
+      const btn = $('#pack-buy-confirm');
+      const tag = btn && btn.dataset.packTag;
+      if (tag) buyGpProduct(tag);
+    });
+    listen($('#pack-buy-modal'), 'click', function (e) { if (e.target === e.currentTarget) hidePackBuyModal(); });
     listen($('#event-banner-go'), 'click', function () { startEvent(state.eventReadyType); });
     listen($('#toy-tap'), 'click', toyTap);
     listen($('#train-modal'), 'click', function (e) {

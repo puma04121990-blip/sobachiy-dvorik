@@ -164,6 +164,16 @@ function packBranchReward(cat) {
   return { count: cards.length, perLvl: perLvl, maxIdle: maxIdle, cards: cards };
 }
 
+function packStarterId(cat) {
+  for (let i = 0; i < SKILL_CARDS.length; i++) {
+    if (SKILL_CARDS[i].cat === cat) return SKILL_CARDS[i].id;
+  }
+  return null;
+}
+function isPackStarterCard(card) {
+  return !!(card && packStarterId(card.cat) === card.id);
+}
+
 function defaultPackUnlocks() {
   return { crew: false, district: false, special: false };
 }
@@ -458,6 +468,8 @@ function defaultCardLevels() {
     PACK_BRANCHES,
     PACK_BRANCH_BY_ID,
     packBranchReward,
+    packStarterId,
+    isPackStarterCard,
     defaultPackUnlocks,
     BREEDS,
     BREED_COUNT,
