@@ -4,6 +4,7 @@
  */
 (function (global) {
   'use strict';
+  if (global.Sounds && typeof global.Sounds.setBgm === 'function') return;
 
   const MUTE_KEY = 'dog-yard-mute';
   const AUDIO_BASE = 'assets/audio/';
@@ -40,6 +41,7 @@
   let bgmEl = null;
   let bgmKey = '';
   let wantedBgm = 'yard';
+  let bgmStarting = false;
 
   try {
     if (typeof localStorage !== "undefined") {
@@ -141,39 +143,69 @@
     }
   }
 
+  function stopOtherAudio(keep) {
+    try {
+      const list = document.querySelectorAll('audio');
+      for (let i = 0; i < list.length; i++) {
+        if (list[i] !== keep) {
+          try { list[i].pause(); } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+
+  function ensureBgmEl() {
+    if (bgmEl) return bgmEl;
+    bgmEl = new Audio();
+    bgmEl.loop = true;
+    bgmEl.preload = 'auto';
+    bgmEl.volume = BGM_VOL;
+    bgmEl.setAttribute('playsinline', 'true');
+    return bgmEl;
+  }
+
   function applyBgmState() {
-    if (!bgmEl) return;
+    const el = ensureBgmEl();
     if (muted || !unlocked) {
-      try { bgmEl.pause(); } catch (_) {}
+      bgmStarting = false;
+      try { el.pause(); } catch (_) {}
       return;
     }
-    bgmEl.volume = BGM_VOL;
-    const p = bgmEl.play();
-    if (p && typeof p.catch === 'function') p.catch(function () {});
+    el.loop = true;
+    el.volume = BGM_VOL;
+    if (!el.paused && !el.ended && el.currentTime > 0) return;
+    if (bgmStarting) return;
+    bgmStarting = true;
+    stopOtherAudio(el);
+    const p = el.play();
+    if (p && typeof p.then === 'function') {
+      p.then(function () { bgmStarting = false; }).catch(function () { bgmStarting = false; });
+    } else {
+      bgmStarting = false;
+    }
   }
 
   function setBgm(key) {
     const next = BGM[key] ? key : 'yard';
     wantedBgm = next;
     if (muted) return;
-    if (bgmKey === next && bgmEl) {
+    const el = ensureBgmEl();
+    const src = AUDIO_BASE + BGM[next];
+    const same = bgmKey === next && el.src && el.src.indexOf(BGM[next]) !== -1;
+    if (same) {
       applyBgmState();
       return;
     }
     bgmKey = next;
     try {
-      if (!bgmEl) {
-        bgmEl = new Audio(AUDIO_BASE + BGM[next]);
-        bgmEl.loop = true;
-        bgmEl.preload = 'auto';
-      } else {
-        bgmEl.pause();
-        bgmEl.src = AUDIO_BASE + BGM[next];
-        bgmEl.loop = true;
-      }
-      bgmEl.volume = BGM_VOL;
+      el.pause();
+      el.loop = true;
+      el.src = src;
+      el.volume = BGM_VOL;
       applyBgmState();
-    } catch (_) {}
+    } catch (_) {
+      bgmStarting = false;
+    }
   }
 
   function playPet() {
@@ -262,12 +294,14 @@
     muted = !!v;
     try { localStorage.setItem(MUTE_KEY, muted ? '1' : '0'); } catch (_) {}
     if (muted) {
+      bgmStarting = false;
       if (ctx && ctx.state === 'running') {
         try { ctx.suspend().catch(function () {}); } catch (_) {}
       }
       if (bgmEl) {
         try { bgmEl.pause(); } catch (_) {}
       }
+      stopOtherAudio(null);
     } else {
       unlock();
       if (ctx && ctx.state === 'suspended') {
@@ -299,6 +333,14 @@
     } else {
       bindUnlock();
     }
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        if (bgmEl) try { bgmEl.pause(); } catch (_) {}
+        bgmStarting = false;
+      } else if (!muted && unlocked) {
+        applyBgmState();
+      }
+    });
   }
 
   global.Sounds = {
