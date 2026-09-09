@@ -809,7 +809,7 @@
   var STICKER_EN = {
     paw: { name: 'Paws', how: 'Achievement “First paws”' },
     bone: { name: 'Bone', how: 'Achievement “Bone in paw”' },
-    heart: { name: 'Heart', how: 'Read 3 chapters' },
+    heart: { name: 'Heart', how: 'Unlock any breed' },
     ball: { name: 'Ball', how: 'Event “Lost toy”' },
     star: { name: 'Star', how: 'Event “Training”' },
     medal: { name: 'Medal', how: 'Hold a show' },
@@ -846,8 +846,7 @@
     walks_50: { name: 'Trail dog', desc: 'Finish 50 walks' },
     yard_stage_3: { name: 'Stage III', desc: 'Reach yard stage 3' },
     yard_stage_5: { name: 'Stage V', desc: 'Reach yard stage 5' },
-    daily_streak_7: { name: 'Week of care', desc: '7-day daily-goal streak' },
-    story_3: { name: 'Storyteller', desc: 'Read 3 chapters' }
+    daily_streak_7: { name: 'Week of care', desc: '7-day daily-goal streak' }
   };
 
   var STAGE_EN = {

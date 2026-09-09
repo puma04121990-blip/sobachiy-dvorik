@@ -73,5 +73,9 @@ assert.equal(Game.packStarterId('district'), 'kiosk');
 assert.equal(Game.packStarterId('special'), 'poster');
 assert.ok(Game.isPackStarterCard(Game.SKILL_CARDS_BY_ID.neighbor));
 assert.ok(!Game.isPackStarterCard(Game.SKILL_CARDS_BY_ID.walker));
+assert.ok(!Game.ACHIEVEMENTS.some(function (a) { return a.id === 'story_3'; }), 'no storyteller ach');
+Game.ACHIEVEMENTS.forEach(function (a) {
+  assert.ok(a.reward > 0, a.id + ' reward');
+});
 
 console.log('content tests: ok');

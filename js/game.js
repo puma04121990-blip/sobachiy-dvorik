@@ -1455,7 +1455,7 @@ function startGame() {
     state.stats.lifetimeBones += a.reward;
     if (id === 'clicks_50') grantSticker('paw');
     if (id === 'bones_1k') grantSticker('bone');
-    if (id === 'story_3') grantSticker('heart');
+    if (id === 'breed_1') grantSticker('heart');
     if (id === 'prestige_1') grantSticker('medal');
     if (window.Sounds) window.Sounds.playBuy();
     showToast(tr('ach_done', { n: fmt(a.reward) }));
