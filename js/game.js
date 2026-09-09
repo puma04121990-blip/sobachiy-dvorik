@@ -642,8 +642,7 @@ function startGame() {
 
   function syncBgm() {
     if (!window.Sounds || typeof window.Sounds.setBgm !== 'function') return;
-    if (activeTab === 'season') window.Sounds.setBgm('season');
-    else window.Sounds.setBgm('yard');
+    window.Sounds.setBgm('yard');
   }
 
   function setTab(tab) {

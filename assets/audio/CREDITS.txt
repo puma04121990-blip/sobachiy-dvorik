@@ -3,8 +3,6 @@ Audio credits — all CC0 / public domain. Commercial use allowed.
 Background
 - bg-yard.mp3 — “Sunset Walk” by KiluaBoy
   https://opengameart.org/content/sunset-walk-ambient-quiet-sweet-loop
-- bg-season.mp3 — “Medieval fair [Loop]” by Woli34
-  https://opengameart.org/content/medieval-fair-loop
 
 SFX & jingles
 - Interface clicks / confirms / errors / plucks — Kenney Interface Sounds
@@ -12,4 +10,4 @@ SFX & jingles
 - Reward / purchase / prestige jingles — Kenney “85 Short music jingles”
   https://opengameart.org/content/85-short-music-jingles
 
-Credit to Kenney.nl, KiluaBoy and Woli34 is appreciated, not required (CC0).
+Credit to Kenney.nl and KiluaBoy is appreciated, not required (CC0).

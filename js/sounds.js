@@ -20,7 +20,6 @@
   };
   const BGM = {
     yard: 'bg-yard.mp3',
-    season: 'bg-season.mp3',
   };
   const SFX_VOL = {
     pet: 0.42,
