@@ -2576,6 +2576,7 @@ function startGame() {
     const comboTag = state.combo >= 1.2 ? ' x' + Math.min(COMBO_MAX, state.combo).toFixed(1) : '';
     spawnPopup(x, y, '+' + fmt(power) + ' 🦴' + comboTag);
     spawnClickFx(x, y + 10);
+    if (window.Sounds) window.Sounds.playPet();
     checkAchievements(); maybeUnlockStory(); renderStats(); updateEnergyUI();
   }
 
@@ -3081,10 +3082,6 @@ function startGame() {
     const gain = getOrePerSec() * dt;
     if (gain > 0 && isFinite(gain)) { state.ore += gain; state.stats.lifetimeBones += gain; bumpQuest('earn', gain); }
     regenEnergy(dt);
-    if (window.Sounds && typeof window.Sounds.setEnergy === 'function') {
-      const maxE = getEnergyMax();
-      window.Sounds.setEnergy(maxE > 0 ? state.energy / maxE : 1);
-    }
     if (state.activeWalk && state.activeWalk.endsAt <= Date.now()) {
       updateWalkUI();
     }
