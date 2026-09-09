@@ -1,5 +1,5 @@
 /**
- * Kenney + OpenGameArt CC0 samples, with Web Audio synth fallback.
+ * CC0 dog-yard samples, with Web Audio synth fallback.
  * Mute flag persisted in localStorage (`dog-yard-mute`).
  */
 (function (global) {

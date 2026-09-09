@@ -4,10 +4,12 @@ Background
 - bg-yard.mp3 — “Sunset Walk” by KiluaBoy
   https://opengameart.org/content/sunset-walk-ambient-quiet-sweet-loop
 
-SFX & jingles
-- Interface clicks / confirms / errors / plucks — Kenney Interface Sounds
-  https://kenney.nl/assets/interface-sounds
-- Reward / purchase / prestige jingles — Kenney “85 Short music jingles”
-  https://opengameart.org/content/85-short-music-jingles
+SFX (dog-yard, not generic UI)
+- Pet yip — “Baby Animals” Bark by Technopeasant
+  https://opengameart.org/content/baby-animals-sounds-pack
+- Treat crunch, cute yips, bark, snore, whimper — rubberduck “80 CC0 creature SFX”
+  https://opengameart.org/content/80-cc0-creature-sfx
+- Paw tap / gift unwrap — Spring Spring “Jay The Doggo”
+  https://opengameart.org/content/jay-the-doggo-sound-effects
 
-Credit to Kenney.nl and KiluaBoy is appreciated, not required (CC0).
+Credit to KiluaBoy, Technopeasant, rubberduck and Spring Spring is appreciated, not required (CC0).
