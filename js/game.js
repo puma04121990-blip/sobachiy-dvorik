@@ -943,11 +943,8 @@ function startGame() {
   function updateSeasonUI() {
     const active = isSeasonActive();
     const acornStat = $('#acorn-stat');
-    const top = $('#season-top-banner');
     const tab = $('#tab-season');
     if (acornStat) acornStat.hidden = !active;
-    // Hide festival strip while event banner is up (same top slot)
-    if (top) top.hidden = !active || !!state.eventReadyType;
     if (tab) tab.hidden = !active;
     if (!active && activeTab === 'season') setTab('shop');
   }
@@ -3246,7 +3243,6 @@ function startGame() {
     listen($('#hide-modal'), 'click', function (e) {
       if (e.target === e.currentTarget && hideActive) endHideGame(false);
     });
-    listen($('#season-banner-go'), 'click', function () { setTab('season'); });
 
     document.querySelectorAll('.tabs > .tab').forEach(function (btn) {
       listen(btn, 'click', function () {
