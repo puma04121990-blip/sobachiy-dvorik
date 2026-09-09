@@ -17,6 +17,7 @@ let _gp = null;
 let _readyPromise = null;
 let _lastFullscreenAt = 0;
 let _saveChain = Promise.resolve();
+let _wipeGen = 0;
 const _status = {
   sdk: 'local',
   cloudSave: 'local',
@@ -171,6 +172,13 @@ async function loadCloudSave() {
 
   const cloudAt = cloud && Number(cloud.lastSaveAt) ? Number(cloud.lastSaveAt) : 0;
   const localAt = local && Number(local.lastSaveAt) ? Number(local.lastSaveAt) : 0;
+  let wiping = false;
+  try { wiping = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dvorik-wipe') === '1'; } catch (_) {}
+  if (wiping) {
+    if (local) return local;
+    if (cloud) return null;
+    return null;
+  }
   if (cloud && cloudAt > localAt + 1000) {
     try {
       writeLocalRaw(JSON.stringify(cloud));
@@ -189,6 +197,8 @@ async function loadCloudSave() {
 
 async function saveCloudSave(state) {
   if (!state || typeof state !== 'object') return;
+  if (typeof window !== 'undefined' && window.__dvorikWiping) return;
+  const gen = _wipeGen;
 
   let json;
   try {
@@ -200,6 +210,8 @@ async function saveCloudSave(state) {
   }
 
   _saveChain = _saveChain.catch(function () {}).then(async function () {
+    if (gen !== _wipeGen) return;
+    if (typeof window !== 'undefined' && window.__dvorikWiping) return;
     const gp = getGp();
     if (!gp || !gp.player) {
       _status.cloudSave = 'local';
@@ -207,6 +219,7 @@ async function saveCloudSave(state) {
     }
     try {
       await gp.player.ready;
+      if (gen !== _wipeGen) return;
       gp.player.set('save', json);
       await gp.player.sync();
       _status.cloudSave = 'ready';
@@ -434,6 +447,45 @@ function clearSaves() {
   } catch (_) {}
 }
 
+async function wipeProgress(emptyPayload) {
+  _wipeGen += 1;
+  if (typeof window !== 'undefined') window.__dvorikWiping = true;
+  try {
+    if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('dvorik-wipe', '1');
+  } catch (_) {}
+  clearSaves();
+  const empty = emptyPayload && typeof emptyPayload === 'object'
+    ? emptyPayload
+    : { v: 8, lastSaveAt: Date.now() };
+  if (!empty.lastSaveAt) empty.lastSaveAt = Date.now();
+  let json = '';
+  try { json = JSON.stringify(empty); } catch (_) { json = '{"v":8,"lastSaveAt":' + Date.now() + '}'; }
+  try { writeLocalRaw(json); } catch (_) {}
+  const gp = getGp();
+  if (gp && gp.player) {
+    try {
+      await gp.player.ready;
+      gp.player.set('save', json);
+      await gp.player.sync();
+      _status.cloudSave = 'ready';
+    } catch (e) {
+      _status.cloudSave = 'error';
+      _status.lastError = (e && e.message) || 'cloud_wipe_failed';
+      console.warn('[gp-bridge] cloud wipe failed', e);
+    }
+  }
+}
+
+function consumeWipeFlag() {
+  try {
+    if (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dvorik-wipe') === '1') {
+      sessionStorage.removeItem('dvorik-wipe');
+      return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
 const GPBridge = {
   PROJECT_ID,
   PUBLIC_TOKEN,
@@ -457,6 +509,8 @@ const GPBridge = {
   exportSaveRaw,
   importSaveRaw,
   clearSaves,
+  wipeProgress,
+  consumeWipeFlag,
 };
 
 if (typeof window !== 'undefined') window.GPBridge = GPBridge;

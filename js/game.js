@@ -3051,7 +3051,9 @@ function startGame() {
   }
 
   async function persist() {
+    if (destroyed || (typeof window !== 'undefined' && window.__dvorikWiping)) return;
     const payload = serialize();
+    if (destroyed || (typeof window !== 'undefined' && window.__dvorikWiping)) return;
     state.lastSaveAt = payload.lastSaveAt;
     if (window.GPBridge) await window.GPBridge.saveCloudSave(payload);
     else { try { localStorage.setItem(SAVE_KEY, JSON.stringify(payload)); } catch (_) {} }
@@ -3353,9 +3355,21 @@ function startGame() {
         ? await window.__dvorikConfirm(tr('reset_q'))
         : window.confirm(tr('reset_q'));
       if (!ok || destroyed) return;
+      destroyed = true;
+      ready = false;
+      window.__dvorikWiping = true;
+      window.__dvorikReady = false;
+      if (saveTimer) { try { clearTimeout(saveTimer); } catch (_) {} }
+      saveQueued = false;
+      if (autosaveTimer) { try { clearInterval(autosaveTimer); } catch (_) {} }
+      const empty = { v: SAVE_VERSION, lastSaveAt: Date.now() };
       try {
-        if (window.GPBridge && window.GPBridge.clearSaves) window.GPBridge.clearSaves();
-        else localStorage.removeItem(SAVE_KEY);
+        if (window.GPBridge && window.GPBridge.wipeProgress) await window.GPBridge.wipeProgress(empty);
+        else {
+          try { localStorage.removeItem(SAVE_KEY); } catch (_) {}
+          try { localStorage.removeItem(LEGACY_SAVE_KEY); } catch (_) {}
+          try { localStorage.setItem(SAVE_KEY, JSON.stringify(empty)); } catch (_) {}
+        }
       } catch (_) {}
       window.location.reload();
     });
@@ -3409,14 +3423,20 @@ function startGame() {
         const cloudAt = Number(cloud.lastSaveAt) || 0;
         const localAt = Number(state.lastSaveAt) || 0;
         if (cloudAt > localAt + 1000) {
-          const extra = applySave(cloud);
-          renderAll();
-          if (extra > 0.01) showOfflineModal(extra);
+          let wiping = false;
+          try { wiping = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('dvorik-wipe') === '1'; } catch (_) {}
+          if (!wiping) {
+            const extra = applySave(cloud);
+            renderAll();
+            if (extra > 0.01) showOfflineModal(extra);
+          }
         }
         setGpStatus();
         restoreGpPurchases();
+        if (window.GPBridge.consumeWipeFlag) window.GPBridge.consumeWipeFlag();
       }).catch(function () {
         if (!destroyed) setGpStatus();
+        if (window.GPBridge && window.GPBridge.consumeWipeFlag) window.GPBridge.consumeWipeFlag();
       });
     }
 
@@ -3485,6 +3505,7 @@ function startGame() {
     listen(document, 'visibilitychange', onVisibility);
 
     function flushSave() {
+      if (destroyed || (typeof window !== 'undefined' && window.__dvorikWiping)) return;
       try { localStorage.setItem(SAVE_KEY, JSON.stringify(serialize())); } catch (_) {}
     }
     listen(window, 'beforeunload', flushSave);
