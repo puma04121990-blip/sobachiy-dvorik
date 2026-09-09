@@ -640,6 +640,14 @@ function startGame() {
     }
   }
 
+  function syncBgm() {
+    if (!window.Sounds || typeof window.Sounds.setBgm !== 'function') return;
+    if (toyActive || trainActive || hideActive || raceActive) window.Sounds.setBgm('event');
+    else if (state.activeWalk && state.activeWalk.endsAt > Date.now()) window.Sounds.setBgm('walk');
+    else if (activeTab === 'season') window.Sounds.setBgm('season');
+    else window.Sounds.setBgm('yard');
+  }
+
   function setTab(tab) {
     if (tab === 'gpshop') tab = 'shop';
     if (tab === 'story') tab = 'shop';
@@ -661,6 +669,7 @@ function startGame() {
       }
     });
     renderActivePanel();
+    syncBgm();
   }
 
   function renderActivePanel() {
@@ -1625,6 +1634,7 @@ function startGame() {
     if (timerEl) timerEl.textContent = '10.0';
     if (modal) modal.hidden = false;
     if (window.Sounds) window.Sounds.playCombo();
+    syncBgm();
     function frame() {
       if (!toyActive) return;
       const left = Math.max(0, toyEndsAt - Date.now());
@@ -1668,6 +1678,7 @@ function startGame() {
     }
     scheduleNextEvent();
     renderStats(); updateEventBtn(); scheduleSave();
+    syncBgm();
   }
 
   function addEventAcorns(mult) {
@@ -1696,6 +1707,7 @@ function startGame() {
     if (window.Sounds) window.Sounds.playCombo();
     updateEventBtn();
     showTrainStep();
+    syncBgm();
   }
   function showTrainStep() {
     const stepEl = $('#train-step');
@@ -1757,6 +1769,7 @@ function startGame() {
     }
     scheduleNextEvent();
     checkAchievements(); maybeUnlockStory(); renderStats(); updateEventBtn(); scheduleSave();
+    syncBgm();
   }
 
   function startHideGame() {
@@ -1785,6 +1798,7 @@ function startGame() {
     if (modal) modal.hidden = false;
     if (window.Sounds) window.Sounds.playCombo();
     updateEventBtn();
+    syncBgm();
   }
   function pickHideCard(idx, btn) {
     if (!hideActive || !btn || btn.classList.contains('flipped')) return;
@@ -1831,6 +1845,7 @@ function startGame() {
     }
     scheduleNextEvent();
     checkAchievements(); maybeUnlockStory(); renderStats(); updateEventBtn(); scheduleSave();
+    syncBgm();
   }
 
   function startRaceGame() {
@@ -1848,6 +1863,7 @@ function startGame() {
     if (modal) modal.hidden = false;
     if (window.Sounds) window.Sounds.playCombo();
     updateEventBtn();
+    syncBgm();
     let raceLastFrame = performance.now();
     function frame(now) {
       if (!raceActive) return;
@@ -1899,6 +1915,7 @@ function startGame() {
     }
     scheduleNextEvent();
     renderStats(); updateEventBtn(); scheduleSave();
+    syncBgm();
   }
 
   function checkEventTimer() {
@@ -2129,6 +2146,7 @@ function startGame() {
     state.activeWalk = { tierId: tier.id, endsAt: Date.now() + tier.durationMs, startedAt: Date.now() };
     if (window.Sounds && window.Sounds.playWalkStart) window.Sounds.playWalkStart();
     else if (window.Sounds) window.Sounds.playUi();
+    syncBgm();
     showToast(tr('walk_start', { icon: tier.icon, name: locn(tier), mins: (tier.durationMs % 60000 ? (tier.durationMs / 60000).toFixed(1) : String(Math.round(tier.durationMs / 60000))) }));
     updateEnergyUI(); renderStats(); scheduleSave();
   }
@@ -2164,6 +2182,7 @@ function startGame() {
     state.energy = Math.min(getEnergyMax(), state.energy + 12 + tier.energy * 0.25);
     if (window.Sounds && window.Sounds.playWalkDone) window.Sounds.playWalkDone();
     else if (window.Sounds) window.Sounds.playOffline();
+    syncBgm();
     showToast(tr('walk_back', { n: fmt(reward) }) + extra);
     checkAchievements(); maybeUnlockStory(); updateEnergyUI(); renderStats();
     if (activeTab === 'quests') renderQuests();
@@ -3376,6 +3395,7 @@ function startGame() {
     lastTick = performance.now();
     ready = true;
     hideBoot();
+    syncBgm();
     window.__dvorikReady = true;
     try {
       var gp = window.__gp;

@@ -1,15 +1,52 @@
 /**
- * Web Audio synthesizer — no external MP3.
+ * Kenney + OpenGameArt CC0 samples, with Web Audio synth fallback.
  * Mute flag persisted in localStorage (`dog-yard-mute`).
  */
 (function (global) {
   'use strict';
 
   const MUTE_KEY = 'dog-yard-mute';
+  const AUDIO_BASE = 'assets/audio/';
+  const SFX = {
+    pet: 'sfx-pet.mp3',
+    ui: 'sfx-ui.mp3',
+    buy: 'sfx-buy.mp3',
+    purchase: 'sfx-purchase.mp3',
+    offline: 'sfx-offline.mp3',
+    combo: 'sfx-combo.mp3',
+    prestige: 'sfx-prestige.mp3',
+    reward: 'sfx-reward.mp3',
+    error: 'sfx-error.mp3',
+    walkStart: 'sfx-walk-start.mp3',
+    walkDone: 'sfx-walk-done.mp3',
+  };
+  const BGM = {
+    yard: 'bg-yard.mp3',
+    walk: 'bg-walk.mp3',
+    event: 'bg-walk.mp3',
+    season: 'bg-season.mp3',
+  };
+  const SFX_VOL = {
+    pet: 0.42,
+    ui: 0.32,
+    buy: 0.4,
+    purchase: 0.45,
+    offline: 0.4,
+    combo: 0.38,
+    prestige: 0.5,
+    reward: 0.48,
+    error: 0.4,
+    walkStart: 0.4,
+    walkDone: 0.45,
+  };
+  const BGM_VOL = 0.2;
 
   let ctx = null;
   let unlocked = false;
   let muted = false;
+  let bgmEl = null;
+  let bgmKey = '';
+  let wantedBgm = 'yard';
 
   try {
     if (typeof localStorage !== "undefined") {
@@ -91,88 +128,154 @@
     } catch (_) {}
   }
 
-  function playPet() {
+  function playSample(key, fallback) {
     unlock();
-    tone(180, 0.09, 'triangle', 0.12, 0, 110);
-    tone(320, 0.07, 'sine', 0.08, 0.04, 220);
-    noiseBurst(0.05, 0.035, 0.01);
+    if (muted) return;
+    const file = SFX[key];
+    if (!file || typeof Audio === 'undefined') {
+      if (fallback) fallback();
+      return;
+    }
+    try {
+      const a = new Audio(AUDIO_BASE + file);
+      a.volume = SFX_VOL[key] != null ? SFX_VOL[key] : 0.4;
+      const p = a.play();
+      if (p && typeof p.catch === 'function') {
+        p.catch(function () { if (fallback) fallback(); });
+      }
+    } catch (_) {
+      if (fallback) fallback();
+    }
+  }
+
+  function applyBgmState() {
+    if (!bgmEl) return;
+    if (muted || !unlocked) {
+      try { bgmEl.pause(); } catch (_) {}
+      return;
+    }
+    bgmEl.volume = BGM_VOL;
+    const p = bgmEl.play();
+    if (p && typeof p.catch === 'function') p.catch(function () {});
+  }
+
+  function setBgm(key) {
+    const next = BGM[key] ? key : 'yard';
+    wantedBgm = next;
+    if (muted) return;
+    if (bgmKey === next && bgmEl) {
+      applyBgmState();
+      return;
+    }
+    bgmKey = next;
+    try {
+      if (!bgmEl) {
+        bgmEl = new Audio(AUDIO_BASE + BGM[next]);
+        bgmEl.loop = true;
+        bgmEl.preload = 'auto';
+      } else {
+        bgmEl.pause();
+        bgmEl.src = AUDIO_BASE + BGM[next];
+        bgmEl.loop = true;
+      }
+      bgmEl.volume = BGM_VOL;
+      applyBgmState();
+    } catch (_) {}
+  }
+
+  function playPet() {
+    playSample('pet', function () {
+      tone(180, 0.09, 'triangle', 0.12, 0, 110);
+      tone(320, 0.07, 'sine', 0.08, 0.04, 220);
+      noiseBurst(0.05, 0.035, 0.01);
+    });
   }
 
   function playUi() {
-    unlock();
-    tone(640, 0.04, 'sine', 0.045, 0);
-    tone(820, 0.035, 'triangle', 0.03, 0.025);
+    playSample('ui', function () {
+      tone(640, 0.04, 'sine', 0.045, 0);
+      tone(820, 0.035, 'triangle', 0.03, 0.025);
+    });
   }
 
   function playBuy() {
-    unlock();
-    tone(523.25, 0.12, 'sine', 0.1, 0);
-    tone(659.25, 0.14, 'sine', 0.09, 0.08);
-    tone(783.99, 0.22, 'triangle', 0.08, 0.16);
+    playSample('buy', function () {
+      tone(523.25, 0.12, 'sine', 0.1, 0);
+      tone(659.25, 0.14, 'sine', 0.09, 0.08);
+      tone(783.99, 0.22, 'triangle', 0.08, 0.16);
+    });
   }
 
   function playPurchase() {
-    unlock();
-    tone(392, 0.1, 'triangle', 0.09, 0);
-    tone(523.25, 0.12, 'sine', 0.1, 0.1);
-    tone(659.25, 0.14, 'sine', 0.1, 0.2);
-    tone(783.99, 0.18, 'triangle', 0.09, 0.32);
-    tone(1046.5, 0.28, 'sine', 0.08, 0.46);
+    playSample('purchase', function () {
+      tone(392, 0.1, 'triangle', 0.09, 0);
+      tone(523.25, 0.12, 'sine', 0.1, 0.1);
+      tone(659.25, 0.14, 'sine', 0.1, 0.2);
+      tone(783.99, 0.18, 'triangle', 0.09, 0.32);
+      tone(1046.5, 0.28, 'sine', 0.08, 0.46);
+    });
   }
 
   function playOffline() {
-    unlock();
-    tone(392, 0.16, 'triangle', 0.09, 0);
-    tone(493.88, 0.16, 'triangle', 0.09, 0.12);
-    tone(587.33, 0.18, 'sine', 0.1, 0.24);
-    tone(784, 0.28, 'sine', 0.11, 0.38);
+    playSample('offline', function () {
+      tone(392, 0.16, 'triangle', 0.09, 0);
+      tone(493.88, 0.16, 'triangle', 0.09, 0.12);
+      tone(587.33, 0.18, 'sine', 0.1, 0.24);
+      tone(784, 0.28, 'sine', 0.11, 0.38);
+    });
   }
 
   function playCombo() {
-    unlock();
-    tone(880, 0.06, 'sine', 0.07, 0);
-    tone(1174.66, 0.08, 'triangle', 0.06, 0.05);
-    tone(1396.91, 0.1, 'sine', 0.05, 0.1);
+    playSample('combo', function () {
+      tone(880, 0.06, 'sine', 0.07, 0);
+      tone(1174.66, 0.08, 'triangle', 0.06, 0.05);
+      tone(1396.91, 0.1, 'sine', 0.05, 0.1);
+    });
   }
 
   function playPrestige() {
-    unlock();
-    tone(523.25, 0.14, 'triangle', 0.1, 0);
-    tone(659.25, 0.14, 'triangle', 0.1, 0.12);
-    tone(783.99, 0.16, 'sine', 0.11, 0.24);
-    tone(1046.5, 0.32, 'sine', 0.12, 0.4);
-    tone(1318.5, 0.22, 'triangle', 0.07, 0.55);
+    playSample('prestige', function () {
+      tone(523.25, 0.14, 'triangle', 0.1, 0);
+      tone(659.25, 0.14, 'triangle', 0.1, 0.12);
+      tone(783.99, 0.16, 'sine', 0.11, 0.24);
+      tone(1046.5, 0.32, 'sine', 0.12, 0.4);
+      tone(1318.5, 0.22, 'triangle', 0.07, 0.55);
+    });
   }
 
   function playReward() {
-    unlock();
-    tone(523.25, 0.1, 'sine', 0.09, 0);
-    tone(659.25, 0.12, 'triangle', 0.1, 0.1);
-    tone(880, 0.16, 'sine', 0.11, 0.22);
-    tone(1174.66, 0.22, 'sine', 0.08, 0.36);
+    playSample('reward', function () {
+      tone(523.25, 0.1, 'sine', 0.09, 0);
+      tone(659.25, 0.12, 'triangle', 0.1, 0.1);
+      tone(880, 0.16, 'sine', 0.11, 0.22);
+      tone(1174.66, 0.22, 'sine', 0.08, 0.36);
+    });
   }
 
   function playError() {
-    unlock();
-    tone(180, 0.1, 'sawtooth', 0.06, 0, 90);
-    tone(140, 0.14, 'square', 0.045, 0.08, 70);
-    noiseBurst(0.06, 0.025, 0.02);
+    playSample('error', function () {
+      tone(180, 0.1, 'sawtooth', 0.06, 0, 90);
+      tone(140, 0.14, 'square', 0.045, 0.08, 70);
+      noiseBurst(0.06, 0.025, 0.02);
+    });
   }
 
   function playWalkStart() {
-    unlock();
-    tone(349.23, 0.1, 'triangle', 0.08, 0);
-    tone(440, 0.12, 'sine', 0.07, 0.1);
-    tone(523.25, 0.14, 'triangle', 0.06, 0.22);
-    noiseBurst(0.08, 0.02, 0.05);
+    playSample('walkStart', function () {
+      tone(349.23, 0.1, 'triangle', 0.08, 0);
+      tone(440, 0.12, 'sine', 0.07, 0.1);
+      tone(523.25, 0.14, 'triangle', 0.06, 0.22);
+      noiseBurst(0.08, 0.02, 0.05);
+    });
   }
 
   function playWalkDone() {
-    unlock();
-    tone(392, 0.12, 'sine', 0.09, 0);
-    tone(523.25, 0.14, 'triangle', 0.1, 0.12);
-    tone(659.25, 0.18, 'sine', 0.1, 0.26);
-    tone(784, 0.26, 'sine', 0.09, 0.42);
+    playSample('walkDone', function () {
+      tone(392, 0.12, 'sine', 0.09, 0);
+      tone(523.25, 0.14, 'triangle', 0.1, 0.12);
+      tone(659.25, 0.18, 'sine', 0.1, 0.26);
+      tone(784, 0.26, 'sine', 0.09, 0.42);
+    });
   }
 
   function isMuted() { return muted; }
@@ -184,12 +287,15 @@
       if (ctx && ctx.state === 'running') {
         try { ctx.suspend().catch(function () {}); } catch (_) {}
       }
+      if (bgmEl) {
+        try { bgmEl.pause(); } catch (_) {}
+      }
     } else {
-      // Unmute: allow context creation again even if a prior AC() failed
       unlock();
       if (ctx && ctx.state === 'suspended') {
         try { ctx.resume().catch(function () {}); } catch (_) {}
       }
+      setBgm(wantedBgm || 'yard');
     }
     return muted;
   }
@@ -199,6 +305,7 @@
   function bindUnlock() {
     const once = function () {
       unlock();
+      if (!muted) setBgm(wantedBgm || 'yard');
       global.removeEventListener('pointerdown', once, true);
       global.removeEventListener('touchstart', once, true);
       global.removeEventListener('keydown', once, true);
@@ -228,6 +335,7 @@
     playError: playError,
     playWalkStart: playWalkStart,
     playWalkDone: playWalkDone,
+    setBgm: setBgm,
     unlock: unlock,
     isMuted: isMuted,
     setMuted: setMuted,
