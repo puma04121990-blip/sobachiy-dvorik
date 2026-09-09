@@ -42,6 +42,10 @@
   let bgmKey = '';
   let wantedBgm = 'yard';
   let bgmStarting = false;
+  let energy01 = 1;
+  let nextBreathAt = 0;
+  let breathPumpId = 0;
+  let noiseBuf = null;
 
   try {
     if (typeof localStorage !== "undefined") {
@@ -70,6 +74,7 @@
       c.resume().catch(function () {});
     }
     unlocked = true;
+    startBreathPump();
   }
 
   function tone(freq, dur, type, gainVal, when, slideTo) {
@@ -121,6 +126,116 @@
       src.start(t0);
       src.stop(t0 + dur + 0.02);
     } catch (_) {}
+  }
+
+
+  function getPinkBuffer(c) {
+    if (noiseBuf && noiseBuf.sampleRate === c.sampleRate) return noiseBuf;
+    const len = Math.max(1, Math.floor(c.sampleRate * 1.2));
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const d = buf.getChannelData(0);
+    let b0 = 0, b1 = 0, b2 = 0;
+    for (let i = 0; i < len; i++) {
+      const w = Math.random() * 2 - 1;
+      b0 = 0.99886 * b0 + w * 0.0555179;
+      b1 = 0.99332 * b1 + w * 0.0750759;
+      b2 = 0.96900 * b2 + w * 0.1538520;
+      d[i] = (b0 + b1 + b2 + w * 0.18) * 0.32;
+    }
+    noiseBuf = buf;
+    return buf;
+  }
+
+  function tiredness() {
+    const empty = 1 - Math.max(0, Math.min(1, energy01));
+    if (empty < 0.18) return 0;
+    return Math.pow((empty - 0.18) / 0.82, 1.4);
+  }
+
+  function emitPant(c, t0, tired) {
+    const buf = getPinkBuffer(c);
+    const cycle = 1.75 - tired * 1.38;
+    const inhaleDur = Math.max(0.07, cycle * 0.34);
+    const exhaleDur = Math.max(0.1, cycle * 0.5);
+    const vol = 0.03 + tired * 0.26;
+    const rasp = tired;
+
+    function whoosh(start, dur, freq, q, gainVal, oscHz) {
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const bp = c.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.setValueAtTime(freq, start);
+      bp.frequency.exponentialRampToValueAtTime(Math.max(80, freq * (0.65 + rasp * 0.15)), start + dur);
+      bp.Q.value = q;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gainVal), start + dur * 0.28);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+      src.connect(bp);
+      bp.connect(g);
+      g.connect(c.destination);
+      src.start(start);
+      src.stop(start + dur + 0.02);
+      if (oscHz) {
+        const osc = c.createOscillator();
+        const og = c.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(oscHz, start);
+        osc.frequency.exponentialRampToValueAtTime(Math.max(40, oscHz * 0.72), start + dur);
+        og.gain.setValueAtTime(0.0001, start);
+        og.gain.exponentialRampToValueAtTime(gainVal * 0.22, start + dur * 0.3);
+        og.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+        osc.connect(og);
+        og.connect(c.destination);
+        osc.start(start);
+        osc.stop(start + dur + 0.02);
+      }
+    }
+
+    const inFreq = 980 + rasp * 420;
+    const outFreq = 420 - rasp * 140;
+    whoosh(t0, inhaleDur, inFreq, 1.1 - rasp * 0.4, vol * (0.55 + rasp * 0.35), 0);
+    whoosh(t0 + inhaleDur * 0.72, exhaleDur, outFreq, 0.85, vol, 92 + rasp * 40);
+  }
+
+  function pumpBreath() {
+    breathPumpId = 0;
+    if (muted || !unlocked) return;
+    if (typeof document !== 'undefined' && document.hidden) {
+      breathPumpId = requestAnimationFrame(pumpBreath);
+      return;
+    }
+    const c = getCtx();
+    if (!c) {
+      breathPumpId = requestAnimationFrame(pumpBreath);
+      return;
+    }
+    try {
+      if (c.state === 'suspended') c.resume().catch(function () {});
+      const now = c.currentTime;
+      if (!nextBreathAt || nextBreathAt < now - 0.6) nextBreathAt = now + 0.05;
+      let n = 0;
+      while (nextBreathAt < now + 0.22 && n++ < 4) {
+        const tired = tiredness();
+        const cycle = tired <= 0 ? 1.7 : (1.75 - tired * 1.38);
+        if (tired > 0.01) emitPant(c, nextBreathAt, tired);
+        const jitter = tired > 0.82 ? (Math.random() * 0.08 - 0.02) : 0;
+        nextBreathAt += Math.max(0.22, cycle + jitter);
+      }
+    } catch (_) {}
+    breathPumpId = requestAnimationFrame(pumpBreath);
+  }
+
+  function startBreathPump() {
+    if (!breathPumpId) breathPumpId = requestAnimationFrame(pumpBreath);
+  }
+
+  function setEnergy(ratio) {
+    const r = Number(ratio);
+    energy01 = isFinite(r) ? Math.max(0, Math.min(1, r)) : 1;
+    if (unlocked && !muted) startBreathPump();
   }
 
   function playSample(key, fallback) {
@@ -308,6 +423,7 @@
         try { ctx.resume().catch(function () {}); } catch (_) {}
       }
       setBgm(wantedBgm || 'yard');
+      startBreathPump();
     }
     return muted;
   }
@@ -356,6 +472,7 @@
     playWalkStart: playWalkStart,
     playWalkDone: playWalkDone,
     setBgm: setBgm,
+    setEnergy: setEnergy,
     unlock: unlock,
     isMuted: isMuted,
     setMuted: setMuted,
