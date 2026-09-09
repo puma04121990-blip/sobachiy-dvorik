@@ -22,17 +22,17 @@
     yard: 'bg-yard.mp3',
   };
   const SFX_VOL = {
-    pet: 0.42,
-    ui: 0.32,
-    buy: 0.4,
-    purchase: 0.45,
-    offline: 0.4,
-    combo: 0.38,
-    prestige: 0.5,
-    reward: 0.48,
-    error: 0.4,
+    pet: 0.22,
+    ui: 0.16,
+    buy: 0.22,
+    purchase: 0.24,
+    offline: 0.22,
+    combo: 0.18,
+    prestige: 0.26,
+    reward: 0.24,
+    error: 0.18,
   };
-  const BGM_VOL = 0.2;
+  const BGM_VOL = 0.16;
 
   let ctx = null;
   let unlocked = false;
