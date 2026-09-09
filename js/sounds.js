@@ -17,13 +17,9 @@
     prestige: 'sfx-prestige.mp3',
     reward: 'sfx-reward.mp3',
     error: 'sfx-error.mp3',
-    walkStart: 'sfx-walk-start.mp3',
-    walkDone: 'sfx-walk-done.mp3',
   };
   const BGM = {
     yard: 'bg-yard.mp3',
-    walk: 'bg-walk.mp3',
-    event: 'bg-walk.mp3',
     season: 'bg-season.mp3',
   };
   const SFX_VOL = {
@@ -36,8 +32,6 @@
     prestige: 0.5,
     reward: 0.48,
     error: 0.4,
-    walkStart: 0.4,
-    walkDone: 0.45,
   };
   const BGM_VOL = 0.2;
 
@@ -260,23 +254,8 @@
     });
   }
 
-  function playWalkStart() {
-    playSample('walkStart', function () {
-      tone(349.23, 0.1, 'triangle', 0.08, 0);
-      tone(440, 0.12, 'sine', 0.07, 0.1);
-      tone(523.25, 0.14, 'triangle', 0.06, 0.22);
-      noiseBurst(0.08, 0.02, 0.05);
-    });
-  }
-
-  function playWalkDone() {
-    playSample('walkDone', function () {
-      tone(392, 0.12, 'sine', 0.09, 0);
-      tone(523.25, 0.14, 'triangle', 0.1, 0.12);
-      tone(659.25, 0.18, 'sine', 0.1, 0.26);
-      tone(784, 0.26, 'sine', 0.09, 0.42);
-    });
-  }
+  function playWalkStart() {}
+  function playWalkDone() {}
 
   function isMuted() { return muted; }
 

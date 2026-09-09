@@ -642,9 +642,7 @@ function startGame() {
 
   function syncBgm() {
     if (!window.Sounds || typeof window.Sounds.setBgm !== 'function') return;
-    if (toyActive || trainActive || hideActive || raceActive) window.Sounds.setBgm('event');
-    else if (state.activeWalk && state.activeWalk.endsAt > Date.now()) window.Sounds.setBgm('walk');
-    else if (activeTab === 'season') window.Sounds.setBgm('season');
+    if (activeTab === 'season') window.Sounds.setBgm('season');
     else window.Sounds.setBgm('yard');
   }
 
@@ -2144,9 +2142,6 @@ function startGame() {
     state.energy -= tier.energy;
     state.ore -= tier.boneCost;
     state.activeWalk = { tierId: tier.id, endsAt: Date.now() + tier.durationMs, startedAt: Date.now() };
-    if (window.Sounds && window.Sounds.playWalkStart) window.Sounds.playWalkStart();
-    else if (window.Sounds) window.Sounds.playUi();
-    syncBgm();
     showToast(tr('walk_start', { icon: tier.icon, name: locn(tier), mins: (tier.durationMs % 60000 ? (tier.durationMs / 60000).toFixed(1) : String(Math.round(tier.durationMs / 60000))) }));
     updateEnergyUI(); renderStats(); scheduleSave();
   }
@@ -2180,9 +2175,6 @@ function startGame() {
     }
     // walk restores some energy
     state.energy = Math.min(getEnergyMax(), state.energy + 12 + tier.energy * 0.25);
-    if (window.Sounds && window.Sounds.playWalkDone) window.Sounds.playWalkDone();
-    else if (window.Sounds) window.Sounds.playOffline();
-    syncBgm();
     showToast(tr('walk_back', { n: fmt(reward) }) + extra);
     checkAchievements(); maybeUnlockStory(); updateEnergyUI(); renderStats();
     if (activeTab === 'quests') renderQuests();

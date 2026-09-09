@@ -1,17 +1,15 @@
 Audio credits — all CC0 / public domain. Commercial use allowed.
 
 Background
-- bg-yard.mp3  — “Ukulele Forest” loop by StarNinjas
-  https://opengameart.org/content/ukulele-forest-beginning-loop-and-end
-- bg-walk.mp3  — “Port Town Loop” by beardalaxy
-  https://opengameart.org/content/port-town-loop
+- bg-yard.mp3 — “Sunset Walk” by KiluaBoy
+  https://opengameart.org/content/sunset-walk-ambient-quiet-sweet-loop
 - bg-season.mp3 — “Medieval fair [Loop]” by Woli34
   https://opengameart.org/content/medieval-fair-loop
 
 SFX & jingles
 - Interface clicks / confirms / errors / plucks — Kenney Interface Sounds
   https://kenney.nl/assets/interface-sounds
-- Reward / purchase / prestige / walk-done jingles — Kenney “85 Short music jingles”
+- Reward / purchase / prestige jingles — Kenney “85 Short music jingles”
   https://opengameart.org/content/85-short-music-jingles
 
-Credit to Kenney.nl, StarNinjas, beardalaxy and Woli34 is appreciated, not required (CC0).
+Credit to Kenney.nl, KiluaBoy and Woli34 is appreciated, not required (CC0).
