@@ -44,3 +44,39 @@ assert.equal(core.applyTrackedProgress(null, "earn", 1).changed, false);
 
 console.log('game-core tests: ok');
 
+
+// --- save migrations ---
+{
+  const v1 = core.applyVersionMigrations({ v: 1, ore: 50 }, 8, { energyMaxBase: 100 });
+  assert.equal(v1.v, 8);
+  assert.equal(v1.selectedBreed, 'lab');
+  assert.ok(Array.isArray(v1.unlockedBreeds) && v1.unlockedBreeds.indexOf('lab') !== -1);
+  assert.equal(v1.selectedYard, 'sunny');
+  assert.equal(v1.inventory.boneBoost, 0);
+  assert.ok(Array.isArray(v1.stickers));
+  assert.equal(v1.energy, 100);
+  assert.equal(v1.yardStage, 1);
+  assert.ok(v1.levelsCards && typeof v1.levelsCards === 'object');
+  assert.ok(v1.levelsTraining && typeof v1.levelsTraining === 'object');
+  assert.equal(v1.stats.lifetimeBones, 50);
+}
+
+{
+  const v4 = core.applyVersionMigrations({ v: 4, ore: 10, energy: 40 }, 8, { energyMaxBase: 120 });
+  assert.equal(v4.v, 8);
+  assert.equal(v4.energy, 40);
+  assert.equal(v4.yardStage, 1);
+  assert.equal(v4.cardComboClaimed, false);
+}
+
+{
+  const hostile = JSON.parse('{"v":1,"ore":3,"__proto__":{"x":1}}');
+  const cleaned = core.applyVersionMigrations(hostile, 8, { energyMaxBase: 100 });
+  assert.equal(cleaned.ore, 3);
+  assert.equal(Object.prototype.x, undefined);
+}
+
+assert.equal(core.applyVersionMigrations(null, 8), null);
+assert.equal(core.applyVersionMigrations([], 8), null);
+
+console.log('game-core migration tests: ok');
