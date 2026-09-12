@@ -948,12 +948,13 @@ function startGame() {
 
     const ACTOR_W = 96;
     const KENNEL_RESERVE = 102;
-    const WALK_SPEED = 56;
-    const FRAME_FPS = 6;
+    const WALK_SPEED = 50;
+    const FRAME_FPS = Math.max(5, Math.min(9, WALK_SPEED / 8));
     const TRANS_FPS = 11;
     const APPROACH_SNAP = 4;
     let mode = 'walk';
     let dir = 1;
+    let pendingDir = null;
     let x = 16;
     let modeUntil = 0;
     let raf = 0;
@@ -985,7 +986,7 @@ function startGame() {
 
     function walkFrameCount() {
       const n = Number(actor.dataset.walkFrames);
-      return n > 0 ? n : 4;
+      return n > 0 ? n : 6;
     }
 
     function sitdownFrameCount() {
@@ -1071,6 +1072,20 @@ function startGame() {
       while (frameAcc >= frameDur) {
         frameAcc -= frameDur;
         frame = (frame + 1) % frames;
+        if (pendingDir != null && frame === 0) {
+          dir = pendingDir;
+          pendingDir = null;
+        }
+      }
+    }
+
+    function requestDir(next) {
+      if (next === dir && pendingDir == null) return;
+      if (frame === 0) {
+        dir = next;
+        pendingDir = null;
+      } else {
+        pendingDir = next;
       }
     }
 
@@ -1080,8 +1095,8 @@ function startGame() {
       actor.dataset.mode = mode;
       if (sheet === 'walk' && (mode === 'walk' || mode === 'approach')) {
         paintWalkFrame();
-        const bob = Math.sin(performance.now() / 160) * 2;
-        setSpriteXform(1, bob);
+        // No walk bob — leg animation alone looks smoother
+        setSpriteXform(null);
       } else if (mode === 'sitdown' && sheet === 'sitdown') {
         paintSheetFrame(sitdownFrameCount());
       } else if (mode === 'standup' && sheet === 'standup') {
@@ -1091,6 +1106,7 @@ function startGame() {
 
     function enterApproach() {
       mode = 'approach';
+      pendingDir = null;
       setSitIdle(false);
       setSpriteXform(null);
       applyWalkSheet();
@@ -1101,6 +1117,7 @@ function startGame() {
 
     function enterSitdown(now) {
       mode = 'sitdown';
+      pendingDir = null;
       transStart = now;
       setSitIdle(false);
       setSpriteXform(null);
@@ -1110,6 +1127,7 @@ function startGame() {
     function enterSit(now) {
       const b = walkBounds();
       mode = 'sit';
+      pendingDir = null;
       x = b.sitX;
       dir = 1;
       applySitSheet();
@@ -1120,6 +1138,7 @@ function startGame() {
 
     function enterStandup(now) {
       mode = 'standup';
+      pendingDir = null;
       transStart = now;
       setSitIdle(false);
       setSpriteXform(null);
@@ -1131,7 +1150,13 @@ function startGame() {
       setSitIdle(false);
       setSpriteXform(null);
       applyWalkSheet();
-      if (flipMaybe && Math.random() < 0.55) dir *= -1;
+      // Apply flip on sit exit (stride restart) so scaleX does not mid-stride flip
+      if (flipMaybe && Math.random() < 0.55) {
+        dir *= -1;
+      }
+      pendingDir = null;
+      frame = 0;
+      frameAcc = 0;
       schedule(now);
     }
 
@@ -1151,6 +1176,7 @@ function startGame() {
         mode = 'sit';
         x = b.sitX;
         dir = 1;
+        pendingDir = null;
         applySitSheet();
         setSitIdle(false);
         setSpriteXform(null);
@@ -1164,8 +1190,8 @@ function startGame() {
         } else {
           const b = walkBounds();
           x += dir * WALK_SPEED * dt;
-          if (x <= b.minX) { x = b.minX; dir = 1; }
-          if (x >= b.maxX) { x = b.maxX; dir = -1; }
+          if (x <= b.minX) { x = b.minX; requestDir(1); }
+          if (x >= b.maxX) { x = b.maxX; requestDir(-1); }
           advanceWalkFrames(dt, FRAME_FPS);
         }
       }
@@ -1175,13 +1201,16 @@ function startGame() {
         if (Math.abs(x - b.sitX) < APPROACH_SNAP) {
           x = b.sitX;
           dir = 1;
+          pendingDir = null;
           enterSitdown(ts);
         } else {
           dir = x < b.sitX ? 1 : -1;
+          pendingDir = null;
           x += dir * WALK_SPEED * dt;
           if ((dir > 0 && x >= b.sitX) || (dir < 0 && x <= b.sitX)) {
             x = b.sitX;
             dir = 1;
+            pendingDir = null;
             enterSitdown(ts);
           } else {
             advanceWalkFrames(dt, FRAME_FPS);
@@ -1218,11 +1247,13 @@ function startGame() {
           mode = 'sit';
           x = b.sitX;
           dir = 1;
+          pendingDir = null;
           applySitSheet();
           setSitIdle(false);
           setSpriteXform(null);
         } else {
           mode = 'walk';
+          pendingDir = null;
           applyWalkSheet();
           setSitIdle(false);
           setSpriteXform(null);
@@ -1260,7 +1291,7 @@ function startGame() {
       actor.dataset.standupSrc = standupSrc;
       actor.dataset.frameW = String(breed.frameW || 192);
       actor.dataset.frameH = String(breed.frameH || 192);
-      actor.dataset.walkFrames = String(breed.walkFrames || 4);
+      actor.dataset.walkFrames = String(breed.walkFrames || 6);
       actor.dataset.sitdownFrames = String(breed.sitdownFrames || 4);
     }
     if (sprite) {
@@ -1271,7 +1302,7 @@ function startGame() {
         sprite.style.backgroundPosition = '0 0';
       } else if (walkSrc) {
         sprite.style.backgroundImage = 'url("' + walkSrc + '")';
-        const frames = Number((actor && actor.dataset.walkFrames) || 4) || 4;
+        const frames = Number((actor && actor.dataset.walkFrames) || 6) || 6;
         const w = sprite.clientWidth || 96;
         sprite.style.backgroundSize = (frames * w) + 'px 100%';
         sprite.style.backgroundPosition = '0 0';
