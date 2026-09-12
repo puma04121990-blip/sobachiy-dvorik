@@ -262,7 +262,7 @@ header h1 {
 
 #dogActor.dog-sit-idle .dog-sprite,
 #dogActor[data-mode="sit"] .dog-sprite {
-  animation: dog-sit-idle 2.2s ease-in-out infinite;
+  animation: none;
 }
 
 .dog-art {
@@ -344,19 +344,14 @@ header h1 {
 }
 
 /* Click: squash / wag on yard dog sprite (and legacy .dog-art) */
+/* Yard dog: no tap squash/wag jitter */
 #mine-btn.clicked .dog-actor .dog-sprite,
-#mine-btn.clicked .dog-actor .dog-art {
-  animation: click-squash 0.22s ease-out;
-}
-
+#mine-btn.clicked .dog-actor .dog-art,
 #mine-btn.wag .dog-actor .dog-sprite,
-#mine-btn.wag .dog-actor .dog-art {
-  animation: dog-wag 0.28s ease-in-out;
-}
-
+#mine-btn.wag .dog-actor .dog-art,
 #mine-btn.clicked.wag .dog-actor .dog-sprite,
 #mine-btn.clicked.wag .dog-actor .dog-art {
-  animation: click-squash 0.22s ease-out, dog-wag 0.28s ease-in-out;
+  animation: none;
 }
 
 @keyframes click-squash {
