@@ -194,59 +194,128 @@ header h1 {
   background: #ffe8d6;
 }
 
-#mine-btn {
+#mine-btn,
+#mine-btn.yard-stage {
   position: relative;
-  width: min(72vw, 220px);
-  height: min(72vw, 220px);
+  width: 100%;
+  height: clamp(220px, 58vw, 260px);
   border: none;
-  border-radius: 50%;
+  border-radius: 16px;
   cursor: pointer;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 35% 28%, #fff9f2 0%, #ffd4b0 32%, #f5a878 65%, #e8916a 100%);
-  box-shadow:
-    0 0 0 5px rgba(232, 145, 106, 0.28),
-    0 0 0 11px rgba(126, 184, 232, 0.18),
-    0 14px 40px rgba(92, 64, 51, 0.28),
-    inset 0 -10px 24px rgba(180, 90, 50, 0.12);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0;
+  background: transparent;
+  box-shadow: none;
+  display: block;
   padding: 0;
   transition: transform 0.12s ease;
   touch-action: manipulation;
   z-index: 1;
 }
 
+/* Legacy wrap kept for safety if DOM not yet updated */
 .dog-wrap {
   position: absolute;
   inset: 0;
   border-radius: 50%;
   overflow: hidden;
-  display: block;
+  display: none;
   pointer-events: none;
-  animation: dog-bob 2.4s ease-in-out infinite;
-  background: #ffd4b0 url("../assets/dog-click.webp") center 40% / cover no-repeat;
+}
+
+.dog-actor {
+  position: absolute;
+  left: 0;
+  bottom: 10px;
+  width: 88px;
+  height: 88px;
+  z-index: 3;
+  pointer-events: none;
+  will-change: transform;
+  transform: translate3d(12%, 0, 0);
+  transform-origin: center bottom;
 }
 
 .dog-art {
-  width: 100%;
-  height: 100%;
+  width: 88px;
+  height: 88px;
   object-fit: cover;
   object-position: center 40%;
   border-radius: 50%;
   display: block;
   pointer-events: none;
-  filter: saturate(1.08) contrast(1.06) drop-shadow(0 4px 10px rgba(92, 64, 51, 0.25));
+  filter: saturate(1.08) contrast(1.06) drop-shadow(0 6px 12px rgba(92, 64, 51, 0.35));
+  background: rgba(255, 245, 235, 0.35);
+}
+
+.kennel {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  width: 90px;
+  height: 78px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.kennel-body {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 46px;
+  background:
+    linear-gradient(180deg, #c48a52 0%, #a56b3a 55%, #8a5530 100%);
+  border: 2px solid #6e4020;
+  border-radius: 4px 4px 2px 2px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 220, 170, 0.25),
+    0 4px 10px rgba(92, 64, 51, 0.28);
+}
+
+.kennel-body::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 28px;
+  height: 30px;
+  background: #3a2818;
+  border-radius: 14px 14px 2px 2px;
+  box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.45);
+}
+
+.kennel-roof {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 10px;
+  height: 0;
+  border-left: 45px solid transparent;
+  border-right: 45px solid transparent;
+  border-bottom: 28px solid #8b4e2a;
+  filter: drop-shadow(0 2px 2px rgba(92, 64, 51, 0.35));
+}
+
+.kennel-roof::after {
+  content: '';
+  position: absolute;
+  left: -40px;
+  top: 4px;
+  width: 0;
+  height: 0;
+  border-left: 40px solid transparent;
+  border-right: 40px solid transparent;
+  border-bottom: 22px solid #a86234;
 }
 
 .mine-label {
-  position: relative;
-  z-index: 2;
-  margin-top: auto;
-  margin-bottom: 14%;
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 5;
+  margin: 0;
   font-size: 0.8rem;
   font-weight: 800;
   color: #fff;
@@ -255,38 +324,35 @@ header h1 {
   text-shadow:
     0 1px 2px rgba(92, 64, 51, 0.55),
     0 0 10px rgba(92, 64, 51, 0.35);
-  background: rgba(92, 64, 51, 0.38);
-  padding: 4px 12px;
+  background: rgba(92, 64, 51, 0.45);
+  padding: 4px 14px;
   border-radius: 999px;
   backdrop-filter: blur(2px);
+  white-space: nowrap;
 }
 
-/* Idle gentle bob */
+/* Idle gentle bob on actor when sitting */
 @keyframes dog-bob {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-5px); }
+  50% { transform: translateY(-4px); }
 }
 
-/* Click: squash / pulse */
-#mine-btn:active {
-  transform: scale(0.92);
+@keyframes friend-bob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-4px); }
 }
 
-#mine-btn:active .dog-wrap {
-  animation: none;
-  transform: scale(0.96, 0.9);
-}
-
-#mine-btn.clicked {
+/* Click: squash / wag on dog portrait */
+#mine-btn.clicked .dog-actor .dog-art {
   animation: click-squash 0.22s ease-out;
 }
 
-#mine-btn.clicked .dog-wrap {
-  animation: none;
+#mine-btn.wag .dog-actor .dog-art {
+  animation: dog-wag 0.28s ease-in-out;
 }
 
-#mine-btn.wag .dog-wrap {
-  animation: dog-wag 0.28s ease-in-out;
+#mine-btn.clicked.wag .dog-actor .dog-art {
+  animation: click-squash 0.22s ease-out, dog-wag 0.28s ease-in-out;
 }
 
 @keyframes click-squash {
@@ -298,8 +364,8 @@ header h1 {
 
 @keyframes dog-wag {
   0%, 100% { transform: rotate(0deg) translateY(0); }
-  25% { transform: rotate(-6deg) translateY(-2px); }
-  75% { transform: rotate(6deg) translateY(-1px); }
+  25% { transform: rotate(-8deg) translateY(-3px); }
+  75% { transform: rotate(8deg) translateY(-2px); }
 }
 
 /* Legacy pulse kept for compatibility */
@@ -592,16 +658,24 @@ header h1 {
 
 @media (prefers-reduced-motion: reduce) {
   .dog-wrap,
+  .dog-actor,
+  .dog-art,
+  .friend-art,
   #mine-btn.clicked,
   #mine-btn.pulse,
   .panel-section.panel-fade,
   #mine-btn.wag .dog-wrap,
+  #mine-btn.wag .dog-actor .dog-art,
+  #mine-btn.clicked .dog-actor .dog-art,
   .hint-first {
     animation: none !important;
   }
   .fx-heart,
   .fx-sparkle {
     animation-duration: 0.01ms;
+  }
+  .dog-actor {
+    transition: none !important;
   }
 }
 
@@ -1604,21 +1678,28 @@ header h1 {
   }
 }
 
-/* ——— v4: friend avatar ——— */
+/* ——— v4/v5: friend avatar on kennel roof ——— */
 .friend-art {
   position: absolute;
-  right: 6%;
-  bottom: 10%;
-  width: 28%;
-  height: 28%;
+  left: 50%;
+  top: -6px;
+  width: 44px;
+  height: 44px;
+  transform: translateX(-50%);
   object-fit: cover;
   object-position: center 40%;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 4px 12px rgba(92, 64, 51, 0.28);
-  z-index: 3;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 12px rgba(92, 64, 51, 0.32);
+  z-index: 4;
   pointer-events: none;
   background: #fff5eb;
+  animation: friend-bob 2.6s ease-in-out infinite;
+}
+
+.friend-art[hidden] {
+  display: none !important;
+  animation: none;
 }
 
 .season-stat .stat-value {
@@ -1834,7 +1915,7 @@ header h1 {
 .energy-wrap {
   position: relative;
   z-index: 2;
-  width: min(78vw, 260px);
+  width: min(92%, 320px);
   margin: 10px auto 0;
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.72);

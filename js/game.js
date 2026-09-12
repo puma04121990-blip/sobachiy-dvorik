@@ -937,6 +937,120 @@ function startGame() {
     renderConsumables(); renderStats(); scheduleSave();
   }
 
+
+  function createYardDog() {
+    const actor = $('#dogActor');
+    const stage = $('#mine-btn');
+    if (!actor || !stage) {
+      return { start: function () {}, stop: function () {} };
+    }
+
+    const ACTOR_W = 88;
+    const KENNEL_RESERVE = 102;
+    const WALK_SPEED = 56;
+    let mode = 'walk';
+    let dir = 1;
+    let x = 16;
+    let modeUntil = 0;
+    let raf = 0;
+    let running = false;
+    let lastTs = 0;
+
+    function prefersReduced() {
+      try {
+        return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function rand(a, b) {
+      return a + Math.random() * (b - a);
+    }
+
+    function walkBounds() {
+      const w = stage.clientWidth || 280;
+      const minX = 8;
+      const maxX = Math.max(minX, w - ACTOR_W - KENNEL_RESERVE);
+      return { minX: minX, maxX: maxX, sitX: maxX };
+    }
+
+    function schedule(now) {
+      if (mode === 'walk') modeUntil = now + rand(4000, 8000);
+      else modeUntil = now + rand(2000, 4000);
+    }
+
+    function paint() {
+      const sx = dir < 0 ? -1 : 1;
+      actor.style.transform = 'translate3d(' + x.toFixed(1) + 'px,0,0) scaleX(' + sx + ')';
+      actor.dataset.mode = mode;
+    }
+
+    function tick(ts) {
+      if (!running || destroyed) return;
+      raf = requestAnimationFrame(tick);
+      if (document.visibilityState === 'hidden') {
+        lastTs = 0;
+        return;
+      }
+      if (!lastTs) lastTs = ts;
+      const dt = Math.min(0.05, (ts - lastTs) / 1000);
+      lastTs = ts;
+
+      if (prefersReduced()) {
+        const b = walkBounds();
+        mode = 'sit';
+        x = b.sitX;
+        dir = 1;
+        paint();
+        return;
+      }
+
+      if (ts >= modeUntil) {
+        if (mode === 'walk') {
+          mode = 'sit';
+          const b = walkBounds();
+          x = b.sitX;
+          dir = 1;
+        } else {
+          mode = 'walk';
+          if (Math.random() < 0.55) dir *= -1;
+        }
+        schedule(ts);
+      }
+
+      if (mode === 'walk') {
+        const b = walkBounds();
+        x += dir * WALK_SPEED * dt;
+        if (x <= b.minX) { x = b.minX; dir = 1; }
+        if (x >= b.maxX) { x = b.maxX; dir = -1; }
+      }
+
+      paint();
+    }
+
+    return {
+      start: function () {
+        if (running) return;
+        running = true;
+        const b = walkBounds();
+        x = Math.min(Math.max(x, b.minX), b.maxX);
+        mode = prefersReduced() ? 'sit' : 'walk';
+        if (mode === 'sit') { x = b.sitX; dir = 1; }
+        schedule(performance.now());
+        lastTs = 0;
+        paint();
+        raf = requestAnimationFrame(tick);
+      },
+      stop: function () {
+        running = false;
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0;
+        lastTs = 0;
+      }
+    };
+  }
+
   function applyBreedArt() {
     const img = $('#dogArt');
     const breed = getBreed();
@@ -3339,6 +3453,9 @@ function startGame() {
     applyBreedArt();
     applyYardArt();
     applyFriendArt();
+    const yardDog = createYardDog();
+    yardDog.start();
+    cleanups.push(function () { try { yardDog.stop(); } catch (_) {} });
     updateSeasonUI();
     if (window.I18n) {
       window.I18n.applyDom();
