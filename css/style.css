@@ -257,7 +257,7 @@ header h1 {
 
 @keyframes dog-sit-idle {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+  50% { transform: translateY(-2px); }
 }
 
 #dogActor.dog-sit-idle .dog-sprite,
