@@ -941,13 +941,15 @@ function startGame() {
   function createYardDog() {
     const actor = $('#dogActor');
     const stage = $('#mine-btn');
+    const sprite = $('#dogSprite');
     if (!actor || !stage) {
       return { start: function () {}, stop: function () {} };
     }
 
-    const ACTOR_W = 88;
+    const ACTOR_W = 96;
     const KENNEL_RESERVE = 102;
     const WALK_SPEED = 56;
+    const FRAME_FPS = 8;
     let mode = 'walk';
     let dir = 1;
     let x = 16;
@@ -955,6 +957,9 @@ function startGame() {
     let raf = 0;
     let running = false;
     let lastTs = 0;
+    let frame = 0;
+    let frameAcc = 0;
+    let lastAppliedMode = '';
 
     function prefersReduced() {
       try {
@@ -980,10 +985,35 @@ function startGame() {
       else modeUntil = now + rand(2000, 4000);
     }
 
+    function applySpriteMode(force) {
+      if (!sprite) return;
+      if (!force && mode === lastAppliedMode) return;
+      lastAppliedMode = mode;
+      const walkSrc = actor.dataset.walkSrc || '';
+      const sitSrc = actor.dataset.sitSrc || '';
+      if (mode === 'sit') {
+        if (sitSrc) sprite.style.backgroundImage = 'url("' + sitSrc + '")';
+        sprite.style.backgroundSize = '100% 100%';
+        sprite.style.backgroundPosition = '0 0';
+        frame = 0;
+        frameAcc = 0;
+      } else {
+        if (walkSrc) sprite.style.backgroundImage = 'url("' + walkSrc + '")';
+        sprite.style.backgroundSize = '400% 100%';
+        sprite.style.backgroundPosition = '0 0';
+        frame = 0;
+        frameAcc = 0;
+      }
+    }
+
     function paint() {
       const sx = dir < 0 ? -1 : 1;
       actor.style.transform = 'translate3d(' + x.toFixed(1) + 'px,0,0) scaleX(' + sx + ')';
       actor.dataset.mode = mode;
+      applySpriteMode(false);
+      if (sprite && mode === 'walk') {
+        sprite.style.backgroundPosition = '-' + (frame * 25) + '% 0';
+      }
     }
 
     function tick(ts) {
@@ -1017,6 +1047,7 @@ function startGame() {
           if (Math.random() < 0.55) dir *= -1;
         }
         schedule(ts);
+        applySpriteMode(true);
       }
 
       if (mode === 'walk') {
@@ -1024,6 +1055,12 @@ function startGame() {
         x += dir * WALK_SPEED * dt;
         if (x <= b.minX) { x = b.minX; dir = 1; }
         if (x >= b.maxX) { x = b.maxX; dir = -1; }
+        frameAcc += dt;
+        const frameDur = 1 / FRAME_FPS;
+        while (frameAcc >= frameDur) {
+          frameAcc -= frameDur;
+          frame = (frame + 1) % 4;
+        }
       }
 
       paint();
@@ -1039,6 +1076,8 @@ function startGame() {
         if (mode === 'sit') { x = b.sitX; dir = 1; }
         schedule(performance.now());
         lastTs = 0;
+        lastAppliedMode = '';
+        applySpriteMode(true);
         paint();
         raf = requestAnimationFrame(tick);
       },
@@ -1053,8 +1092,33 @@ function startGame() {
 
   function applyBreedArt() {
     const img = $('#dogArt');
+    const sprite = $('#dogSprite');
+    const actor = $('#dogActor');
     const breed = getBreed();
-    if (img && breed) img.src = breed.src;
+    if (!breed) return;
+    if (img && !img.hasAttribute('hidden')) img.src = breed.src;
+    else if (img && breed.src) img.src = breed.src;
+    const walkSrc = breed.walkSrc || '';
+    const sitSrc = breed.sitSrc || '';
+    if (actor) {
+      actor.dataset.walkSrc = walkSrc;
+      actor.dataset.sitSrc = sitSrc;
+      actor.dataset.frameW = String(breed.frameW || 192);
+      actor.dataset.frameH = String(breed.frameH || 192);
+      actor.dataset.walkFrames = String(breed.walkFrames || 4);
+    }
+    if (sprite) {
+      const mode = (actor && actor.dataset.mode) || 'walk';
+      if (mode === 'sit' && sitSrc) {
+        sprite.style.backgroundImage = 'url("' + sitSrc + '")';
+        sprite.style.backgroundSize = '100% 100%';
+        sprite.style.backgroundPosition = '0 0';
+      } else if (walkSrc) {
+        sprite.style.backgroundImage = 'url("' + walkSrc + '")';
+        sprite.style.backgroundSize = '400% 100%';
+        sprite.style.backgroundPosition = '0 0';
+      }
+    }
   }
   function applyYardArt() {
     const bg = $('#yard-bg');

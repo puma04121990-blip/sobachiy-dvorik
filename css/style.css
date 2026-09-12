@@ -226,13 +226,31 @@ header h1 {
   position: absolute;
   left: 0;
   bottom: 10px;
-  width: 88px;
-  height: 88px;
+  width: 96px;
+  height: 96px;
   z-index: 3;
   pointer-events: none;
   will-change: transform;
   transform: translate3d(12%, 0, 0);
   transform-origin: center bottom;
+  overflow: hidden;
+}
+
+.dog-sprite {
+  width: 100%;
+  height: 100%;
+  background-size: 400% 100%;
+  background-repeat: no-repeat;
+  background-position: 0 0;
+  image-rendering: auto;
+  display: block;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 12px rgba(92, 64, 51, 0.35));
+}
+
+.dog-actor[data-mode="sit"] .dog-sprite {
+  background-size: 100% 100%;
+  background-position: 0 0;
 }
 
 .dog-art {
@@ -245,6 +263,10 @@ header h1 {
   pointer-events: none;
   filter: saturate(1.08) contrast(1.06) drop-shadow(0 6px 12px rgba(92, 64, 51, 0.35));
   background: rgba(255, 245, 235, 0.35);
+}
+
+.dog-art[hidden] {
+  display: none !important;
 }
 
 .kennel {
@@ -307,15 +329,18 @@ header h1 {
   50% { transform: translateX(-50%) translateY(-4px); }
 }
 
-/* Click: squash / wag on dog portrait */
+/* Click: squash / wag on yard dog sprite (and legacy .dog-art) */
+#mine-btn.clicked .dog-actor .dog-sprite,
 #mine-btn.clicked .dog-actor .dog-art {
   animation: click-squash 0.22s ease-out;
 }
 
+#mine-btn.wag .dog-actor .dog-sprite,
 #mine-btn.wag .dog-actor .dog-art {
   animation: dog-wag 0.28s ease-in-out;
 }
 
+#mine-btn.clicked.wag .dog-actor .dog-sprite,
 #mine-btn.clicked.wag .dog-actor .dog-art {
   animation: click-squash 0.22s ease-out, dog-wag 0.28s ease-in-out;
 }
@@ -624,13 +649,16 @@ header h1 {
 @media (prefers-reduced-motion: reduce) {
   .dog-wrap,
   .dog-actor,
+  .dog-sprite,
   .dog-art,
   .friend-art,
   #mine-btn.clicked,
   #mine-btn.pulse,
   .panel-section.panel-fade,
   #mine-btn.wag .dog-wrap,
+  #mine-btn.wag .dog-actor .dog-sprite,
   #mine-btn.wag .dog-actor .dog-art,
+  #mine-btn.clicked .dog-actor .dog-sprite,
   #mine-btn.clicked .dog-actor .dog-art,
   .hint-first {
     animation: none !important;
