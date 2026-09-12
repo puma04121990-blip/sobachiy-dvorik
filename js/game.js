@@ -949,7 +949,7 @@ function startGame() {
     const ACTOR_W = 96;
     const KENNEL_RESERVE = 102;
     const WALK_SPEED = 50;
-    const FRAME_FPS = Math.max(5, Math.min(9, WALK_SPEED / 8));
+    const FRAME_FPS = Math.max(10, Math.min(12, WALK_SPEED / 4.5));
     const TRANS_FPS = 11;
     const APPROACH_SNAP = 4;
     let mode = 'walk';
@@ -986,7 +986,7 @@ function startGame() {
 
     function walkFrameCount() {
       const n = Number(actor.dataset.walkFrames);
-      return n > 0 ? n : 6;
+      return n > 0 ? n : 8;
     }
 
     function sitdownFrameCount() {
@@ -1291,7 +1291,7 @@ function startGame() {
       actor.dataset.standupSrc = standupSrc;
       actor.dataset.frameW = String(breed.frameW || 192);
       actor.dataset.frameH = String(breed.frameH || 192);
-      actor.dataset.walkFrames = String(breed.walkFrames || 6);
+      actor.dataset.walkFrames = String(breed.walkFrames || 8);
       actor.dataset.sitdownFrames = String(breed.sitdownFrames || 4);
     }
     if (sprite) {
@@ -1302,7 +1302,7 @@ function startGame() {
         sprite.style.backgroundPosition = '0 0';
       } else if (walkSrc) {
         sprite.style.backgroundImage = 'url("' + walkSrc + '")';
-        const frames = Number((actor && actor.dataset.walkFrames) || 6) || 6;
+        const frames = Number((actor && actor.dataset.walkFrames) || 8) || 8;
         const w = sprite.clientWidth || 96;
         sprite.style.backgroundSize = (frames * w) + 'px 100%';
         sprite.style.backgroundPosition = '0 0';
