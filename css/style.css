@@ -249,64 +249,29 @@ header h1 {
 
 .kennel {
   position: absolute;
-  right: 10px;
-  bottom: 8px;
-  width: 90px;
-  height: 78px;
+  right: 2%;
+  bottom: 2px;
+  width: 42%;
+  max-width: 150px;
+  height: auto;
   z-index: 2;
   pointer-events: none;
 }
 
-.kennel-body {
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 0;
-  height: 46px;
-  background:
-    linear-gradient(180deg, #c48a52 0%, #a56b3a 55%, #8a5530 100%);
-  border: 2px solid #6e4020;
-  border-radius: 4px 4px 2px 2px;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 220, 170, 0.25),
-    0 4px 10px rgba(92, 64, 51, 0.28);
+.kennel-art {
+  width: 100%;
+  height: auto;
+  display: block;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(92, 64, 51, 0.35));
 }
 
+/* Legacy CSS kennel parts — neutralized (sprite kennel used instead) */
+.kennel-roof,
+.kennel-body,
+.kennel-roof::after,
 .kennel-body::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 0;
-  transform: translateX(-50%);
-  width: 28px;
-  height: 30px;
-  background: #3a2818;
-  border-radius: 14px 14px 2px 2px;
-  box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.45);
-}
-
-.kennel-roof {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 10px;
-  height: 0;
-  border-left: 45px solid transparent;
-  border-right: 45px solid transparent;
-  border-bottom: 28px solid #8b4e2a;
-  filter: drop-shadow(0 2px 2px rgba(92, 64, 51, 0.35));
-}
-
-.kennel-roof::after {
-  content: '';
-  position: absolute;
-  left: -40px;
-  top: 4px;
-  width: 0;
-  height: 0;
-  border-left: 40px solid transparent;
-  border-right: 40px solid transparent;
-  border-bottom: 22px solid #a86234;
+  display: none !important;
 }
 
 .mine-label {
@@ -1679,12 +1644,14 @@ header h1 {
 }
 
 /* ——— v4/v5: friend avatar on kennel roof ——— */
-.friend-art {
+.friend-art,
+.friend-on-roof {
   position: absolute;
   left: 50%;
-  top: -6px;
-  width: 44px;
-  height: 44px;
+  top: 12%;
+  width: 32%;
+  height: auto;
+  aspect-ratio: 1;
   transform: translateX(-50%);
   object-fit: cover;
   object-position: center 40%;
