@@ -1493,7 +1493,9 @@ function startGame() {
       const card = document.createElement('div');
       card.className = 'story-card' + (unlocked ? '' : ' locked') + (unlocked && !read ? ' unread' : '') + (read ? ' read' : '');
       let badge = !unlocked ? '<span class="story-badge">🔒</span>' : (!read ? '<span class="story-badge">' + tr('story_new') + '</span>' : '<span class="story-badge">✓</span>');
-      card.innerHTML = '<span class="item-icon">' + (idx + 1) + '</span><div class="story-body"><div class="story-name">' + ((window.I18n && I18n.storyOf) ? I18n.storyOf(ch).title : ch.title) + '</div><div class="story-desc">' + (unlocked ? (read ? tr('story_reread') : tr('story_tap')) : tr('story_locked')) + '</div>' + (unlocked ? '<button type="button" class="btn btn-sm" data-story="' + ch.id + '">' + (read ? tr('story_reread_btn') : tr('story_read_btn')) + '</button>' : '') + '</div>' + badge;
+      const storyTitle = escapeHtml(((window.I18n && I18n.storyOf) ? I18n.storyOf(ch).title : ch.title) || '');
+      const storyId = escapeHtml(ch.id);
+      card.innerHTML = '<span class="item-icon">' + (idx + 1) + '</span><div class="story-body"><div class="story-name">' + storyTitle + '</div><div class="story-desc">' + (unlocked ? (read ? tr('story_reread') : tr('story_tap')) : tr('story_locked')) + '</div>' + (unlocked ? '<button type="button" class="btn btn-sm" data-story="' + storyId + '">' + (read ? tr('story_reread_btn') : tr('story_read_btn')) + '</button>' : '') + '</div>' + badge;
       root.appendChild(card);
     });
     root.querySelectorAll('[data-story]').forEach(function (btn) {
