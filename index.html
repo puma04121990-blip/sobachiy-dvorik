@@ -65,8 +65,9 @@
         <img id="kennelArt" class="kennel-art" src="assets/kennel.webp" alt="" decoding="async" />
         <img id="friendArt" class="friend-art friend-on-roof" alt="" hidden />
       </div>
-      <div class="dog-actor" id="dogActor">
-        <img id="dogArt" src="assets/dog-click.webp" alt="" class="dog-art" decoding="async" fetchpriority="high" />
+      <div class="dog-actor" id="dogActor" data-mode="walk">
+        <div id="dogSprite" class="dog-sprite" aria-hidden="true"></div>
+        <img id="dogArt" class="dog-art" alt="" hidden />
       </div>
       <span class="mine-label" data-i18n="pet_btn">ПОЧЕСАТЬ</span>
     </button>
