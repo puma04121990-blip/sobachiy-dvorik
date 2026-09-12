@@ -60,11 +60,15 @@
 
   <section class="mine-area" id="mine-area">
     <div class="yard-bg" id="yard-bg" aria-hidden="true"></div>
-    <button type="button" id="mine-btn" aria-label="Почесать пёсика" data-i18n-aria="pet_aria">
-      <span class="dog-wrap" aria-hidden="true">
+    <button type="button" id="mine-btn" class="yard-stage" aria-label="Почесать пёсика" data-i18n-aria="pet_aria">
+      <div class="kennel" aria-hidden="true">
+        <img id="friendArt" class="friend-art friend-on-roof" alt="" hidden />
+        <div class="kennel-roof"></div>
+        <div class="kennel-body"></div>
+      </div>
+      <div class="dog-actor" id="dogActor">
         <img id="dogArt" src="assets/dog-click.webp" alt="" class="dog-art" decoding="async" fetchpriority="high" />
-        <img id="friendArt" class="friend-art" alt="" hidden />
-      </span>
+      </div>
       <span class="mine-label" data-i18n="pet_btn">ПОЧЕСАТЬ</span>
     </button>
     <p class="hint-first" id="hint-first" hidden data-i18n="first_hint">Нажмите на пёсика — или пробел</p>
