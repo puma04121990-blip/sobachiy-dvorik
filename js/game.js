@@ -647,7 +647,6 @@ function startGame() {
 
   function setTab(tab) {
     if (tab === 'gpshop') tab = 'shop';
-    if (tab === 'story') tab = 'shop';
     if (!tab || tab === 'more') return;
     if (tab !== activeTab && window.Sounds && window.Sounds.playUi) window.Sounds.playUi();
     activeTab = tab;
@@ -678,6 +677,7 @@ function startGame() {
     else if (activeTab === 'yard') renderYards();
     else if (activeTab === 'album') renderAlbum();
     else if (activeTab === 'season') renderSeason();
+    else if (activeTab === 'story') renderStory();
     else if (activeTab === 'quests') renderQuests();
     else if (activeTab === 'achievements') renderAchievements();
     else if (activeTab === 'prestige') renderPrestige();
@@ -819,7 +819,27 @@ function startGame() {
         btn.classList.remove('locked');
       });
     }
-    if (comboRoot) comboRoot.innerHTML = '';
+    if (comboRoot) {
+      ensureCardCombo();
+      const ids = pickDailyCardCombo(state.cardComboDay || localDayKey());
+      const hits = ids.filter(function (id) { return state.cardComboHits && state.cardComboHits[id]; }).length;
+      const done = !!state.cardComboClaimed;
+      const ready = !done && hits >= ids.length && ids.length > 0;
+      comboRoot.hidden = false;
+      const icons = ids.map(function (id) {
+        const c = SKILL_CARDS_BY_ID[id];
+        const hit = state.cardComboHits && state.cardComboHits[id];
+        const ico = c && c.icon ? c.icon : '❔';
+        return '<span class="card-combo-ico' + (hit ? ' on' : '') + '">' + ico + '</span>';
+      }).join('');
+      let action = '';
+      if (done) action = '<span class="card-combo-meta">' + tr('combo_done') + '</span>';
+      else if (ready) action = '<button type="button" class="btn btn-sm" data-claim-combo="1">' + tr('combo_claim') + '</button>';
+      else action = '<span class="card-combo-meta">' + tr('combo_go') + ' · ' + hits + '/' + ids.length + '</span>';
+      comboRoot.innerHTML = '<div class="card-combo-title">' + tr('combo_h') + '</div><div class="card-combo-row">' + icons + '</div>' + action;
+      const claimBtn = comboRoot.querySelector('[data-claim-combo]');
+      if (claimBtn) claimBtn.addEventListener('click', function (e) { e.preventDefault(); claimCardCombo(); });
+    }
     if (!grid) return;
     grid.innerHTML = '';
     SKILL_CARDS.forEach(function (c) {
