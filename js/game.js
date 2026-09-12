@@ -949,7 +949,7 @@ function startGame() {
     const ACTOR_W = 96;
     const KENNEL_RESERVE = 102;
     const WALK_SPEED = 50;
-    const FRAME_FPS = Math.max(10, Math.min(12, WALK_SPEED / 4.5));
+    const FRAME_FPS = 11;
     const TRANS_FPS = 11;
     const APPROACH_SNAP = 4;
     let mode = 'walk';
@@ -1106,13 +1106,12 @@ function startGame() {
 
     function enterApproach() {
       mode = 'approach';
-      pendingDir = null;
       setSitIdle(false);
       setSpriteXform(null);
       applyWalkSheet();
       const b = walkBounds();
-      if (x < b.sitX) dir = 1;
-      else if (x > b.sitX) dir = -1;
+      if (x < b.sitX) requestDir(1);
+      else if (x > b.sitX) requestDir(-1);
     }
 
     function enterSitdown(now) {
@@ -1149,6 +1148,7 @@ function startGame() {
       mode = 'walk';
       setSitIdle(false);
       setSpriteXform(null);
+      if (sprite) sprite.style.transform = '';
       applyWalkSheet();
       // Apply flip on sit exit (stride restart) so scaleX does not mid-stride flip
       if (flipMaybe && Math.random() < 0.55) {
@@ -1204,8 +1204,7 @@ function startGame() {
           pendingDir = null;
           enterSitdown(ts);
         } else {
-          dir = x < b.sitX ? 1 : -1;
-          pendingDir = null;
+          requestDir(x < b.sitX ? 1 : -1);
           x += dir * WALK_SPEED * dt;
           if ((dir > 0 && x >= b.sitX) || (dir < 0 && x <= b.sitX)) {
             x = b.sitX;
@@ -1278,8 +1277,10 @@ function startGame() {
     const actor = $('#dogActor');
     const breed = getBreed();
     if (!breed) return;
-    if (img && !img.hasAttribute('hidden')) img.src = breed.src;
-    else if (img && breed.src) img.src = breed.src;
+    if (img) {
+      img.setAttribute('hidden', '');
+      if (breed.src) img.src = breed.src;
+    }
     const walkSrc = breed.walkSrc || '';
     const sitSrc = breed.sitSrc || '';
     const sitdownSrc = breed.sitdownSrc || '';

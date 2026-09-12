@@ -239,13 +239,13 @@ header h1 {
 .dog-sprite {
   width: 100%;
   height: 100%;
-  background-size: 400% 100%;
+  /* Walk/sheet sizing comes from JS (N * w px); do not force % here or the whole sheet shows */
   background-repeat: no-repeat;
   background-position: 0 0;
   image-rendering: auto;
   display: block;
   pointer-events: none;
-  filter: drop-shadow(0 6px 12px rgba(92, 64, 51, 0.35));
+  filter: none; /* drop-shadow looked like a second dog / ghost trail */
   transform-origin: 50% 100%;
   transition: none;
 }
@@ -277,6 +277,8 @@ header h1 {
   background: rgba(255, 245, 235, 0.35);
 }
 
+#dogArt,
+#dogArt[hidden],
 .dog-art[hidden] {
   display: none !important;
 }
