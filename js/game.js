@@ -1493,9 +1493,7 @@ function startGame() {
       const card = document.createElement('div');
       card.className = 'story-card' + (unlocked ? '' : ' locked') + (unlocked && !read ? ' unread' : '') + (read ? ' read' : '');
       let badge = !unlocked ? '<span class="story-badge">🔒</span>' : (!read ? '<span class="story-badge">' + tr('story_new') + '</span>' : '<span class="story-badge">✓</span>');
-      const storyTitle = escapeHtml(((window.I18n && I18n.storyOf) ? I18n.storyOf(ch).title : ch.title) || '');
-      const storyId = escapeHtml(ch.id);
-      card.innerHTML = '<span class="item-icon">' + (idx + 1) + '</span><div class="story-body"><div class="story-name">' + storyTitle + '</div><div class="story-desc">' + (unlocked ? (read ? tr('story_reread') : tr('story_tap')) : tr('story_locked')) + '</div>' + (unlocked ? '<button type="button" class="btn btn-sm" data-story="' + storyId + '">' + (read ? tr('story_reread_btn') : tr('story_read_btn')) + '</button>' : '') + '</div>' + badge;
+      card.innerHTML = '<span class="item-icon">' + (idx + 1) + '</span><div class="story-body"><div class="story-name">' + ((window.I18n && I18n.storyOf) ? I18n.storyOf(ch).title : ch.title) + '</div><div class="story-desc">' + (unlocked ? (read ? tr('story_reread') : tr('story_tap')) : tr('story_locked')) + '</div>' + (unlocked ? '<button type="button" class="btn btn-sm" data-story="' + ch.id + '">' + (read ? tr('story_reread_btn') : tr('story_read_btn')) + '</button>' : '') + '</div>' + badge;
       root.appendChild(card);
     });
     root.querySelectorAll('[data-story]').forEach(function (btn) {
@@ -2738,74 +2736,16 @@ function startGame() {
 
   function migrateSave(data) {
     if (!data || typeof data !== 'object') return null;
-    const out = window.GameCore && window.GameCore.normalizeSave
-      ? window.GameCore.normalizeSave(data)
-      : Object.assign({}, data);
+    let out;
+    if (window.GameCore && window.GameCore.applyVersionMigrations) {
+      out = window.GameCore.applyVersionMigrations(data, SAVE_VERSION, { energyMaxBase: ENERGY_MAX_BASE });
+    } else {
+      out = window.GameCore && window.GameCore.normalizeSave
+        ? window.GameCore.normalizeSave(data)
+        : Object.assign({}, data);
+    }
     if (!out) return null;
-    const ver = Number(out.v) || 1;
-    if (ver < 2) {
-      out.prestigeLevel = Number(out.prestigeLevel) || 0;
-      out.medals = Number(out.medals) || 0;
-      out.selectedBreed = out.selectedBreed || 'lab';
-      out.unlockedBreeds = Array.isArray(out.unlockedBreeds) ? out.unlockedBreeds : ['lab'];
-      if (out.unlockedBreeds.indexOf('lab') === -1) out.unlockedBreeds.unshift('lab');
-      out.stats = out.stats || {};
-      out.stats.totalClicks = Number(out.stats.totalClicks) || 0;
-      out.stats.lifetimeBones = Number(out.stats.lifetimeBones) || Number(out.ore) || 0;
-      out.stats.upgradesBought = Number(out.stats.upgradesBought) || 0;
-      out.achievementsClaimed = out.achievementsClaimed || {};
-      out.quests = Array.isArray(out.quests) ? out.quests : [];
-      out.questDaySeed = out.questDaySeed || '';
-      out.joyUntil = Number(out.joyUntil) || 0;
-      out.joyReadyAt = Number(out.joyReadyAt) || 0;
-      out.levels = Object.assign(defaultLevels(), out.levels || {});
-    }
-    if (ver < 3) {
-      out.selectedYard = out.selectedYard || 'sunny';
-      out.unlockedYards = Array.isArray(out.unlockedYards) ? out.unlockedYards : ['sunny'];
-      if (out.unlockedYards.indexOf('sunny') === -1) out.unlockedYards.unshift('sunny');
-      out.inventory = out.inventory || { boneBoost: 0 };
-      if (out.inventory.boneBoost == null) out.inventory.boneBoost = 0;
-      out.activeItem = out.activeItem || null;
-      out.storyRead = out.storyRead || {};
-      out.stats = out.stats || {};
-      out.stats.eventsDone = Number(out.stats.eventsDone) || 0;
-      out.nextEventAt = Number(out.nextEventAt) || 0;
-      out.eventReadyType = out.eventReadyType || null;
-      out.levels = Object.assign(defaultLevels(), out.levels || {});
-    }
-    if (ver < 4) {
-      out.stickers = Array.isArray(out.stickers) ? out.stickers : [];
-      out.stickerSetsClaimed = (out.stickerSetsClaimed && typeof out.stickerSetsClaimed === 'object' && !Array.isArray(out.stickerSetsClaimed)) ? out.stickerSetsClaimed : {};
-      out.unlockedFriends = Array.isArray(out.unlockedFriends) ? out.unlockedFriends : [];
-      out.activeFriend = out.activeFriend || null;
-      {
-        const ac = Number(out.acorns);
-        out.acorns = isFinite(ac) && ac > 0 ? ac : 0;
-      }
-      out.seasonBoostUntil = Number(out.seasonBoostUntil) || 0;
-      if (!isFinite(out.seasonBoostUntil)) out.seasonBoostUntil = 0;
-      out.seasonPurchases = (out.seasonPurchases && typeof out.seasonPurchases === 'object' && !Array.isArray(out.seasonPurchases)) ? out.seasonPurchases : {};
-      out.unlockedYards = Array.isArray(out.unlockedYards) ? out.unlockedYards : ['sunny'];
-    }
-    if (ver < 5) {
-      out.medalUpgrades = (out.medalUpgrades && typeof out.medalUpgrades === 'object' && !Array.isArray(out.medalUpgrades)) ? out.medalUpgrades : {};
-      out.energy = isFinite(Number(out.energy)) ? Number(out.energy) : ENERGY_MAX_BASE;
-      out.energyRestReadyAt = Number(out.energyRestReadyAt) || 0;
-      out.activeWalk = out.activeWalk && typeof out.activeWalk === 'object' ? out.activeWalk : null;
-      out.yardStage = Math.max(1, Number(out.yardStage) || 1);
-      out.dailyGoals = Array.isArray(out.dailyGoals) ? out.dailyGoals : [];
-      out.dailyDayKey = out.dailyDayKey || '';
-      out.dailyStreak = Number(out.dailyStreak) || 0;
-      out.dailyLastClearDay = out.dailyLastClearDay || '';
-      out.questStreak = Number(out.questStreak) || 0;
-      out.questLastClearDay = out.questLastClearDay || '';
-      out.questClaimsToday = Number(out.questClaimsToday) || 0;
-      out.stats = out.stats || {};
-      out.stats.walksDone = Number(out.stats.walksDone) || 0;
-      // Old saves may feel rich briefly under new costs — intentional soft migrate
-    }
-    // Training tree: default 0s, never wipe existing progress
+    // Training tree:    // Training tree: default 0s, never wipe existing progress
     {
       const baseT = defaultTrainingLevels();
       const srcT = (out.levelsTraining && typeof out.levelsTraining === 'object' && !Array.isArray(out.levelsTraining)) ? out.levelsTraining : {};
