@@ -950,6 +950,7 @@ function startGame() {
     const KENNEL_RESERVE = 102;
     const WALK_SPEED = 56;
     const FRAME_FPS = 8;
+    const APPROACH_SNAP = 4;
     let mode = 'walk';
     let dir = 1;
     let x = 16;
@@ -959,7 +960,9 @@ function startGame() {
     let lastTs = 0;
     let frame = 0;
     let frameAcc = 0;
-    let lastAppliedMode = '';
+    let sheet = '';
+    let transStart = 0;
+    let transDur = 0;
 
     function prefersReduced() {
       try {
@@ -980,29 +983,70 @@ function startGame() {
       return { minX: minX, maxX: maxX, sitX: maxX };
     }
 
-    function schedule(now) {
-      if (mode === 'walk') modeUntil = now + rand(4000, 8000);
-      else modeUntil = now + rand(2000, 4000);
+    function walkFrameCount() {
+      const n = Number(actor.dataset.walkFrames);
+      return n > 0 ? n : 4;
     }
 
-    function applySpriteMode(force) {
+    function schedule(now) {
+      if (mode === 'walk') modeUntil = now + rand(4000, 8000);
+      else if (mode === 'sit') modeUntil = now + rand(2000, 4000);
+      else modeUntil = now + 1e12;
+    }
+
+    function setSitIdle(on) {
+      if (on) actor.classList.add('dog-sit-idle');
+      else actor.classList.remove('dog-sit-idle');
+    }
+
+    function setSpriteXform(scaleY, ty) {
       if (!sprite) return;
-      if (!force && mode === lastAppliedMode) return;
-      lastAppliedMode = mode;
+      if (scaleY == null) {
+        sprite.style.transform = '';
+        return;
+      }
+      sprite.style.transform = 'translateY(' + ty.toFixed(2) + 'px) scaleY(' + scaleY.toFixed(3) + ')';
+    }
+
+    function paintWalkFrame() {
+      if (!sprite) return;
+      const frames = walkFrameCount();
+      const w = sprite.clientWidth || 96;
+      const f = ((frame % frames) + frames) % frames;
+      sprite.style.backgroundSize = (frames * w) + 'px 100%';
+      sprite.style.backgroundPosition = (-f * w) + 'px 0';
+    }
+
+    function applyWalkSheet() {
+      if (!sprite) return;
       const walkSrc = actor.dataset.walkSrc || '';
+      if (walkSrc) sprite.style.backgroundImage = 'url("' + walkSrc + '")';
+      paintWalkFrame();
+      sheet = 'walk';
+    }
+
+    function applySitSheet() {
+      if (!sprite) return;
       const sitSrc = actor.dataset.sitSrc || '';
-      if (mode === 'sit') {
-        if (sitSrc) sprite.style.backgroundImage = 'url("' + sitSrc + '")';
-        sprite.style.backgroundSize = '100% 100%';
-        sprite.style.backgroundPosition = '0 0';
-        frame = 0;
-        frameAcc = 0;
-      } else {
-        if (walkSrc) sprite.style.backgroundImage = 'url("' + walkSrc + '")';
-        sprite.style.backgroundSize = '400% 100%';
-        sprite.style.backgroundPosition = '0 0';
-        frame = 0;
-        frameAcc = 0;
+      if (sitSrc) sprite.style.backgroundImage = 'url("' + sitSrc + '")';
+      sprite.style.backgroundSize = '100% 100%';
+      sprite.style.backgroundPosition = '0 0';
+      frame = 0;
+      frameAcc = 0;
+      sheet = 'sit';
+    }
+
+    function easeOut(t) {
+      return 1 - (1 - t) * (1 - t);
+    }
+
+    function advanceWalkFrames(dt, fps) {
+      frameAcc += dt;
+      const frameDur = 1 / Math.max(0.5, fps);
+      const frames = walkFrameCount();
+      while (frameAcc >= frameDur) {
+        frameAcc -= frameDur;
+        frame = (frame + 1) % frames;
       }
     }
 
@@ -1010,10 +1054,55 @@ function startGame() {
       const sx = dir < 0 ? -1 : 1;
       actor.style.transform = 'translate3d(' + x.toFixed(1) + 'px,0,0) scaleX(' + sx + ')';
       actor.dataset.mode = mode;
-      applySpriteMode(false);
-      if (sprite && mode === 'walk') {
-        sprite.style.backgroundPosition = '-' + (frame * 25) + '% 0';
+      if (sheet === 'walk' && (mode === 'walk' || mode === 'approach' || mode === 'sitdown' || mode === 'standup')) {
+        paintWalkFrame();
       }
+    }
+
+    function enterApproach() {
+      mode = 'approach';
+      setSitIdle(false);
+      setSpriteXform(null);
+      applyWalkSheet();
+      const b = walkBounds();
+      if (x < b.sitX) dir = 1;
+      else if (x > b.sitX) dir = -1;
+    }
+
+    function enterSitdown(now) {
+      mode = 'sitdown';
+      transStart = now;
+      transDur = rand(450, 550);
+      setSitIdle(false);
+      applyWalkSheet();
+    }
+
+    function enterSit(now) {
+      const b = walkBounds();
+      mode = 'sit';
+      x = b.sitX;
+      dir = 1;
+      applySitSheet();
+      setSpriteXform(null);
+      setSitIdle(!prefersReduced());
+      schedule(now);
+    }
+
+    function enterStandup(now) {
+      mode = 'standup';
+      transStart = now;
+      transDur = 350;
+      setSitIdle(false);
+      applySitSheet();
+    }
+
+    function enterWalk(now, flipMaybe) {
+      mode = 'walk';
+      setSitIdle(false);
+      setSpriteXform(null);
+      applyWalkSheet();
+      if (flipMaybe && Math.random() < 0.55) dir *= -1;
+      schedule(now);
     }
 
     function tick(ts) {
@@ -1032,35 +1121,74 @@ function startGame() {
         mode = 'sit';
         x = b.sitX;
         dir = 1;
+        applySitSheet();
+        setSitIdle(false);
+        setSpriteXform(null);
         paint();
         return;
       }
 
-      if (ts >= modeUntil) {
-        if (mode === 'walk') {
-          mode = 'sit';
-          const b = walkBounds();
-          x = b.sitX;
-          dir = 1;
+      if (mode === 'walk') {
+        if (ts >= modeUntil) {
+          enterApproach();
         } else {
-          mode = 'walk';
-          if (Math.random() < 0.55) dir *= -1;
+          const b = walkBounds();
+          x += dir * WALK_SPEED * dt;
+          if (x <= b.minX) { x = b.minX; dir = 1; }
+          if (x >= b.maxX) { x = b.maxX; dir = -1; }
+          advanceWalkFrames(dt, FRAME_FPS);
         }
-        schedule(ts);
-        applySpriteMode(true);
       }
 
-      if (mode === 'walk') {
+      if (mode === 'approach') {
         const b = walkBounds();
-        x += dir * WALK_SPEED * dt;
-        if (x <= b.minX) { x = b.minX; dir = 1; }
-        if (x >= b.maxX) { x = b.maxX; dir = -1; }
-        frameAcc += dt;
-        const frameDur = 1 / FRAME_FPS;
-        while (frameAcc >= frameDur) {
-          frameAcc -= frameDur;
-          frame = (frame + 1) % 4;
+        if (Math.abs(x - b.sitX) < APPROACH_SNAP) {
+          x = b.sitX;
+          dir = 1;
+          enterSitdown(ts);
+        } else {
+          dir = x < b.sitX ? 1 : -1;
+          x += dir * WALK_SPEED * dt;
+          if ((dir > 0 && x >= b.sitX) || (dir < 0 && x <= b.sitX)) {
+            x = b.sitX;
+            dir = 1;
+            enterSitdown(ts);
+          } else {
+            advanceWalkFrames(dt, FRAME_FPS);
+          }
         }
+      }
+
+      if (mode === 'sitdown') {
+        const p = Math.min(1, (ts - transStart) / transDur);
+        if (p < 0.45) {
+          const u = p / 0.45;
+          if (sheet !== 'walk') applyWalkSheet();
+          setSpriteXform(1 - u * (1 - 0.82), u * 6);
+          advanceWalkFrames(dt, FRAME_FPS * 0.45);
+        } else {
+          if (sheet !== 'sit') applySitSheet();
+          const e = easeOut((p - 0.45) / 0.55);
+          setSpriteXform(0.88 + e * (1 - 0.88), (1 - e) * 4);
+        }
+        if (p >= 1) enterSit(ts);
+      } else if (mode === 'sit') {
+        x = walkBounds().sitX;
+        dir = 1;
+        if (ts >= modeUntil) enterStandup(ts);
+      } else if (mode === 'standup') {
+        const p = Math.min(1, (ts - transStart) / transDur);
+        if (p < 0.45) {
+          const u = p / 0.45;
+          if (sheet !== 'sit') applySitSheet();
+          setSpriteXform(1 - u * (1 - 0.88), u * 4);
+        } else {
+          if (sheet !== 'walk') applyWalkSheet();
+          const e = easeOut((p - 0.45) / 0.55);
+          setSpriteXform(0.82 + e * (1 - 0.82), (1 - e) * 6);
+          advanceWalkFrames(dt, FRAME_FPS * 0.6);
+        }
+        if (p >= 1) enterWalk(ts, true);
       }
 
       paint();
@@ -1072,12 +1200,21 @@ function startGame() {
         running = true;
         const b = walkBounds();
         x = Math.min(Math.max(x, b.minX), b.maxX);
-        mode = prefersReduced() ? 'sit' : 'walk';
-        if (mode === 'sit') { x = b.sitX; dir = 1; }
+        if (prefersReduced()) {
+          mode = 'sit';
+          x = b.sitX;
+          dir = 1;
+          applySitSheet();
+          setSitIdle(false);
+          setSpriteXform(null);
+        } else {
+          mode = 'walk';
+          applyWalkSheet();
+          setSitIdle(false);
+          setSpriteXform(null);
+        }
         schedule(performance.now());
         lastTs = 0;
-        lastAppliedMode = '';
-        applySpriteMode(true);
         paint();
         raf = requestAnimationFrame(tick);
       },
@@ -1115,7 +1252,9 @@ function startGame() {
         sprite.style.backgroundPosition = '0 0';
       } else if (walkSrc) {
         sprite.style.backgroundImage = 'url("' + walkSrc + '")';
-        sprite.style.backgroundSize = '400% 100%';
+        const frames = Number((actor && actor.dataset.walkFrames) || 4) || 4;
+        const w = sprite.clientWidth || 96;
+        sprite.style.backgroundSize = (frames * w) + 'px 100%';
         sprite.style.backgroundPosition = '0 0';
       }
     }

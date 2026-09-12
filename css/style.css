@@ -246,11 +246,23 @@ header h1 {
   display: block;
   pointer-events: none;
   filter: drop-shadow(0 6px 12px rgba(92, 64, 51, 0.35));
+  transform-origin: 50% 100%;
+  transition: none;
 }
 
 .dog-actor[data-mode="sit"] .dog-sprite {
   background-size: 100% 100%;
   background-position: 0 0;
+}
+
+@keyframes dog-sit-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+#dogActor.dog-sit-idle .dog-sprite,
+#dogActor[data-mode="sit"] .dog-sprite {
+  animation: dog-sit-idle 2.2s ease-in-out infinite;
 }
 
 .dog-art {
@@ -660,6 +672,8 @@ header h1 {
   #mine-btn.wag .dog-actor .dog-art,
   #mine-btn.clicked .dog-actor .dog-sprite,
   #mine-btn.clicked .dog-actor .dog-art,
+  #dogActor.dog-sit-idle .dog-sprite,
+  #dogActor[data-mode="sit"] .dog-sprite,
   .hint-first {
     animation: none !important;
   }
