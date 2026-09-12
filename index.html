@@ -129,6 +129,10 @@
           <span class="more-ico" aria-hidden="true">🍂</span>
           <span class="more-txt" data-i18n="tab_season">Сезон</span>
         </button>
+        <button type="button" class="more-item" data-tab="story" role="menuitem">
+          <span class="more-ico" aria-hidden="true">📖</span>
+          <span class="more-txt" data-i18n="tab_story">История</span>
+        </button>
         <button type="button" class="more-item" data-tab="quests" role="menuitem">
           <span class="more-ico" aria-hidden="true">🎯</span>
           <span class="more-txt" data-i18n="tab_quests">Квесты</span>
@@ -159,6 +163,7 @@
 
   <section class="panel-section" id="panel-cards" data-panel="cards" hidden>
     <h2 data-i18n="cards_h">Стая дворика</h2>
+    <div id="card-combo" class="card-combo" hidden></div>
     <div class="card-cats" id="card-cats" role="tablist" aria-label="Ветки стаи">
       <button type="button" class="card-cat active" data-card-cat="crew">
         <span class="card-cat-name" data-i18n="cat_crew">Команда</span>
@@ -208,6 +213,12 @@
     <p class="panel-hint" id="season-hint" data-i18n="season_hint">Собирайте жёлуди кликами и мини-играми.</p>
     <div class="season-banner-inline" id="season-banner-inline" data-i18n="season_inline">Фестиваль активен! Жёлуди капают с почесушек.</div>
     <div id="season-shop"></div>
+  </section>
+
+  <section class="panel-section" id="panel-story" data-panel="story" hidden>
+    <h2 data-i18n="story_h">История дворика</h2>
+    <p class="panel-hint" data-i18n="story_hint">Открывайте главы по мере прогресса.</p>
+    <div id="story"></div>
   </section>
 
   <section class="panel-section" id="panel-quests" data-panel="quests" hidden>
@@ -322,6 +333,14 @@
       <div class="game-score"><span data-i18n="race_score">Ритм:</span> <strong id="race-score">0%</strong></div>
       <button type="button" class="btn btn-tap-frenzy" id="race-tap" data-i18n="race_tap">ТАП!</button>
       <p class="game-hint" id="race-hint" data-i18n="race_keep">Держите темп — не слишком редко!</p>
+    </div>
+  </div>
+
+  <div id="story-modal" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-labelledby="story-modal-title">
+      <h3 id="story-modal-title"></h3>
+      <div id="story-lines" class="story-lines"></div>
+      <button type="button" class="btn" id="story-next" data-i18n="next">Дальше</button>
     </div>
   </div>
 
