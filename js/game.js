@@ -950,6 +950,9 @@ function startGame() {
     const KENNEL_RESERVE = 102;
     const WALK_SPEED = 50;
     const FRAME_FPS = 11;
+    const IDLE_FPS = 6;
+    const SIT_FPS = 5;
+    const REACTION_FPS = 10;
     const TRANS_FPS = 11;
     const APPROACH_SNAP = 4;
     let mode = 'walk';
@@ -964,6 +967,7 @@ function startGame() {
     let frameAcc = 0;
     let sheet = '';
     let transStart = 0;
+    let reactionUntil = 0;
 
     function prefersReduced() {
       try {
@@ -994,9 +998,15 @@ function startGame() {
       return n > 0 ? n : 4;
     }
 
+    function frameCount(name, fallback) {
+      const n = Number(actor.dataset[name + 'Frames']);
+      return n > 0 ? n : fallback;
+    }
+
     function schedule(now) {
       if (mode === 'walk') modeUntil = now + rand(4000, 8000);
-      else if (mode === 'sit') modeUntil = now + rand(2000, 4000);
+      else if (mode === 'sit') modeUntil = now + rand(2200, 4200);
+      else if (mode === 'idle') modeUntil = now + rand(1200, 2400);
       else modeUntil = now + 1e12;
     }
 
@@ -1034,15 +1044,24 @@ function startGame() {
       sheet = 'walk';
     }
 
+    function applyIdleSheet() {
+      if (!sprite) return;
+      const src = actor.dataset.idleSrc || '';
+      if (src) sprite.style.backgroundImage = 'url("' + src + '")';
+      frame = 0;
+      frameAcc = 0;
+      sheet = 'idle';
+      paintSheetFrame(frameCount('idle', 7));
+    }
+
     function applySitSheet() {
       if (!sprite) return;
       const sitSrc = actor.dataset.sitSrc || '';
       if (sitSrc) sprite.style.backgroundImage = 'url("' + sitSrc + '")';
-      sprite.style.backgroundSize = '100% 100%';
-      sprite.style.backgroundPosition = '0 0';
       frame = 0;
       frameAcc = 0;
       sheet = 'sit';
+      paintSheetFrame(frameCount('sit', 7));
     }
 
     function applySitdownSheet() {
@@ -1062,7 +1081,17 @@ function startGame() {
       frame = 0;
       frameAcc = 0;
       sheet = 'standup';
-      paintSheetFrame(sitdownFrameCount());
+      paintSheetFrame(frameCount('standup', 6));
+    }
+
+    function applyReactionSheet() {
+      if (!sprite) return;
+      const src = actor.dataset.reactionSrc || '';
+      if (src) sprite.style.backgroundImage = 'url("' + src + '")';
+      frame = 0;
+      frameAcc = 0;
+      sheet = 'reaction';
+      paintSheetFrame(frameCount('reaction', 7));
     }
 
     function advanceWalkFrames(dt, fps) {
@@ -1076,6 +1105,15 @@ function startGame() {
           dir = pendingDir;
           pendingDir = null;
         }
+      }
+    }
+
+    function advanceLoopFrames(dt, fps, frames) {
+      frameAcc += dt;
+      const frameDur = 1 / Math.max(0.5, fps);
+      while (frameAcc >= frameDur) {
+        frameAcc -= frameDur;
+        frame = (frame + 1) % frames;
       }
     }
 
@@ -1100,7 +1138,13 @@ function startGame() {
       } else if (mode === 'sitdown' && sheet === 'sitdown') {
         paintSheetFrame(sitdownFrameCount());
       } else if (mode === 'standup' && sheet === 'standup') {
-        paintSheetFrame(sitdownFrameCount());
+        paintSheetFrame(frameCount('standup', 6));
+      } else if (mode === 'idle' && sheet === 'idle') {
+        paintSheetFrame(frameCount('idle', 7));
+      } else if (mode === 'sit' && sheet === 'sit') {
+        paintSheetFrame(frameCount('sit', 7));
+      } else if (mode === 'reaction' && sheet === 'reaction') {
+        paintSheetFrame(frameCount('reaction', 7));
       }
     }
 
@@ -1142,6 +1186,26 @@ function startGame() {
       setSitIdle(false);
       setSpriteXform(null);
       applyStandupSheet();
+    }
+
+    function enterIdle(now) {
+      mode = 'idle';
+      pendingDir = null;
+      applyIdleSheet();
+      setSitIdle(false);
+      setSpriteXform(null);
+      schedule(now);
+    }
+
+    function enterReaction(now) {
+      reactionUntil = now + 720;
+      if (mode === 'reaction') return;
+      mode = 'reaction';
+      pendingDir = null;
+      dir = 1;
+      applyReactionSheet();
+      setSitIdle(false);
+      setSpriteXform(null);
     }
 
     function enterWalk(now, flipMaybe) {
@@ -1217,6 +1281,11 @@ function startGame() {
         }
       }
 
+      if (mode === 'idle') {
+        advanceLoopFrames(dt, IDLE_FPS, frameCount('idle', 7));
+        if (ts >= modeUntil) enterWalk(ts, true);
+      }
+
       if (mode === 'sitdown') {
         const frames = sitdownFrameCount();
         const elapsed = (ts - transStart) / 1000;
@@ -1225,16 +1294,25 @@ function startGame() {
       } else if (mode === 'sit') {
         x = walkBounds().sitX;
         dir = 1;
+        advanceLoopFrames(dt, SIT_FPS, frameCount('sit', 7));
         if (ts >= modeUntil) enterStandup(ts);
       } else if (mode === 'standup') {
-        const frames = sitdownFrameCount();
+        const frames = frameCount('standup', 6);
         const elapsed = (ts - transStart) / 1000;
         frame = Math.min(frames - 1, Math.floor(elapsed * TRANS_FPS));
-        if (elapsed >= frames / TRANS_FPS) enterWalk(ts, true);
+        if (elapsed >= frames / TRANS_FPS) enterIdle(ts);
+      } else if (mode === 'reaction') {
+        advanceLoopFrames(dt, REACTION_FPS, frameCount('reaction', 7));
+        if (ts >= reactionUntil) enterWalk(ts, false);
       }
 
       paint();
     }
+
+    function onReact() {
+      if (!prefersReduced()) enterReaction(performance.now());
+    }
+    stage.addEventListener('dog:react', onReact);
 
     return {
       start: function () {
@@ -1264,6 +1342,7 @@ function startGame() {
       },
       stop: function () {
         running = false;
+        stage.removeEventListener('dog:react', onReact);
         if (raf) cancelAnimationFrame(raf);
         raf = 0;
         lastTs = 0;
@@ -1282,24 +1361,46 @@ function startGame() {
       if (breed.src) img.src = breed.src;
     }
     const walkSrc = breed.walkSrc || '';
+    const idleSrc = breed.idleSrc || '';
     const sitSrc = breed.sitSrc || '';
     const sitdownSrc = breed.sitdownSrc || '';
     const standupSrc = breed.standupSrc || '';
+    const reactionSrc = breed.reactionSrc || '';
     if (actor) {
       actor.dataset.walkSrc = walkSrc;
+      actor.dataset.idleSrc = idleSrc;
       actor.dataset.sitSrc = sitSrc;
       actor.dataset.sitdownSrc = sitdownSrc;
       actor.dataset.standupSrc = standupSrc;
+      actor.dataset.reactionSrc = reactionSrc;
       actor.dataset.frameW = String(breed.frameW || 192);
       actor.dataset.frameH = String(breed.frameH || 192);
       actor.dataset.walkFrames = String(breed.walkFrames || 8);
       actor.dataset.sitdownFrames = String(breed.sitdownFrames || 4);
+      actor.dataset.idleFrames = String(breed.idleFrames || 7);
+      actor.dataset.sitFrames = String(breed.sitFrames || 7);
+      actor.dataset.standupFrames = String(breed.standupFrames || 6);
+      actor.dataset.reactionFrames = String(breed.reactionFrames || 7);
     }
     if (sprite) {
       const mode = (actor && actor.dataset.mode) || 'walk';
       if (mode === 'sit' && sitSrc) {
         sprite.style.backgroundImage = 'url("' + sitSrc + '")';
-        sprite.style.backgroundSize = '100% 100%';
+        const frames = Number((actor && actor.dataset.sitFrames) || 7) || 7;
+        const w = sprite.clientWidth || 96;
+        sprite.style.backgroundSize = (frames * w) + 'px 100%';
+        sprite.style.backgroundPosition = '0 0';
+      } else if (mode === 'idle' && idleSrc) {
+        sprite.style.backgroundImage = 'url("' + idleSrc + '")';
+        const frames = Number((actor && actor.dataset.idleFrames) || 7) || 7;
+        const w = sprite.clientWidth || 96;
+        sprite.style.backgroundSize = (frames * w) + 'px 100%';
+        sprite.style.backgroundPosition = '0 0';
+      } else if (mode === 'reaction' && reactionSrc) {
+        sprite.style.backgroundImage = 'url("' + reactionSrc + '")';
+        const frames = Number((actor && actor.dataset.reactionFrames) || 7) || 7;
+        const w = sprite.clientWidth || 96;
+        sprite.style.backgroundSize = (frames * w) + 'px 100%';
         sprite.style.backgroundPosition = '0 0';
       } else if (walkSrc) {
         sprite.style.backgroundImage = 'url("' + walkSrc + '")';
@@ -2956,6 +3057,7 @@ function startGame() {
       void btn.offsetWidth;
       btn.classList.add('clicked');
       if (Math.random() < 0.28 || state.combo >= 1.5) btn.classList.add('wag');
+      btn.dispatchEvent(new Event('dog:react'));
       setTimeout(function () { btn.classList.remove('clicked', 'wag'); }, 240);
     }
     let x = window.innerWidth / 2;
