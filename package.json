@@ -4,7 +4,7 @@
   "version": "5.1.0",
   "description": "Dog Yard Clicker static HTML5 game",
   "scripts": {
-    "test": "node tests/game-core.test.js && node tests/content.test.js",
-    "check": "node --check js/game-core.js && node --check js/content.js && node --check js/gp-bridge.js && node --check js/sounds.js && node --check js/i18n.js && node --check js/game.js"
+    "test": "node tests/game-core.test.js && node tests/content.test.js && node tests/dog-animation.test.js && node tests/economy.test.js",
+    "check": "node --check js/game-core.js && node --check js/content.js && node --check js/gp-bridge.js && node --check js/sounds.js && node --check js/i18n.js && node --check js/game.js && node --check js/economy.js"
   }
 }

@@ -155,6 +155,11 @@ function applyVersionMigrations(data, targetVersion, options) {
     out.cardComboClaimed = !!out.cardComboClaimed;
   }
 
+  if (ver < 9 && out.activeWalk) {
+    out.activeWalk = Object.assign({}, out.activeWalk, {
+      legacyEntryCost: ({short:40,park:400,long:3200})[out.activeWalk.tierId] || 0
+    });
+  }
   out.v = target;
   return out;
 }

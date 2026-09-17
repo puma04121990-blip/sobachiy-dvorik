@@ -6,16 +6,8 @@
     return;
   }
 
-/**
- * Собачий дворик — idle/clicker (cute dogs theme) · content pack v5 (retention)
- *
- * ——— BALANCE CONSTANTS (документация) ———
- * Hamster-style cards: linear +X/sec per level, geometric cost, max 20.
- * Later cards in a tree pay more; first-buy payback stays ~3–12 min.
- * Shop is early click + small helpers; cards are the idle engine.
- * No idle softcap. Click softcap is a gentle curve @400 / 0.7.
- * Prestige 2e8 × 2.2^level. Medals +2%/medal + shop in Выставка.
- */
+/** Dog care economy: fixed walk quotes, stable activity rewards and bounded daily tasks.
+ * See docs/economy-audit.md for formulas, migration rules and simulation limits. */
 function startGame() {
   'use strict';
   const cleanups = [];
@@ -50,8 +42,15 @@ function startGame() {
     defaultLevels, defaultTrainingLevels, defaultCardLevels, fmtStatic,
   } = Game;
 
+  const Economy = window.DogEconomy;
+  let lastPetAt = null;
+  let eventUnit = .5;
+  let toyLastAttempt = -Infinity;
+  let trainMistakes = 0;
+  let hideShowing = false;
   const state = {
     ore: 0,
+    incomeBySource: {},
     levels: defaultLevels(),
     levelsTraining: defaultTrainingLevels(),
     levelsCards: defaultCardLevels(),
@@ -223,7 +222,10 @@ function startGame() {
     return 1 + getTrainingSum('allIncome');
   }
   function isPackCatOwned(cat) {
-    return !!(state.packUnlocked && state.packUnlocked[cat]);
+    return !!(state.packUnlocked && state.packUnlocked[cat]) ||
+      (cat === 'crew' && state.stats.walksDone >= 2) ||
+      (cat === 'district' && state.stats.eventsDone >= 2) ||
+      (cat === 'special' && state.yardStage >= 2);
   }
   function grantPackCat(cat) {
     if (!state.packUnlocked) state.packUnlocked = defaultPackUnlocks();
@@ -292,7 +294,7 @@ function startGame() {
     if (e < 15) return ENERGY_TIRED_MULT + (1 - ENERGY_TIRED_MULT) * (e / 15);
     return 1;
   }
-  function getClickPower() {
+  function getClickPower(stable) {
     let p = BASE_CLICK;
     for (const u of Object.values(UPGRADES)) p += (state.levels[u.id] || 0) * u.clickPower;
     p = softcapValue(p, CLICK_SOFTCAP, SOFTCAP_POWER);
@@ -304,16 +306,16 @@ function startGame() {
     p *= getMedalShopMult('click');
     p *= getYardStageMult();
     p *= getVipMult();
-    p *= Math.min(COMBO_MAX, Math.max(1, state.combo));
-    if (Date.now() < state.joyUntil) p *= JOY_MULT;
-    p *= getItemMult();
-    if (Date.now() < (state.seasonBoostUntil || 0)) p *= SEASON_BOOST_MULT;
-    p *= getEnergyClickMult();
+    if (!stable) {
+      p *= Math.min(COMBO_MAX, Math.max(1, state.combo));
+      p *= Math.max(getItemMult(), Date.now() < (state.seasonBoostUntil || 0) ? SEASON_BOOST_MULT : 1);
+      p *= getEnergyClickMult();
+    }
     p *= getTrainingAllIncomeMult();
     if (!isFinite(p) || p < 0) return BASE_CLICK * ENERGY_TIRED_MULT;
     return p;
   }
-  function getIdleMult() {
+  function getIdleMult(stable) {
     let m = 1;
     for (const u of Object.values(UPGRADES)) m += (state.levels[u.id] || 0) * u.idleMult;
     m += getTrainingSum('idleMult');
@@ -325,18 +327,22 @@ function startGame() {
     m *= getYardStageMult();
     m *= getVipMult();
     m *= getTrainingAllIncomeMult();
-    if (Date.now() < state.adBoostUntil) m *= AD_BOOST_MULT;
-    m *= getItemMult();
-    if (Date.now() < (state.seasonBoostUntil || 0)) m *= SEASON_BOOST_MULT;
+    if (!stable) m *= Math.max(Date.now() < state.adBoostUntil ? AD_BOOST_MULT : 1, getItemMult(), Date.now() < (state.seasonBoostUntil || 0) ? SEASON_BOOST_MULT : 1);
     if (!isFinite(m) || m < 0) return 1;
     return m;
   }
-  function getOrePerSec() {
+  function getOrePerSec(stable) {
     let r = 0;
     for (const u of Object.values(UPGRADES)) r += (state.levels[u.id] || 0) * u.orePerSec;
     r += getCardOrePerSec();
-    const out = r * getIdleMult();
+    const out = r * getIdleMult(stable);
     return isFinite(out) && out > 0 ? out : 0;
+  }
+  function economyRate() { return Economy.rate(getOrePerSec(true), getClickPower(true)); }
+  function creditBones(amount, source, countsAsEarning) {
+    const credited = Economy.credit(state, amount, source);
+    if (countsAsEarning && credited) bumpQuest('earn', credited);
+    return credited;
   }
   function getOfflineCapSec() {
     return OFFLINE_CAP_SEC + (state.levels.bed || 0) * OFFLINE_BED_BONUS_SEC;
@@ -460,24 +466,6 @@ function startGame() {
     if (s < 90) return tr('payback_s', { n: Math.max(1, Math.ceil(s)) });
     if (s < 3600) return tr('payback_m', { n: Math.max(1, Math.round(s / 60)) });
     return tr('payback_h', { n: (s / 3600).toFixed(1) });
-  }
-  function pickDailyCardCombo(seed) {
-    const ids = SKILL_CARD_IDS.slice();
-    const out = [];
-    for (let i = 0; i < 3 && ids.length; i++) {
-      const idx = Math.floor(seededRand(seed, 40 + i) * ids.length);
-      out.push(ids.splice(idx, 1)[0]);
-    }
-    return out;
-  }
-  function ensureCardCombo() {
-    const key = localDayKey();
-    if (state.cardComboDay !== key) {
-      state.cardComboDay = key;
-      state.cardComboHits = {};
-      state.cardComboClaimed = false;
-    }
-    if (!state.cardComboHits || typeof state.cardComboHits !== 'object') state.cardComboHits = {};
   }
   function fmt(n) {
     if (!isFinite(n)) return '0';
@@ -702,7 +690,7 @@ function startGame() {
     }
     if (u.orePerSec) {
       arrow(fmt(lvl * u.orePerSec) + tr('per_sec'), fmt((lvl + 1) * u.orePerSec) + tr('per_sec'));
-      extra(tr('plus_ops_lvl', { n: fmt(u.orePerSec) }) + ' · ' + fmtPayback(cost / u.orePerSec));
+      extra(tr('plus_ops_lvl', { n: fmt(u.orePerSec) }) + ' · ' + fmtPayback(cost / (u.orePerSec * getIdleMult(true))));
     }
     if (u.clickPct) {
       arrow('+' + fmtPct(lvl * u.clickPct) + '%', '+' + fmtPct((lvl + 1) * u.clickPct) + '%');
@@ -808,8 +796,6 @@ function startGame() {
   }
 
   function renderSkillCards() {
-    ensureCardCombo();
-    const comboRoot = $('#card-combo');
     const grid = $('#skill-cards');
     const cats = $('#card-cats');
     if (cats) {
@@ -818,27 +804,6 @@ function startGame() {
         btn.classList.toggle('active', cat === activeCardCat);
         btn.classList.remove('locked');
       });
-    }
-    if (comboRoot) {
-      ensureCardCombo();
-      const ids = pickDailyCardCombo(state.cardComboDay || localDayKey());
-      const hits = ids.filter(function (id) { return state.cardComboHits && state.cardComboHits[id]; }).length;
-      const done = !!state.cardComboClaimed;
-      const ready = !done && hits >= ids.length && ids.length > 0;
-      comboRoot.hidden = false;
-      const icons = ids.map(function (id) {
-        const c = SKILL_CARDS_BY_ID[id];
-        const hit = state.cardComboHits && state.cardComboHits[id];
-        const ico = c && c.icon ? c.icon : '❔';
-        return '<span class="card-combo-ico' + (hit ? ' on' : '') + '">' + ico + '</span>';
-      }).join('');
-      let action = '';
-      if (done) action = '<span class="card-combo-meta">' + tr('combo_done') + '</span>';
-      else if (ready) action = '<button type="button" class="btn btn-sm" data-claim-combo="1">' + tr('combo_claim') + '</button>';
-      else action = '<span class="card-combo-meta">' + tr('combo_go') + ' · ' + hits + '/' + ids.length + '</span>';
-      comboRoot.innerHTML = '<div class="card-combo-title">' + tr('combo_h') + '</div><div class="card-combo-row">' + icons + '</div>' + action;
-      const claimBtn = comboRoot.querySelector('[data-claim-combo]');
-      if (claimBtn) claimBtn.addEventListener('click', function (e) { e.preventDefault(); claimCardCombo(); });
     }
     if (!grid) return;
     grid.innerHTML = '';
@@ -856,13 +821,13 @@ function startGame() {
       card.className = 'skill-card' + (can ? '' : ' disabled') + (unlocked ? '' : ' pack-locked') + (maxed ? ' maxed' : '');
       const now = lvl * (c.orePerSec || 0);
       let desc = '<span class="skill-card-now">' + tr('card_now', { n: fmt(now) }) + '</span>';
-      desc += '<span class="skill-card-next">' + tr('plus_ops_lvl', { n: fmt(c.orePerSec) }) + (unlocked && !maxed ? ' · ' + fmtPayback(cost / c.orePerSec) : '') + '</span>';
+      desc += '<span class="skill-card-next">' + tr('plus_ops_lvl', { n: fmt(c.orePerSec) }) + (unlocked && !maxed ? ' · ' + fmtPayback(cost / (c.orePerSec * getIdleMult(true))) : '') + '</span>';
       if (maxed) desc += '<span class="skill-card-next">' + tr('maxed') + '</span>';
-      const costHtml = !unlocked ? tr('pack_locked_cta') : (maxed ? tr('maxed') : '🦴 ' + fmt(cost));
+      const costHtml = !unlocked ? (!branchOwned ? tr('branch_' + c.cat) : cardUnlockText(c)) : (maxed ? tr('maxed') : '🦴 ' + fmt(cost));
       card.innerHTML = '<div class="skill-card-top"><span class="skill-card-ico">' + c.icon + '</span><span class="skill-card-lvl">' + tr('lvl') + lvl + '</span></div><div class="skill-card-name">' + locn(c) + '</div><div class="skill-card-desc">' + desc + '</div><div class="skill-card-cost">' + costHtml + '</div>';
       card.addEventListener('click', function () {
         if (!unlocked) {
-          if (!branchOwned) { openPackBuyModal(c.cat); return; }
+          if (!branchOwned) { showToast(tr('branch_' + c.cat)); return; }
           showToast(cardUnlockText(c) || tr('locked'));
           return;
         }
@@ -876,7 +841,7 @@ function startGame() {
     const c = SKILL_CARDS_BY_ID[id];
     if (!c) return;
     if (!isPackCardOpen(c)) {
-      if (!isPackCatOwned(c.cat)) { openPackBuyModal(c.cat); return; }
+      if (!isPackCatOwned(c.cat)) { showToast(tr('branch_' + c.cat)); return; }
       showToast(cardUnlockText(c) || tr('locked'));
       return;
     }
@@ -887,25 +852,8 @@ function startGame() {
     state.levelsCards[id] = (state.levelsCards[id] || 0) + 1;
     state.stats.upgradesBought += 1;
     bumpQuest('buy', 1);
-    ensureCardCombo();
-    const comboIds = pickDailyCardCombo(state.cardComboDay || localDayKey());
-    if (comboIds.indexOf(id) !== -1) state.cardComboHits[id] = true;
     if (window.Sounds) window.Sounds.playBuy();
     checkAchievements(); maybeUnlockStory(); renderAll(); scheduleSave();
-  }
-  function claimCardCombo() {
-    ensureCardCombo();
-    if (state.cardComboClaimed) return;
-    const ids = pickDailyCardCombo(state.cardComboDay || localDayKey());
-    if (!ids.every(function (id) { return state.cardComboHits && state.cardComboHits[id]; })) return;
-    const reward = Math.max(80, Math.floor(getOrePerSec() * 90 + getClickPower() * 40));
-    state.cardComboClaimed = true;
-    state.ore += reward;
-    state.stats.lifetimeBones += reward;
-    bumpQuest('earn', reward);
-    if (window.Sounds) window.Sounds.playBuy();
-    showToast(tr('quest_done', { n: fmt(reward) }));
-    renderSkillCards(); renderStats(); scheduleSave();
   }
 
   function renderConsumables() {
@@ -947,9 +895,11 @@ function startGame() {
     }
 
     const ACTOR_W = 96;
-    const KENNEL_RESERVE = 102;
     const WALK_SPEED = 50;
     const FRAME_FPS = 11;
+    const IDLE_FPS = 6;
+    const SIT_FPS = 5;
+    const REACTION_FPS = 10;
     const TRANS_FPS = 11;
     const APPROACH_SNAP = 4;
     let mode = 'walk';
@@ -964,6 +914,31 @@ function startGame() {
     let frameAcc = 0;
     let sheet = '';
     let transStart = 0;
+    let reactionUntil = 0;
+    let activeWalkSrc = '';
+    const decodedSheets = new Map();
+    function sheetsReady() {
+      return ['walk', 'idle', 'sitdown', 'sit', 'standup', 'reaction', 'sitReaction'].map(function (state) {
+        const src = actor.dataset[state + 'Src'];
+        if (!src) return true;
+        if (!decodedSheets.has(src)) {
+          const entry = { ready: false, image: new Image() };
+          decodedSheets.set(src, entry);
+          entry.image.onload = function () {
+            if (entry.image.decode) entry.image.decode().then(function () { entry.ready = true; }).catch(function () { entry.ready = true; });
+            else entry.ready = true;
+          };
+          entry.image.src = src;
+        }
+        return decodedSheets.get(src).ready;
+      }).every(Boolean);
+    }
+    function walkSpeed() {
+      return Number(actor.dataset.walkStride) > 0 ? (actor.clientWidth || ACTOR_W) * Number(actor.dataset.walkStride) / Number(actor.dataset.walkDuration || 1.2) : WALK_SPEED;
+    }
+    function walkFps() { return Number(actor.dataset.walkDuration) > 0 ? walkFrameCount() / Number(actor.dataset.walkDuration) : FRAME_FPS; }
+    function loopFps(fallback) { return Number(actor.dataset.loopFps) || fallback; }
+    function transitionFps() { return Number(actor.dataset.transitionFps) || TRANS_FPS; }
 
     function prefersReduced() {
       try {
@@ -979,8 +954,24 @@ function startGame() {
 
     function walkBounds() {
       const w = stage.clientWidth || 280;
-      const minX = 8;
-      const maxX = Math.max(minX, w - ACTOR_W - KENNEL_RESERVE);
+      const actorW = actor.clientWidth || ACTOR_W;
+      const bg = $('#yard-bg');
+      const kennel = stage.querySelector('.kennel');
+      const h = (bg && bg.clientHeight) || stage.clientHeight || 300;
+      const data = (bg && bg.dataset) || {};
+      const sourceW = Number(data.sourceWidth) || 1536;
+      const sourceH = Number(data.sourceHeight) || 1024;
+      const scale = Math.max(w / sourceW, h / sourceH);
+      const renderedW = sourceW * scale;
+      const cropX = (w - renderedW) / 2;
+      const left = cropX + (Number(data.walkLeft) || 0.30) * renderedW + 6;
+      const right = cropX + (Number(data.walkRight) || 0.80) * renderedW - 6;
+      const kennelW = kennel ? kennel.clientWidth : Math.min(w * 0.42, 150);
+      const kennelLeft = kennel ? kennel.offsetLeft : w * 0.98 - kennelW;
+      // Stop just before the entrance, not in the building's wall.
+      const door = kennelLeft + kennelW * 0.34;
+      const minX = Math.max(6, Math.min(left, w - actorW - 6));
+      const maxX = Math.max(minX, Math.min(right - actorW, door - actorW, w - actorW - 6));
       return { minX: minX, maxX: maxX, sitX: maxX };
     }
 
@@ -994,9 +985,15 @@ function startGame() {
       return n > 0 ? n : 4;
     }
 
+    function frameCount(name, fallback) {
+      const n = Number(actor.dataset[name + 'Frames']);
+      return n > 0 ? n : fallback;
+    }
+
     function schedule(now) {
       if (mode === 'walk') modeUntil = now + rand(4000, 8000);
-      else if (mode === 'sit') modeUntil = now + rand(2000, 4000);
+      else if (mode === 'sit') modeUntil = now + rand(2200, 4200);
+      else if (mode === 'idle') modeUntil = now + rand(1200, 2400);
       else modeUntil = now + 1e12;
     }
 
@@ -1016,6 +1013,11 @@ function startGame() {
 
     function paintSheetFrame(frames) {
       if (!sprite) return;
+      const src = actor.dataset[(sheet === 'sit' && performance.now() < reactionUntil && actor.dataset.sitReactionSrc ? 'sitReaction' : sheet) + 'Src'];
+      if (src && sprite.dataset.sheetSrc !== src) {
+        sprite.style.backgroundImage = 'url("' + src + '")';
+        sprite.dataset.sheetSrc = src;
+      }
       const w = sprite.clientWidth || 96;
       const f = Math.min(frames - 1, Math.max(0, frame | 0));
       sprite.style.backgroundSize = (frames * w) + 'px 100%';
@@ -1029,26 +1031,31 @@ function startGame() {
     function applyWalkSheet() {
       if (!sprite) return;
       const walkSrc = actor.dataset.walkSrc || '';
-      if (walkSrc) sprite.style.backgroundImage = 'url("' + walkSrc + '")';
-      paintWalkFrame();
       sheet = 'walk';
+      paintWalkFrame();
+    }
+
+    function applyIdleSheet() {
+      if (!sprite) return;
+      const src = actor.dataset.idleSrc || '';
+      frame = 0;
+      frameAcc = 0;
+      sheet = 'idle';
+      paintSheetFrame(frameCount('idle', 7));
     }
 
     function applySitSheet() {
       if (!sprite) return;
       const sitSrc = actor.dataset.sitSrc || '';
-      if (sitSrc) sprite.style.backgroundImage = 'url("' + sitSrc + '")';
-      sprite.style.backgroundSize = '100% 100%';
-      sprite.style.backgroundPosition = '0 0';
       frame = 0;
       frameAcc = 0;
       sheet = 'sit';
+      paintSheetFrame(frameCount('sit', 7));
     }
 
     function applySitdownSheet() {
       if (!sprite) return;
       const src = actor.dataset.sitdownSrc || '';
-      if (src) sprite.style.backgroundImage = 'url("' + src + '")';
       frame = 0;
       frameAcc = 0;
       sheet = 'sitdown';
@@ -1058,11 +1065,19 @@ function startGame() {
     function applyStandupSheet() {
       if (!sprite) return;
       const src = actor.dataset.standupSrc || '';
-      if (src) sprite.style.backgroundImage = 'url("' + src + '")';
       frame = 0;
       frameAcc = 0;
       sheet = 'standup';
-      paintSheetFrame(sitdownFrameCount());
+      paintSheetFrame(frameCount('standup', 6));
+    }
+
+    function applyReactionSheet() {
+      if (!sprite) return;
+      const src = actor.dataset.reactionSrc || '';
+      frame = 0;
+      frameAcc = 0;
+      sheet = 'reaction';
+      paintSheetFrame(frameCount('reaction', 7));
     }
 
     function advanceWalkFrames(dt, fps) {
@@ -1079,15 +1094,16 @@ function startGame() {
       }
     }
 
-    function requestDir(next) {
-      if (next === dir && pendingDir == null) return;
-      if (frame === 0) {
-        dir = next;
-        pendingDir = null;
-      } else {
-        pendingDir = next;
+    function advanceLoopFrames(dt, fps, frames) {
+      frameAcc += dt;
+      const frameDur = 1 / Math.max(0.5, fps);
+      while (frameAcc >= frameDur) {
+        frameAcc -= frameDur;
+        frame = (frame + 1) % frames;
       }
     }
+
+    function requestDir(next) { dir = next; pendingDir = null; }
 
     function paint() {
       const sx = dir < 0 ? -1 : 1;
@@ -1100,7 +1116,13 @@ function startGame() {
       } else if (mode === 'sitdown' && sheet === 'sitdown') {
         paintSheetFrame(sitdownFrameCount());
       } else if (mode === 'standup' && sheet === 'standup') {
-        paintSheetFrame(sitdownFrameCount());
+        paintSheetFrame(frameCount('standup', 6));
+      } else if (mode === 'idle' && sheet === 'idle') {
+        paintSheetFrame(frameCount('idle', 7));
+      } else if (mode === 'sit' && sheet === 'sit') {
+        paintSheetFrame(frameCount('sit', 7));
+      } else if (mode === 'reaction' && sheet === 'reaction') {
+        paintSheetFrame(frameCount('reaction', 7));
       }
     }
 
@@ -1144,16 +1166,33 @@ function startGame() {
       applyStandupSheet();
     }
 
+    function enterIdle(now) {
+      mode = 'idle';
+      pendingDir = null;
+      applyIdleSheet();
+      setSitIdle(false);
+      setSpriteXform(null);
+      schedule(now);
+    }
+
+    function enterReaction(now) {
+      reactionUntil = now + 1200;
+      if (mode === 'reaction') return;
+      mode = 'reaction';
+      pendingDir = null;
+      applyReactionSheet();
+      setSitIdle(false);
+      setSpriteXform(null);
+    }
+
     function enterWalk(now, flipMaybe) {
       mode = 'walk';
       setSitIdle(false);
       setSpriteXform(null);
       if (sprite) sprite.style.transform = '';
       applyWalkSheet();
-      // Apply flip on sit exit (stride restart) so scaleX does not mid-stride flip
-      if (flipMaybe && Math.random() < 0.55) {
-        dir *= -1;
-      }
+      // Leave the kennel facing away; never flip right and immediately back left.
+      if (flipMaybe) dir = x >= walkBounds().maxX - 1 ? -1 : 1;
       pendingDir = null;
       frame = 0;
       frameAcc = 0;
@@ -1167,17 +1206,25 @@ function startGame() {
         lastTs = 0;
         return;
       }
+      if (!sheetsReady()) { lastTs = 0; return; }
+      const bounds = walkBounds();
+      x = Math.max(bounds.minX, Math.min(bounds.maxX, x));
       if (!lastTs) lastTs = ts;
       const dt = Math.min(0.05, (ts - lastTs) / 1000);
       lastTs = ts;
 
+      if (activeWalkSrc !== actor.dataset.walkSrc) {
+        activeWalkSrc = actor.dataset.walkSrc;
+        enterWalk(ts, false);
+      }
       if (prefersReduced()) {
         const b = walkBounds();
         mode = 'sit';
         x = b.sitX;
         dir = 1;
         pendingDir = null;
-        applySitSheet();
+        if (sheet !== 'sit') applySitSheet();
+        frame = 0;
         setSitIdle(false);
         setSpriteXform(null);
         paint();
@@ -1189,10 +1236,12 @@ function startGame() {
           enterApproach();
         } else {
           const b = walkBounds();
-          x += dir * WALK_SPEED * dt;
-          if (x <= b.minX) { x = b.minX; requestDir(1); }
-          if (x >= b.maxX) { x = b.maxX; requestDir(-1); }
-          advanceWalkFrames(dt, FRAME_FPS);
+          const oldX = x;
+          x = Math.max(b.minX, Math.min(b.maxX, x + dir * walkSpeed() * dt));
+          advanceWalkFrames(Math.abs(x - oldX) / walkSpeed(), walkFps());
+          if (x <= b.minX) requestDir(1);
+          if (x >= b.maxX) requestDir(-1);
+          if (b.maxX === b.minX) enterIdle(ts);
         }
       }
 
@@ -1205,36 +1254,52 @@ function startGame() {
           enterSitdown(ts);
         } else {
           requestDir(x < b.sitX ? 1 : -1);
-          x += dir * WALK_SPEED * dt;
+          x += dir * walkSpeed() * dt;
           if ((dir > 0 && x >= b.sitX) || (dir < 0 && x <= b.sitX)) {
             x = b.sitX;
             dir = 1;
             pendingDir = null;
             enterSitdown(ts);
           } else {
-            advanceWalkFrames(dt, FRAME_FPS);
+            advanceWalkFrames(dt, walkFps());
           }
         }
+      }
+
+      if (mode === 'idle') {
+        advanceLoopFrames(dt, loopFps(IDLE_FPS), frameCount('idle', 7));
+        if (ts >= modeUntil) enterWalk(ts, true);
       }
 
       if (mode === 'sitdown') {
         const frames = sitdownFrameCount();
         const elapsed = (ts - transStart) / 1000;
-        frame = Math.min(frames - 1, Math.floor(elapsed * TRANS_FPS));
-        if (elapsed >= frames / TRANS_FPS) enterSit(ts);
+        frame = Math.min(frames - 1, Math.floor(elapsed * transitionFps()));
+        if (elapsed >= frames / transitionFps()) enterSit(ts);
       } else if (mode === 'sit') {
         x = walkBounds().sitX;
         dir = 1;
+        advanceLoopFrames(dt, loopFps(SIT_FPS), frameCount('sit', 7));
         if (ts >= modeUntil) enterStandup(ts);
       } else if (mode === 'standup') {
-        const frames = sitdownFrameCount();
+        const frames = frameCount('standup', 6);
         const elapsed = (ts - transStart) / 1000;
-        frame = Math.min(frames - 1, Math.floor(elapsed * TRANS_FPS));
-        if (elapsed >= frames / TRANS_FPS) enterWalk(ts, true);
+        frame = Math.min(frames - 1, Math.floor(elapsed * transitionFps()));
+        if (elapsed >= frames / transitionFps()) enterIdle(ts);
+      } else if (mode === 'reaction') {
+        advanceLoopFrames(dt, loopFps(REACTION_FPS), frameCount('reaction', 7));
+        if (ts >= reactionUntil) enterWalk(ts, false);
       }
 
       paint();
     }
+
+    function onReact() {
+      // Seated petting uses the same pose with only the tail animated.
+      if (mode === 'sit' && !prefersReduced()) { reactionUntil = performance.now() + 1200; modeUntil = Math.max(modeUntil, reactionUntil); }
+      if (!prefersReduced() && (mode === 'walk' || mode === 'idle' || mode === 'reaction')) enterReaction(performance.now());
+    }
+    stage.addEventListener('dog:react', onReact);
 
     return {
       start: function () {
@@ -1264,6 +1329,7 @@ function startGame() {
       },
       stop: function () {
         running = false;
+        stage.removeEventListener('dog:react', onReact);
         if (raf) cancelAnimationFrame(raf);
         raf = 0;
         lastTs = 0;
@@ -1282,38 +1348,47 @@ function startGame() {
       if (breed.src) img.src = breed.src;
     }
     const walkSrc = breed.walkSrc || '';
+    const idleSrc = breed.idleSrc || '';
     const sitSrc = breed.sitSrc || '';
     const sitdownSrc = breed.sitdownSrc || '';
     const standupSrc = breed.standupSrc || '';
+    const reactionSrc = breed.reactionSrc || '';
     if (actor) {
+      actor.dataset.walkStride = String(breed.walkStride || 0);
+      actor.dataset.walkDuration = String(breed.walkDuration || 0);
+      actor.dataset.loopFps = String(breed.loopFps || 0);
+      actor.dataset.transitionFps = String(breed.transitionFps || 0);
       actor.dataset.walkSrc = walkSrc;
+      actor.dataset.idleSrc = idleSrc;
       actor.dataset.sitSrc = sitSrc;
       actor.dataset.sitdownSrc = sitdownSrc;
       actor.dataset.standupSrc = standupSrc;
+      actor.dataset.reactionSrc = reactionSrc;
+      actor.dataset.sitReactionSrc = breed.sitReactionSrc || '';
       actor.dataset.frameW = String(breed.frameW || 192);
       actor.dataset.frameH = String(breed.frameH || 192);
       actor.dataset.walkFrames = String(breed.walkFrames || 8);
       actor.dataset.sitdownFrames = String(breed.sitdownFrames || 4);
+      actor.dataset.idleFrames = String(breed.idleFrames || 7);
+      actor.dataset.sitFrames = String(breed.sitFrames || 7);
+      actor.dataset.standupFrames = String(breed.standupFrames || 6);
+      actor.dataset.reactionFrames = String(breed.reactionFrames || 7);
     }
-    if (sprite) {
-      const mode = (actor && actor.dataset.mode) || 'walk';
-      if (mode === 'sit' && sitSrc) {
-        sprite.style.backgroundImage = 'url("' + sitSrc + '")';
-        sprite.style.backgroundSize = '100% 100%';
-        sprite.style.backgroundPosition = '0 0';
-      } else if (walkSrc) {
-        sprite.style.backgroundImage = 'url("' + walkSrc + '")';
-        const frames = Number((actor && actor.dataset.walkFrames) || 8) || 8;
-        const w = sprite.clientWidth || 96;
-        sprite.style.backgroundSize = (frames * w) + 'px 100%';
-        sprite.style.backgroundPosition = '0 0';
-      }
-    }
+    // Only createYardDog owns sprite image, sheet width and frame position.
+    // UI refreshes and clicks must never reset an active animation.
   }
+
   function applyYardArt() {
     const bg = $('#yard-bg');
     const yard = getYard();
-    if (bg && yard) bg.style.backgroundImage = 'url("' + yard.src + '")';
+    if (bg && yard) {
+      bg.style.backgroundImage = 'url("' + yard.src + '")';
+      const area = yard.walkArea || { left: 0.3, right: 0.8, width: 1536, height: 1024 };
+      bg.dataset.walkLeft = String(area.left);
+      bg.dataset.walkRight = String(area.right);
+      bg.dataset.sourceWidth = String(area.width);
+      bg.dataset.sourceHeight = String(area.height);
+    }
   }
   function applyFriendArt() {
     const img = $('#friendArt');
@@ -1468,9 +1543,9 @@ function startGame() {
         const card = document.createElement('div');
         card.className = 'album-set';
         let btn = '';
-        if (complete && !claimed) btn = '<button type="button" class="btn btn-sm" data-claim-set="' + set.id + '">' + tr('claim_cost', { n: fmt(set.reward) }) + '</button>';
+        if (complete && !claimed) btn = '<button type="button" class="btn btn-sm" data-claim-set="' + set.id + '">' + tr('claim_cost', { n: fmt(albumReward(set)) }) + '</button>';
         else if (claimed) btn = '<span class="breed-active">' + tr('reward_got') + '</span>';
-        card.innerHTML = '<div class="album-set-title">' + locn(set) + '</div><div class="album-set-meta">' + owned + '/' + set.stickers.length + ' · ' + tr('reward_bones', { n: fmt(set.reward) }) + '</div>' + btn;
+        card.innerHTML = '<div class="album-set-title">' + locn(set) + '</div><div class="album-set-meta">' + owned + '/' + set.stickers.length + ' · ' + tr('reward_bones', { n: fmt(albumReward(set)) }) + '</div>' + btn;
         setsRoot.appendChild(card);
       });
       setsRoot.querySelectorAll('[data-claim-set]').forEach(function (btn) {
@@ -1504,9 +1579,8 @@ function startGame() {
     const ok = set.stickers.every(function (sid) { return hasSticker(sid); });
     if (!ok) { showToast(tr('set_incomplete')); return; }
     state.stickerSetsClaimed[id] = true;
-    const reward = Math.max(0, Number(set.reward) || 0);
-    state.ore += reward;
-    state.stats.lifetimeBones += reward;
+    const reward = albumReward(set);
+    creditBones(reward, 'album', false);
     if (window.Sounds) window.Sounds.playBuy();
     showToast(tr('set_done', { name: locn(set), n: fmt(reward) }));
     renderAlbum(); renderStats(); maybeUnlockStory(); scheduleSave();
@@ -1649,12 +1723,9 @@ function startGame() {
     return (h >>> 0) / 4294967296;
   }
   function makeQuestReward(type, target) {
-    const streakBonus = 1 + Math.min(0.5, (state.questStreak || 0) * 0.05);
-    if (type === 'clicks') return Math.floor((50 + target * 1.8) * streakBonus);
-    if (type === 'earn') return Math.floor((target * 0.18 + 120) * streakBonus);
-    if (type === 'buy') return Math.floor((220 + target * 80 + state.stats.upgradesBought * 3) * streakBonus);
-    return Math.floor(120 * streakBonus);
+    return Economy.quest(type, target, economyRate(), getClickPower(true), state.questStreak);
   }
+
   function generateQuests(seed) {
     const used = {};
     const list = [];
@@ -1665,7 +1736,7 @@ function startGame() {
       used[pick] = true;
       const tpl = QUEST_POOL[pick];
       const ti = Math.floor(seededRand(seed, i * 3 + 1) * tpl.targets.length);
-      const target = tpl.targets[ti];
+      const target = tpl.type === 'earn' ? Math.ceil(economyRate() * tpl.targets[ti]) : tpl.targets[ti];
       list.push({ id: seed + '-' + i + '-' + tpl.type, type: tpl.type, target: target, progress: 0, reward: makeQuestReward(tpl.type, target), label: tpl.label(target), claimed: false });
     }
     return list;
@@ -1682,14 +1753,8 @@ function startGame() {
       state.quests = generateQuests(seed);
       return;
     }
-    state.quests = state.quests.filter(function (q) {
-      return !!(q && !q.claimed);
-    });
-    while (state.quests.length < 3) {
-      const extra = generateQuests(seed + '-fix-' + state.quests.length);
-      state.quests.push(extra[0]);
-    }
   }
+
   function bumpQuest(type, amount) {
     ensureQuests();
     ensureDailyGoals();
@@ -1713,22 +1778,17 @@ function startGame() {
     if (!q || q.claimed || q.progress < q.target) return;
     q.claimed = true;
     const reward = Math.max(0, Number(q.reward) || 0);
-    q.reward = 0;
-    state.ore += reward;
-    state.stats.lifetimeBones += reward;
+
+    creditBones(reward, 'quests', false);
     state.questClaimsToday = (state.questClaimsToday || 0) + 1;
-    if (state.questClaimsToday === 3 && state.questLastClearDay !== daySeed()) {
+    if (state.quests.every(function (item) { return item.claimed; }) && state.questLastClearDay !== daySeed()) {
       state.questStreak = (state.questStreak || 0) + 1;
       state.questLastClearDay = daySeed();
+      state.dailyStreak = Math.max(state.dailyStreak || 0, state.questStreak);
       showToast(tr('quest_streak', { n: state.questStreak }));
     }
     if (window.Sounds) window.Sounds.playBuy();
     showToast(tr('quest_done', { n: fmt(reward) }));
-    const tpl = QUEST_POOL.find(function (t) { return t.type === q.type; }) || QUEST_POOL[0];
-    const ti = Math.floor(Math.random() * tpl.targets.length);
-    const target = tpl.targets[ti];
-    const idx = state.quests.indexOf(q);
-    state.quests[idx] = { id: daySeed() + '-r-' + Date.now() + '-' + tpl.type, type: tpl.type, target: target, progress: 0, reward: makeQuestReward(tpl.type, target), label: tpl.label(target), claimed: false };
     renderQuests(); renderStats(); checkAchievements(); maybeUnlockStory(); scheduleSave();
   }
   function questBarPct(item) {
@@ -1798,7 +1858,7 @@ function startGame() {
     const dailyHead = document.createElement('div');
     dailyHead.className = 'section-subhead';
     dailyHead.innerHTML = '<strong>' + tr('daily_h') + '</strong> · ' + (state.dailyStreak || 0);
-    root.appendChild(dailyHead);
+    if ((state.dailyGoals || []).length) root.appendChild(dailyHead);
     (state.dailyGoals || []).forEach(function (g) {
       const done = !g.claimed && g.progress >= g.target;
       const card = document.createElement('div');
@@ -1821,7 +1881,7 @@ function startGame() {
       card.className = 'quest-card' + (done ? ' done' : '');
       card.setAttribute('data-quest-id', q.id);
       const pct = questBarPct(q);
-      card.innerHTML = '<div class="quest-title">' + escapeHtml(qLabel(q)) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(q.progress, q.target)) + ' / ' + fmt(q.target) + ' · ' + tr('reward_bones', { n: fmt(q.reward) }) + '</div>' + (done ? '<button type="button" class="btn btn-sm" data-claim="' + escapeHtml(q.id) + '">' + tr('claim') + '</button>' : '');
+      card.innerHTML = '<div class="quest-title">' + escapeHtml(qLabel(q)) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(q.progress, q.target)) + ' / ' + fmt(q.target) + ' · ' + tr('reward_bones', { n: fmt(q.reward) }) + '</div>' + (q.claimed ? '<span class="breed-active">' + tr('claimed') + '</span>' : done ? '<button type="button" class="btn btn-sm" data-claim="' + escapeHtml(q.id) + '">' + tr('claim') + '</button>' : '');
       root.appendChild(card);
     });
   }
@@ -1834,19 +1894,20 @@ function startGame() {
     });
     if (any && activeTab === 'achievements') renderAchievements();
   }
+  function achievementReward(a) { return Math.min(a.reward, Math.floor(Math.max(60, economyRate() * 120))); }
+  function albumReward(set) { return Math.min(set.reward, Math.floor(Math.max(90, economyRate() * 180))); }
   function claimAchievement(id) {
     const a = ACHIEVEMENTS.find(function (x) { return x.id === id; });
     if (!a || state.achievementsClaimed[id]) return;
     if (!a.check(state)) return;
     state.achievementsClaimed[id] = true;
-    state.ore += a.reward;
-    state.stats.lifetimeBones += a.reward;
+    creditBones(achievementReward(a), 'achievements', false);
     if (id === 'clicks_50') grantSticker('paw');
     if (id === 'bones_1k') grantSticker('bone');
     if (id === 'breed_1') grantSticker('heart');
     if (id === 'prestige_1') grantSticker('medal');
     if (window.Sounds) window.Sounds.playBuy();
-    showToast(tr('ach_done', { n: fmt(a.reward) }));
+    showToast(tr('ach_done', { n: fmt(achievementReward(a)) }));
     renderAchievements(); renderStats(); maybeUnlockStory(); scheduleSave();
   }
   function renderAchievements() {
@@ -1858,7 +1919,7 @@ function startGame() {
       const ready = !claimed && a.check(state);
       const card = document.createElement('div');
       card.className = 'ach-card' + (claimed ? ' claimed' : '') + (ready ? ' ready' : '');
-      card.innerHTML = '<div class="ach-body"><div class="ach-name">' + locn(a) + '</div><div class="ach-desc">' + locd(a) + '</div><div class="ach-reward">🦴 ' + fmt(a.reward) + '</div></div>' + (claimed ? '<span class="ach-status">✓</span>' : ready ? '<button type="button" class="btn btn-sm" data-ach="' + a.id + '">' + tr('claim') + '</button>' : '<span class="ach-status">…</span>');
+      card.innerHTML = '<div class="ach-body"><div class="ach-name">' + locn(a) + '</div><div class="ach-desc">' + locd(a) + '</div><div class="ach-reward">🦴 ' + fmt(achievementReward(a)) + '</div></div>' + (claimed ? '<span class="ach-status">✓</span>' : ready ? '<button type="button" class="btn btn-sm" data-ach="' + a.id + '">' + tr('claim') + '</button>' : '<span class="ach-status">…</span>');
       root.appendChild(card);
     });
     root.querySelectorAll('[data-ach]').forEach(function (btn) {
@@ -1973,6 +2034,7 @@ function startGame() {
   function updateEventBtn() {
     const btn = $('#btn-event');
     if (!btn) return;
+    if (state.activeWalk) { btn.disabled = true; btn.textContent = tr('play_after_walk'); return; }
     if (toyActive || trainActive || hideActive || raceActive) { btn.disabled = true; btn.textContent = tr('event_running'); return; }
     if (state.eventReadyType) { btn.disabled = false; btn.textContent = tr('event_ready'); return; }
     const left = Math.max(0, (state.nextEventAt || 0) - Date.now());
@@ -1986,6 +2048,9 @@ function startGame() {
   }
   function startEvent(forcedType) {
     if (toyActive || trainActive || hideActive || raceActive) return;
+    if (state.activeWalk) { showToast(tr('pet_away')); return; }
+    if (!state.eventReadyType && Date.now() < state.nextEventAt) return;
+    eventUnit = economyRate();
     const type = forcedType || state.eventReadyType || pickEventType();
     hideEventBanner();
     state.eventReadyType = null;
@@ -2008,6 +2073,7 @@ function startGame() {
   function startToyGame() {
     toyActive = true;
     toyTaps = 0;
+    toyLastAttempt = -Infinity;
     toyEndsAt = Date.now() + TOY_DURATION_MS;
     const modal = $('#toy-modal');
     const tapsEl = $('#toy-taps');
@@ -2021,6 +2087,8 @@ function startGame() {
       if (!toyActive) return;
       const left = Math.max(0, toyEndsAt - Date.now());
       if (timerEl) timerEl.textContent = (left / 1000).toFixed(1);
+      const marker = $('#fetch-marker');
+      if (marker) marker.style.left = (Economy.timing(TOY_DURATION_MS - left) * 100) + '%';
       if (left <= 0) { endToyGame(); return; }
       toyRaf = requestAnimationFrame(frame);
     }
@@ -2029,12 +2097,17 @@ function startGame() {
   }
   function toyTap() {
     if (!toyActive) return;
-    toyTaps += 1;
+    const now = Date.now();
+    if (now >= toyEndsAt || now - toyLastAttempt < 1000) return;
+    toyLastAttempt = now;
+    const position = Economy.timing(TOY_DURATION_MS - (toyEndsAt - now));
+    if (position >= .60 && position <= .85) toyTaps += 1;
     const tapsEl = $('#toy-taps');
     if (tapsEl) tapsEl.textContent = String(toyTaps);
     if (window.Sounds) window.Sounds.playPet();
   }
   function endToyGame() {
+    if (!toyActive) return;
     toyActive = false;
     if (toyRaf) cancelAnimationFrame(toyRaf);
     toyRaf = null;
@@ -2044,11 +2117,10 @@ function startGame() {
     toyTaps = 0;
     if (taps > 0) {
       const base = Math.max(1, getClickPower());
-      const reward = Math.floor(taps * TOY_REWARD_PER_TAP * Math.max(1, base * 0.15) * EVENT_REWARD_MULT);
-      state.ore += reward;
-      state.stats.lifetimeBones += reward;
+      const reward = Economy.activity(eventUnit, Math.min(1, taps / 6));
+      creditBones(reward, 'events', true);
       state.stats.eventsDone = (state.stats.eventsDone || 0) + 1;
-      bumpDailyGoal('events', 1);
+      bumpQuest('events', 1);
       grantSticker('ball', true);
       addEventAcorns(0.8);
       if (window.Sounds) window.Sounds.playOffline();
@@ -2082,6 +2154,7 @@ function startGame() {
   function startTrainGame() {
     trainActive = true;
     trainSeq = [];
+    trainMistakes = 0;
     for (let i = 0; i < 5; i++) trainSeq.push(TRAIN_CMDS[Math.floor(Math.random() * TRAIN_CMDS.length)].id);
     trainIndex = 0;
     const modal = $('#train-modal');
@@ -2123,6 +2196,7 @@ function startGame() {
   function answerTrain(id) {
     if (!trainActive || trainShowing) return;
     if (id !== trainSeq[trainIndex]) {
+      trainMistakes += 1;
       if (window.Sounds) window.Sounds.playPet();
       showToast(tr('train_miss'));
       showTrainStep();
@@ -2134,15 +2208,15 @@ function startGame() {
     showTrainStep();
   }
   function endTrainGame(success) {
+    if (!trainActive) return;
     trainActive = false;
     const modal = $('#train-modal');
     if (modal) modal.hidden = true;
     if (success) {
-      const reward = Math.floor((80 + getOrePerSec() * 8 + getClickPower() * 12 + trainSeq.length * 25) * EVENT_REWARD_MULT);
-      state.ore += reward;
-      state.stats.lifetimeBones += reward;
+      const reward = Economy.activity(eventUnit, Math.max(0, 1 - trainMistakes * .2));
+      creditBones(reward, 'events', true);
       state.stats.eventsDone = (state.stats.eventsDone || 0) + 1;
-      bumpDailyGoal('events', 1);
+      bumpQuest('events', 1);
       grantSticker('star', true);
       addEventAcorns(1);
       if (window.Sounds) window.Sounds.playOffline();
@@ -2156,6 +2230,7 @@ function startGame() {
 
   function startHideGame() {
     hideActive = true;
+    hideShowing = true;
     hideCardCount = 3 + Math.floor(Math.random() * 2);
     hideBoneIndex = Math.floor(Math.random() * hideCardCount);
     hideTriesLeft = HIDE_TRIES;
@@ -2163,7 +2238,7 @@ function startGame() {
     const status = $('#hide-status');
     const tries = $('#hide-tries');
     const cards = $('#hide-cards');
-    if (status) status.textContent = tr('hide_pick');
+    if (status) status.textContent = tr('hide_watch');
     if (tries) tries.textContent = tr('hide_tries_n', { n: hideTriesLeft });
     if (cards) {
       cards.innerHTML = '';
@@ -2171,19 +2246,20 @@ function startGame() {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'hide-card';
-        b.textContent = '❓';
+        b.textContent = i === hideBoneIndex ? '🦴' : '🍃';
         b.dataset.idx = String(i);
         b.addEventListener('click', function () { pickHideCard(Number(b.dataset.idx), b); });
         cards.appendChild(b);
       }
     }
     if (modal) modal.hidden = false;
+    setTimeout(function () { if (!hideActive) return; hideShowing = false; if (cards) Array.from(cards.children).forEach(function (b) { b.textContent = '❓'; }); if (status) status.textContent = tr('hide_pick'); }, 1200);
     if (window.Sounds) window.Sounds.playCombo();
     updateEventBtn();
     syncBgm();
   }
   function pickHideCard(idx, btn) {
-    if (!hideActive || !btn || btn.classList.contains('flipped')) return;
+    if (!hideActive || hideShowing || !btn || btn.classList.contains('flipped')) return;
     btn.classList.add('flipped');
     if (idx === hideBoneIndex) {
       btn.textContent = '🦴';
@@ -2212,11 +2288,10 @@ function startGame() {
     const modal = $('#hide-modal');
     if (modal) modal.hidden = true;
     if (success) {
-      const reward = Math.floor((60 + getClickPower() * 10 + getOrePerSec() * 5) * EVENT_REWARD_MULT);
-      state.ore += reward;
-      state.stats.lifetimeBones += reward;
+      const reward = Economy.activity(eventUnit, hideTriesLeft / HIDE_TRIES);
+      creditBones(reward, 'events', true);
       state.stats.eventsDone = (state.stats.eventsDone || 0) + 1;
-      bumpDailyGoal('events', 1);
+      bumpQuest('events', 1);
       grantSticker('hide');
       const ac = addEventAcorns(1.1);
       if (window.Sounds) window.Sounds.playOffline();
@@ -2234,7 +2309,7 @@ function startGame() {
     raceActive = true;
     raceFill = 12;
     raceEndsAt = Date.now() + RACE_DURATION_MS;
-    raceLastTap = 0;
+    raceLastTap = Date.now();
     const modal = $('#race-modal');
     const fill = $('#race-fill');
     const score = $('#race-score');
@@ -2264,9 +2339,10 @@ function startGame() {
   function raceTap() {
     if (!raceActive) return;
     const now = Date.now();
-    if (now - raceLastTap < 40) return;
+    if (now >= raceEndsAt) return;
+    const gap = now - raceLastTap;
     raceLastTap = now;
-    raceFill = Math.min(100, raceFill + RACE_TAP_GAIN);
+    raceFill = Math.max(0, Math.min(100, raceFill + Economy.rhythmGain(gap)));
     const fill = $('#race-fill');
     const score = $('#race-score');
     if (fill) fill.style.width = raceFill + '%';
@@ -2282,11 +2358,10 @@ function startGame() {
     if (modal) modal.hidden = true;
     const pct = Math.min(100, raceFill);
     if (!forceFail && pct >= 55) {
-      const reward = Math.floor((50 + getClickPower() * 8 + getOrePerSec() * 6 + pct * 1.5) * EVENT_REWARD_MULT);
-      state.ore += reward;
-      state.stats.lifetimeBones += reward;
+      const reward = Economy.activity(eventUnit, pct / 100);
+      creditBones(reward, 'events', true);
       state.stats.eventsDone = (state.stats.eventsDone || 0) + 1;
-      bumpDailyGoal('events', 1);
+      bumpQuest('events', 1);
       const ac = addEventAcorns(0.9 + pct / 100);
       if (window.Sounds) window.Sounds.playOffline();
       showToast(tr('race_win', { n: fmt(reward), pct: Math.floor(pct) }) + (ac ? ' · 🌰+' + ac : ''));
@@ -2387,9 +2462,7 @@ function startGame() {
       if (product.kind === 'consumable') {
         const gain = Number(product.bones) || 0;
         // Grant once per successful purchase, then consume (prevents redelivery loops)
-        state.ore += gain;
-        state.stats.lifetimeBones += gain;
-        bumpQuest('earn', gain);
+        creditBones(gain, 'purchase', false);
         await persist();
         if (typeof bridge.consume === 'function') await bridge.consume(tag);
         if (window.Sounds && window.Sounds.playPurchase) window.Sounds.playPurchase();
@@ -2485,6 +2558,8 @@ function startGame() {
         restBtn.textContent = tr('rest_plus', { n: ENERGY_REST_GAIN });
       }
     }
+    const actor = $('#dogActor');
+    if (actor) { actor.style.visibility = state.activeWalk ? 'hidden' : ''; actor.disabled = !!state.activeWalk; }
     updateWalkUI();
   }
   function doRest() {
@@ -2508,7 +2583,8 @@ function startGame() {
     if (tier.unlockPrestige && (state.prestigeLevel || 0) < tier.unlockPrestige) return false;
     return true;
   }
-  function startWalk(tierId) {
+  function startWalk(tierId, style) {
+    if (toyActive || trainActive || hideActive || raceActive) { showToast(tr('event_running')); return; }
     if (state.activeWalk && state.activeWalk.endsAt > Date.now()) {
       showToast(tr('already_walk')); return;
     }
@@ -2521,35 +2597,35 @@ function startGame() {
       showToast(tier.unlockPrestige ? tr('need_stage_show', { n: tier.unlockStage }) : tr('need_stage', { n: tier.unlockStage }));
       return;
     }
-    if (state.energy < tier.energy) { showToast(tr('low_energy')); return; }
+    const quote = Economy.walk(tier, economyRate(), getTrainingSum('walkRewardPct'), style);
+    if (state.energy < quote.energy) { showToast(tr('low_energy')); return; }
     if (state.ore < tier.boneCost) { showToast(tr('need') + ' 🦴'); return; }
-    state.energy -= tier.energy;
+    state.energy -= quote.energy;
     state.ore -= tier.boneCost;
-    state.activeWalk = { tierId: tier.id, endsAt: Date.now() + tier.durationMs, startedAt: Date.now() };
+    state.activeWalk = Object.assign({ tierId: tier.id, endsAt: Date.now() + tier.durationMs, startedAt: Date.now() }, quote);
     showToast(tr('walk_start', { icon: tier.icon, name: locn(tier), mins: (tier.durationMs % 60000 ? (tier.durationMs / 60000).toFixed(1) : String(Math.round(tier.durationMs / 60000))) }));
     updateEnergyUI(); renderStats(); scheduleSave();
   }
   function walkRewardBones(tier) {
-    const secs = tier.durationMs / 1000;
-    const base = Math.max(8, getOrePerSec() * secs * 0.55 + getClickPower() * 14);
-    const trainWalk = 1 + getTrainingSum('walkRewardPct');
-    return Math.floor(base * tier.rewardMult * (1 + (state.yardStage || 1) * 0.03) * trainWalk);
+    return Economy.walk(tier, economyRate(), getTrainingSum('walkRewardPct'), 'trail').reward;
   }
+
   function completeWalk(fromClaim) {
     const walk = state.activeWalk;
     if (!walk) return;
     if (Date.now() < walk.endsAt) return;
     const tier = WALK_TIERS.find(function (t) { return t.id === walk.tierId; }) || WALK_TIERS[0];
     state.activeWalk = null;
-    const reward = walkRewardBones(tier);
-    state.ore += reward;
-    state.stats.lifetimeBones += reward;
+    const reward = Number.isFinite(walk.reward) ? walk.reward : walkRewardBones(tier) + (walk.legacyEntryCost || 0);
+    creditBones(reward, 'walks', true);
     state.stats.walksDone = (state.stats.walksDone || 0) + 1;
-    bumpDailyGoal('walks', 1);
+    bumpQuest('walks', 1);
     let extra = '';
-    if (Math.random() < tier.stickerChance) {
+    if (Math.random() < (walk.stickerChance == null ? tier.stickerChance : walk.stickerChance)) {
       const pool = ['paw', 'bone', 'leaf', 'ball'];
-      const sid = pool[Math.floor(Math.random() * pool.length)];
+      const missing = pool.filter(function (id) { return !hasSticker(id); });
+      const choices = missing.length ? missing : pool;
+      const sid = choices[Math.floor(Math.random() * choices.length)];
       if (grantSticker(sid, true)) extra += ' · ' + tr('sticker_bang');
     }
     if (isSeasonActive() && Math.random() < tier.acornChance) {
@@ -2557,8 +2633,8 @@ function startGame() {
       state.acorns = (isFinite(state.acorns) ? state.acorns : 0) + ac;
       extra += ' · 🌰+' + ac;
     }
-    // walk restores some energy
-    state.energy = Math.min(getEnergyMax(), state.energy + 12 + tier.energy * 0.25);
+    // A short rest on return; walking still has a net energy cost.
+    state.energy = Math.min(getEnergyMax(), state.energy + 8);
     showToast(tr('walk_back', { n: fmt(reward) }) + extra);
     checkAchievements(); maybeUnlockStory(); updateEnergyUI(); renderStats();
     if (activeTab === 'quests') renderQuests();
@@ -2574,7 +2650,7 @@ function startGame() {
         btn.disabled = false;
         btn.textContent = tr('claim') + '!';
         btn.dataset.walkAction = 'claim';
-        if (meta) meta.textContent = tr('walk');
+        if (meta) meta.textContent = tr('walk_ready_reward', { n: fmt(state.activeWalk.reward || 0) });
       } else {
         btn.disabled = true;
         const m = Math.floor(left / 60000);
@@ -2586,7 +2662,7 @@ function startGame() {
           const total = (tier && tier.durationMs) || 1;
           const started = state.activeWalk.startedAt || (state.activeWalk.endsAt - total);
           const pct = Math.max(0, Math.min(100, ((Date.now() - started) / total) * 100));
-          meta.textContent = (tier ? tier.icon + ' ' + locn(tier) : tr('walk')) + ' · ' + Math.floor(pct) + '%';
+          meta.textContent = (tier ? tier.icon + ' ' + locn(tier) : tr('walk')) + ' · ' + Math.floor(pct) + '% · 🦴 ' + fmt(state.activeWalk.reward || 0);
         }
       }
       return;
@@ -2612,15 +2688,19 @@ function startGame() {
     }
     list.innerHTML = '';
     WALK_TIERS.forEach(function (t) {
+      ['trail', 'sniff'].forEach(function (style) {
+      const quote = Economy.walk(t, economyRate(), getTrainingSum('walkRewardPct'), style);
+      if (['paw','bone','leaf','ball'].every(hasSticker)) quote.stickerChance = 0;
       const unlocked = isWalkUnlocked(t);
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'walk-tier-btn' + (unlocked ? '' : ' locked');
       row.disabled = !unlocked;
       const mins = (t.durationMs / 60000).toFixed(t.durationMs % 60000 ? 1 : 0);
-      row.innerHTML = '<span class="walk-tier-ico">' + t.icon + '</span><span class="walk-tier-body"><strong>' + locn(t) + '</strong><small>' + tr('walk_row', { mins: mins, energy: t.energy, cost: fmt(t.boneCost) }) + (!unlocked ? ' · ' + tr('walk_stage', { n: t.unlockStage }) : '') + '</small></span>';
-      if (unlocked) row.addEventListener('click', function () { sheet.hidden = true; startWalk(t.id); });
+      row.innerHTML = '<span class="walk-tier-ico">' + t.icon + '</span><span class="walk-tier-body"><strong>' + locn(t) + ' · ' + tr('walk_' + style) + '</strong><small>' + tr('walk_quote', { mins: mins, energy: quote.energy, reward: fmt(quote.reward), chance: Math.round(quote.stickerChance * 100) }) + (!unlocked ? ' · ' + tr('walk_stage', { n: t.unlockStage }) : '') + '</small></span>';
+      if (unlocked) row.addEventListener('click', function () { sheet.hidden = true; startWalk(t.id, style); });
       list.appendChild(row);
+      });
     });
     sheet.hidden = false;
   }
@@ -2678,37 +2758,11 @@ function startGame() {
     return advanced;
   }
 
-  function generateDailyGoals(seed) {
-    const used = {};
-    const list = [];
-    for (let i = 0; i < 3; i++) {
-      let pick = Math.floor(seededRand(seed, i * 5) * DAILY_GOAL_POOL.length);
-      let guard = 0;
-      while (used[pick] && guard < 10) { pick = (pick + 1) % DAILY_GOAL_POOL.length; guard++; }
-      used[pick] = true;
-      const tpl = DAILY_GOAL_POOL[pick];
-      const ti = Math.floor(seededRand(seed, i * 5 + 1) * tpl.targets.length);
-      const target = tpl.targets[ti];
-      const reward = tpl.rewardBones[Math.min(ti, tpl.rewardBones.length - 1)];
-      list.push({ id: seed + '-dg-' + i + '-' + tpl.type, type: tpl.type, target: target, progress: 0, reward: reward, label: tpl.label(target), claimed: false });
-    }
-    return list;
-  }
   function ensureDailyGoals() {
     const key = localDayKey();
-    if (state.dailyDayKey !== key) {
-      if (state.dailyDayKey) {
-        const cleared = state.dailyLastClearDay === state.dailyDayKey
-          || ((state.dailyGoals || []).length > 0 && (state.dailyGoals || []).every(function (g) { return g.claimed; }));
-        if (!cleared) state.dailyStreak = 0;
-      }
-      state.dailyDayKey = key;
-      state.dailyGoals = generateDailyGoals(key);
-    }
-    if (!Array.isArray(state.dailyGoals) || state.dailyGoals.length === 0) {
-      state.dailyGoals = generateDailyGoals(key);
-    }
+    if (state.dailyDayKey !== key) { state.dailyDayKey = key; state.dailyGoals = []; }
   }
+
   function bumpDailyGoal(type, amount) {
     ensureDailyGoals();
     const apply = window.GameCore && window.GameCore.applyTrackedProgress;
@@ -2732,8 +2786,7 @@ function startGame() {
     g.claimed = true;
     const streakMult = 1 + Math.min(0.6, (state.dailyStreak || 0) * 0.06);
     const reward = Math.floor((Number(g.reward) || 0) * streakMult);
-    state.ore += reward;
-    state.stats.lifetimeBones += reward;
+    creditBones(reward, 'legacyDaily', false);
     if (window.Sounds) window.Sounds.playBuy();
     showToast(tr('daily_done', { n: fmt(reward) }));
     const allClaimed = state.dailyGoals.every(function (x) { return x.claimed; });
@@ -2915,7 +2968,7 @@ function startGame() {
   function updateCombo() {
     const now = Date.now();
     const windowMs = getComboWindow();
-    if (state.lastClickAt && now - state.lastClickAt <= windowMs) {
+    if (state.lastClickAt && now - state.lastClickAt >= 500 && now - state.lastClickAt <= windowMs) {
       state.combo = Math.min(COMBO_MAX, state.combo + COMBO_STEP);
       const milestone = Math.floor(state.combo * 2) / 2;
       if (milestone >= 1.5 && milestone > lastComboMilestone) {
@@ -2935,12 +2988,19 @@ function startGame() {
 
   function mineClick(ev) {
     if (!ready || destroyed) return;
+    const petNow = Date.now();
+    if (state.activeWalk) { showToast(tr('pet_away')); return; }
+    if (state.energy < ENERGY_PER_CLICK) { showToast(tr('pet_tired')); return; }
+    if (!Economy.petAllowed(petNow, lastPetAt, state.energy, false)) return;
+    lastPetAt = petNow;
+    const hint = $('#hint-first');
+    if (hint) hint.hidden = true;
     updateCombo();
     clampEnergy();
     const power = getClickPower() * state.pendingClickMult;
-    state.ore += power;
+    creditBones(power, 'petting', true);
     state.stats.totalClicks += 1;
-    state.stats.lifetimeBones += power;
+
     state.energy = Math.max(0, state.energy - ENERGY_PER_CLICK);
     if (isSeasonActive()) {
       const prev = isFinite(state.acorns) ? state.acorns : 0;
@@ -2948,7 +3008,7 @@ function startGame() {
       if (state.stats.totalClicks % 25 === 0) maybeGrantLeafSticker();
     }
     bumpQuest('clicks', 1);
-    bumpQuest('earn', power);
+
     if (state.pendingClickMult > 1) { state.pendingClickMult = 1; showToast(tr('double_used')); }
     const btn = $('#mine-btn');
     if (btn) {
@@ -2956,11 +3016,13 @@ function startGame() {
       void btn.offsetWidth;
       btn.classList.add('clicked');
       if (Math.random() < 0.28 || state.combo >= 1.5) btn.classList.add('wag');
+      btn.dispatchEvent(new Event('dog:react'));
       setTimeout(function () { btn.classList.remove('clicked', 'wag'); }, 240);
     }
     let x = window.innerWidth / 2;
     let y = window.innerHeight * 0.35;
-    if (ev && typeof ev.clientX === 'number') { x = ev.clientX; y = ev.clientY - 20; }
+    const dog = $('#dogActor');
+    if (dog) { const rect = dog.getBoundingClientRect(); x = rect.left + rect.width / 2; y = rect.top + 24; }
     const comboTag = state.combo >= 1.2 ? ' x' + Math.min(COMBO_MAX, state.combo).toFixed(1) : '';
     spawnPopup(x, y, '+' + fmt(power) + ' 🦴' + comboTag);
     spawnClickFx(x, y + 10);
@@ -3008,15 +3070,6 @@ function startGame() {
     checkAchievements(); maybeUnlockStory(); renderAll(); scheduleSave();
   }
 
-  function activateJoy() {
-    const now = Date.now();
-    if (now < state.joyReadyAt || now < state.joyUntil) { showToast(tr('joy_rest')); return; }
-    state.joyUntil = now + JOY_DURATION_MS;
-    state.joyReadyAt = state.joyUntil + JOY_COOLDOWN_MS;
-    showToast(tr('joy_toast'));
-    if (window.Sounds) window.Sounds.playBuy();
-    renderStats(); scheduleSave();
-  }
 
   let rewardBusy = false;
 
@@ -3038,7 +3091,7 @@ function startGame() {
         if (window.Sounds && window.Sounds.playError) window.Sounds.playError();
         return;
       }
-      state.pendingClickMult = AD_BOOST_MULT;
+      state.pendingClickMult = 1;
       state.adBoostUntil = Date.now() + AD_BOOST_DURATION_MS;
       if (window.Sounds && window.Sounds.playReward) window.Sounds.playReward();
       else if (window.Sounds) window.Sounds.playBuy();
@@ -3064,12 +3117,13 @@ function startGame() {
     return {
       v: SAVE_VERSION,
       ore: state.ore,
+      incomeBySource: Object.assign({}, state.incomeBySource),
       levels: Object.assign(defaultLevels(), state.levels),
       levelsTraining: Object.assign(defaultTrainingLevels(), state.levelsTraining || {}),
       levelsCards: Object.assign(defaultCardLevels(), state.levelsCards || {}),
       packUnlocked: Object.assign(defaultPackUnlocks(), state.packUnlocked || {}),
       packPaid: Object.assign(defaultPackUnlocks(), state.packPaid || {}),
-      lastSaveAt: now,
+      lastSaveAt: hiddenAt || now,
       adBoostUntil: adUntil > now ? adUntil : 0,
       pendingClickMult: state.pendingClickMult > 1 ? state.pendingClickMult : 1,
       prestigeLevel: state.prestigeLevel,
@@ -3110,7 +3164,7 @@ function startGame() {
       medalUpgrades: Object.assign({}, state.medalUpgrades || {}),
       energy: isFinite(state.energy) ? Math.max(0, state.energy) : ENERGY_MAX_BASE,
       energyRestReadyAt: Number(state.energyRestReadyAt) || 0,
-      activeWalk: state.activeWalk && state.activeWalk.endsAt ? { tierId: String(state.activeWalk.tierId || 'short'), endsAt: Number(state.activeWalk.endsAt) || 0, startedAt: Number(state.activeWalk.startedAt) || 0 } : null,
+      activeWalk: state.activeWalk && state.activeWalk.endsAt ? Object.assign({}, state.activeWalk) : null,
       yardStage: Math.max(1, Number(state.yardStage) || 1),
       dailyGoals: Array.isArray(state.dailyGoals) ? state.dailyGoals : [],
       dailyDayKey: state.dailyDayKey || '',
@@ -3178,6 +3232,7 @@ function startGame() {
   function applySave(data) {
     data = migrateSave(data);
     if (!data) return 0;
+    state.incomeBySource = Object.assign({}, data.incomeBySource || {});
     state.ore = Number(data.ore) || 0;
     if (!isFinite(state.ore) || state.ore < 0) state.ore = 0;
     state.levels = defaultLevels();
@@ -3250,7 +3305,7 @@ function startGame() {
       const reward = Math.max(0, Number(q.reward) || 0);
       return {
         id: String(q.id || ('q-' + Math.random())),
-        type: q.type === 'clicks' || q.type === 'earn' || q.type === 'buy' ? q.type : 'clicks',
+        type: ['clicks', 'earn', 'buy', 'walks', 'events'].indexOf(q.type) !== -1 ? q.type : 'clicks',
         target: target,
         progress: Math.min(progress, target),
         reward: reward,
@@ -3262,7 +3317,7 @@ function startGame() {
     state.questStreak = Number(data.questStreak) || 0;
     state.questLastClearDay = data.questLastClearDay || '';
     state.questClaimsToday = Number(data.questClaimsToday) || 0;
-    state.joyUntil = Number(data.joyUntil) || 0;
+    state.joyUntil = 0;
     state.joyReadyAt = Number(data.joyReadyAt) || 0;
     state.inventory = Object.assign({ boneBoost: 0 }, data.inventory || {});
     Object.keys(state.inventory).forEach(function (k) {
@@ -3307,6 +3362,10 @@ function startGame() {
         tierId: String(data.activeWalk.tierId || 'short'),
         endsAt: Number(data.activeWalk.endsAt),
         startedAt: Number(data.activeWalk.startedAt) || 0,
+        reward: Number.isFinite(data.activeWalk.reward) ? Math.max(0, data.activeWalk.reward) : undefined,
+        stickerChance: Number.isFinite(data.activeWalk.stickerChance) ? Math.min(.85, Math.max(0, data.activeWalk.stickerChance)) : undefined,
+        legacyEntryCost: Math.max(0, Number(data.activeWalk.legacyEntryCost) || 0),
+        style: data.activeWalk.style === 'sniff' ? 'sniff' : 'trail',
       };
     } else {
       state.activeWalk = null;
@@ -3344,7 +3403,7 @@ function startGame() {
     }
     // energy regen while offline (capped) — paused during an active walk
     {
-      const offSec = Math.max(0, (Date.now() - last) / 1000);
+      const offSec = Math.max(0, (Date.now() - Math.max(last, state.activeWalk ? state.activeWalk.endsAt : last)) / 1000);
       const walking = !!(state.activeWalk && state.activeWalk.endsAt && state.activeWalk.endsAt > Date.now());
       if (!walking) {
         state.energy = Math.min(getEnergyMax(), (isFinite(state.energy) ? state.energy : getEnergyMax()) + getEnergyRegen() * Math.min(offSec, 4 * 3600));
@@ -3359,13 +3418,13 @@ function startGame() {
     const itemBackup = state.activeItem;
     state.adBoostUntil = 0;
     state.activeItem = null;
-    const rate = getOrePerSec() * getOfflineEfficiency();
+    const rate = getOrePerSec(true) * getOfflineEfficiency();
     state.adBoostUntil = boostBackup;
     state.activeItem = itemBackup;
     const gained = window.GameCore && window.GameCore.offlineGain
       ? window.GameCore.offlineGain(rate, 1, elapsedSec, getOfflineCapSec())
       : rate * elapsedSec;
-    if (gained > 0.01) { state.ore += gained; state.stats.lifetimeBones += gained; return gained; }
+    if (gained > 0.01) { creditBones(gained, 'offline', true); return gained; }
     return 0;
   }
 
@@ -3404,7 +3463,7 @@ function startGame() {
     if (destroyed) return;
     const dt = Math.min(0.25, (now - lastTick) / 1000);
     lastTick = now;
-    if (!ready) {
+    if (!ready || document.visibilityState === 'hidden') {
       rafTick = requestAnimationFrame(tick);
       return;
     }
@@ -3412,7 +3471,7 @@ function startGame() {
     if (!isFinite(state.stats.lifetimeBones) || state.stats.lifetimeBones < 0) state.stats.lifetimeBones = 0;
     if (!isFinite(state.acorns) || state.acorns < 0) state.acorns = 0;
     const gain = getOrePerSec() * dt;
-    if (gain > 0 && isFinite(gain)) { state.ore += gain; state.stats.lifetimeBones += gain; bumpQuest('earn', gain); }
+    if (gain > 0 && isFinite(gain)) { creditBones(gain, 'idle', true); }
     regenEnergy(dt);
     if (state.activeWalk && state.activeWalk.endsAt <= Date.now()) {
       updateWalkUI();
@@ -3531,11 +3590,10 @@ function startGame() {
 
     if (destroyed) return;
 
-    listen($('#mine-btn'), 'click', mineClick);
+    listen($('#dogActor'), 'click', mineClick);
     listen($('#quests'), 'click', onQuestsClick);
     listen($('#btn-ad'), 'click', onRewarded);
     listen($('#btn-save'), 'click', manualSave);
-    listen($('#btn-joy'), 'click', activateJoy);
     listen($('#btn-rest'), 'click', doRest);
     listen($('#btn-walk'), 'click', onWalkButton);
     document.querySelectorAll('[data-walk-close]').forEach(function (el) {
@@ -3728,6 +3786,7 @@ function startGame() {
     renderAll();
     lastTick = performance.now();
     ready = true;
+    scheduleSave();
     hideBoot();
     syncBgm();
     window.__dvorikReady = true;
@@ -3740,7 +3799,7 @@ function startGame() {
     } catch (_) {}
     rafTick = requestAnimationFrame(tick);
     rafShop = requestAnimationFrame(tickShopThrottle);
-    autosaveTimer = setInterval(function () { if (!destroyed) persist(); }, AUTOSAVE_MS);
+    autosaveTimer = setInterval(function () { if (!destroyed && document.visibilityState !== 'hidden') persist(); }, AUTOSAVE_MS);
     statusTimer = setInterval(function () { if (!destroyed) setGpStatus(); }, AUTOSAVE_MS);
 
     setGpStatus();
@@ -3793,7 +3852,7 @@ function startGame() {
     }
     if (firstHint) {
       const hideHint = function () { firstHint.hidden = true; };
-      listen($('#mine-btn'), 'click', hideHint, { once: true });
+      listen($('#dogActor'), 'click', hideHint, { once: true });
     }
 
     function onVisibility() {
@@ -3804,12 +3863,12 @@ function startGame() {
         return;
       }
       if (hiddenAt && Date.now() - hiddenAt > 2500) {
-        const last = Number(state.lastSaveAt) || hiddenAt;
+        const last = hiddenAt;
         const elapsedSec = Math.min(getOfflineCapSec(), Math.max(0, (Date.now() - last) / 1000));
         if (elapsedSec > 2) {
           const walking = !!(state.activeWalk && state.activeWalk.endsAt && state.activeWalk.endsAt > Date.now());
           if (!walking) {
-            state.energy = Math.min(getEnergyMax(), (isFinite(state.energy) ? state.energy : 0) + getEnergyRegen() * Math.min(elapsedSec, 4 * 3600));
+            state.energy = Math.min(getEnergyMax(), (isFinite(state.energy) ? state.energy : 0) + getEnergyRegen() * Math.min(Math.max(0, (Date.now() - Math.max(last, state.activeWalk ? state.activeWalk.endsAt : last)) / 1000), 4 * 3600));
           }
           if (state.activeWalk && state.activeWalk.endsAt && state.activeWalk.endsAt <= Date.now()) {
             completeWalk(true);
@@ -3818,20 +3877,20 @@ function startGame() {
           const itemBackup = state.activeItem;
           state.adBoostUntil = 0;
           state.activeItem = null;
-          const rate = getOrePerSec() * getOfflineEfficiency();
+          const rate = getOrePerSec(true) * getOfflineEfficiency();
           state.adBoostUntil = boostBackup;
           state.activeItem = itemBackup;
           const extra = window.GameCore && window.GameCore.offlineGain
             ? window.GameCore.offlineGain(rate, 1, elapsedSec, getOfflineCapSec())
             : rate * elapsedSec;
           if (extra > 0.01) {
-            state.ore += extra;
-            state.stats.lifetimeBones += extra;
+            creditBones(extra, 'offline', true);
             showOfflineModal(extra);
           }
         }
       }
       hiddenAt = 0;
+      persist();
       lastTick = performance.now();
       renderStats();
     }

@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const Game = require('../js/content.js');
 
 assert.equal(Game.UPGRADE_ORDER.length, Object.keys(Game.UPGRADES).length);
@@ -55,8 +57,17 @@ assert.equal(Game.YARD_STAGES[0].level, 1);
 assert.equal(Game.fmtStatic(1500), '1.50K');
 assert.equal(Game.fmtStatic(12), '12');
 assert.ok(Game.BREEDS.lab.src.indexOf('assets/') === 0);
+Object.values(Game.BREEDS).forEach(function (breed) {
+  ['idle', 'walk', 'sitdown', 'sit', 'standup', 'reaction'].forEach(function (state) {
+    const src = breed[state + 'Src'];
+    const frames = breed[state + 'Frames'];
+    assert.ok(src && src.indexOf('assets/') === 0, breed.id + ' ' + state + ' src');
+    assert.ok(frames >= 6, breed.id + ' ' + state + ' frames');
+    assert.ok(fs.existsSync(path.join(__dirname, '..', src)), breed.id + ' ' + state + ' file');
+  });
+});
 assert.equal(Game.EVENT_MIN_MS, 90 * 1000);
-assert.equal(Game.SAVE_VERSION, 8);
+assert.equal(Game.SAVE_VERSION, 9);
 assert.equal(Game.PACK_BRANCHES.length, 3);
 assert.deepEqual(Game.defaultPackUnlocks(), { crew: false, district: false, special: false });
 Game.PACK_BRANCHES.forEach(function (b) {

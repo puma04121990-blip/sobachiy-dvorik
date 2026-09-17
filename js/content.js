@@ -14,7 +14,7 @@ const AD_BOOST_MULT = 2;
 const AD_BOOST_DURATION_MS = 60 * 1000;
 const SAVE_KEY = 'dog-yard-clicker-v1';
 const LEGACY_SAVE_KEY = 'ore-mine-clicker-v1';
-const SAVE_VERSION = 8;
+const SAVE_VERSION = 9;
 // In production the festival follows the calendar. Set to true only for local QA.
 const SEASON_FORCE = false;
 const ACORN_PER_CLICK = 0.022;
@@ -23,12 +23,12 @@ const SEASON_BOOST_MULT = 1.25;
 const SEASON_BOOST_MS = 60 * 1000;
 const HIDE_TRIES = 2;
 const RACE_DURATION_MS = 5 * 1000;
-const RACE_DECAY_PER_SEC = 18;
+const RACE_DECAY_PER_SEC = 8;
 const RACE_TAP_GAIN = 8;
 
 const COMBO_WINDOW_MS = 800;
-const COMBO_MAX = 3;
-const COMBO_STEP = 0.08;
+const COMBO_MAX = 1.25;
+const COMBO_STEP = 0.025;
 const COMBO_DECAY_PER_SEC = 0.55;
 const WHISTLE_COMBO_MS = 40;
 
@@ -94,6 +94,10 @@ const UPGRADES = {
   radio: { id: 'radio', name: 'Радио', desc: '+9% к автодоходу за уровень', baseCost: 160000, costMult: 1.32, clickPower: 0, orePerSec: 0, idleMult: 0.09, clickPct: 0, comboBonusMs: 0, icon: '📻', unlock: { upgradeId: 'groomer', level: 1, text: 'Нужен Грумер ур. 1' } },
 };
 
+// Helpers have 3–15 minute first-level payback, comparable to pack cards.
+Object.values(UPGRADES).forEach(function (u) {
+  if (u.orePerSec) u.baseCost = Math.min(u.baseCost, Math.round(u.orePerSec * 900));
+});
 const UPGRADE_ORDER = ['pickaxe','squeaky','miner','bowls','collar','ball','bandana','frisbee','drill','heater','warehouse','whistle','clickWhistle','leash','bed','blanket','kids','volunteers','treatBag','mailman','walk','lamp','groomer','night','autofeeder','radio','rubber','kennel','park','kennelPlus'];
 const SHOP_CATS = ['paws', 'tails', 'cozy'];
 const SHOP_CAT_IDS = {
@@ -112,6 +116,9 @@ const TRAINING = [
   { id: 'trick', name: 'Трюк', desc: '+3% офлайн · +12% медалек выставки за уровень', baseCost: 1.4e6, costMult: 1.55, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0.03, medalYield: 0.12, allIncome: 0, icon: '🎪' },
   { id: 'champ', name: 'Чемпион', desc: '+1.5% ко всем доходам за уровень', baseCost: 6e6, costMult: 1.58, clickPct: 0, energyRegen: 0, comboBonusMs: 0, walkRewardPct: 0, idleMult: 0, offlineBonus: 0, medalYield: 0, allIncome: 0.015, icon: '🏆' },
 ];
+// Training is a reachable alternative to buying another passive card.
+const trainingPrices = {sit:500,heel:1200,paw:3500,voice:8000,fetch:24000,trick:120000,champ:600000};
+TRAINING.forEach(function (t) { t.baseCost = trainingPrices[t.id] || t.baseCost; });
 const TRAINING_ORDER = TRAINING.map(function (t) { return t.id; });
 
 /** Hamster-style unique cards: 3 menus, cross-gates between trees. */
@@ -179,14 +186,32 @@ function defaultPackUnlocks() {
 }
 
 const BREEDS = {
-  lab: { id: 'lab', name: 'Лабрадор', desc: 'Сбалансированный старт', src: 'assets/dog-click.webp', walkSrc: 'assets/dog-lab-walk.webp', sitSrc: 'assets/dog-lab-sit.webp', sitdownSrc: 'assets/dog-lab-sitdown.webp', standupSrc: 'assets/dog-lab-standup.webp', sitdownFrames: 4, walkFrames: 8, frameW: 192, frameH: 192, unlockCost: 0, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: true },
-  corgi: { id: 'corgi', name: 'Корги', desc: '+5% к почесушкам', src: 'assets/dog-corgi.webp', walkSrc: 'assets/dog-corgi-walk.webp', sitSrc: 'assets/dog-corgi-sit.webp', sitdownSrc: 'assets/dog-corgi-sitdown.webp', standupSrc: 'assets/dog-corgi-standup.webp', sitdownFrames: 4, walkFrames: 8, frameW: 192, frameH: 192, unlockCost: 35000, reqLifetime: 1e5, bonuses: { clickMult: 1.05, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: false },
-  husky: { id: 'husky', name: 'Хаски', desc: '+5% к автодоходу', src: 'assets/dog-husky.webp', walkSrc: 'assets/dog-husky-walk.webp', sitSrc: 'assets/dog-husky-sit.webp', sitdownSrc: 'assets/dog-husky-sitdown.webp', standupSrc: 'assets/dog-husky-standup.webp', sitdownFrames: 4, walkFrames: 8, frameW: 192, frameH: 192, unlockCost: 140000, reqLifetime: 5e5, bonuses: { clickMult: 1, idleMult: 1.05, comboWindowBonus: 0 }, startUnlocked: false },
-  dachshund: { id: 'dachshund', name: 'Такса', desc: '+200 мс к окну комбо', src: 'assets/dog-dachshund.webp', walkSrc: 'assets/dog-dachshund-walk.webp', sitSrc: 'assets/dog-dachshund-sit.webp', sitdownSrc: 'assets/dog-dachshund-sitdown.webp', standupSrc: 'assets/dog-dachshund-standup.webp', sitdownFrames: 4, walkFrames: 8, frameW: 192, frameH: 192, unlockCost: 450000, reqLifetime: 2.5e6, reqMedals: 1, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 200 }, startUnlocked: false },
-  shiba: { id: 'shiba', name: 'Сиба', desc: '+4% к почесушкам и +2% к автодоходу', src: 'assets/dog-shiba.webp', walkSrc: 'assets/dog-shiba-walk.webp', sitSrc: 'assets/dog-shiba-sit.webp', sitdownSrc: 'assets/dog-shiba-sitdown.webp', standupSrc: 'assets/dog-shiba-standup.webp', sitdownFrames: 4, walkFrames: 8, frameW: 192, frameH: 192, unlockCost: 1.2e6, reqLifetime: 6e6, reqMedals: 2, bonuses: { clickMult: 1.04, idleMult: 1.02, comboWindowBonus: 0 }, startUnlocked: false },
-  poodle: { id: 'poodle', name: 'Пудель', desc: '+8% к автодоходу', src: 'assets/dog-poodle.webp', walkSrc: 'assets/dog-poodle-walk.webp', sitSrc: 'assets/dog-poodle-sit.webp', sitdownSrc: 'assets/dog-poodle-sitdown.webp', standupSrc: 'assets/dog-poodle-standup.webp', sitdownFrames: 4, walkFrames: 8, frameW: 192, frameH: 192, unlockCost: 2.8e6, reqLifetime: 2.5e7, reqMedals: 3, bonuses: { clickMult: 1, idleMult: 1.08, comboWindowBonus: 0 }, startUnlocked: false },
-  beagle: { id: 'beagle', name: 'Бигль', desc: '+6% к почесушкам · +80 мс комбо', src: 'assets/dog-beagle.webp', walkSrc: 'assets/dog-beagle-walk.webp', sitSrc: 'assets/dog-beagle-sit.webp', sitdownSrc: 'assets/dog-beagle-sitdown.webp', standupSrc: 'assets/dog-beagle-standup.webp', sitdownFrames: 4, walkFrames: 8, frameW: 192, frameH: 192, unlockCost: 7e6, reqLifetime: 8e7, reqMedals: 5, bonuses: { clickMult: 1.06, idleMult: 1, comboWindowBonus: 80 }, startUnlocked: false },
+  lab: { id: 'lab', name: 'Лабрадор', desc: 'Сбалансированный старт', src: 'assets/dog-click.webp', spriteBase: 'assets/sprites-v2/dog-lab-', walkFrames: 7, idleFrames: 7, sitdownFrames: 6, sitFrames: 7, standupFrames: 6, reactionFrames: 7, frameW: 192, frameH: 192, unlockCost: 0, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: true },
+  corgi: { id: 'corgi', name: 'Корги', desc: '+5% к почесушкам', src: 'assets/dog-corgi.webp', spriteBase: 'assets/sprites-v2/dog-corgi-', walkFrames: 7, idleFrames: 7, sitdownFrames: 6, sitFrames: 7, standupFrames: 6, reactionFrames: 7, frameW: 192, frameH: 192, unlockCost: 35000, reqLifetime: 1e5, bonuses: { clickMult: 1.05, idleMult: 1, comboWindowBonus: 0 }, startUnlocked: false },
+  husky: { id: 'husky', name: 'Хаски', desc: '+5% к автодоходу', src: 'assets/dog-husky.webp', spriteBase: 'assets/sprites-v2/dog-husky-', walkFrames: 7, idleFrames: 7, sitdownFrames: 6, sitFrames: 7, standupFrames: 6, reactionFrames: 7, frameW: 192, frameH: 192, unlockCost: 140000, reqLifetime: 5e5, bonuses: { clickMult: 1, idleMult: 1.05, comboWindowBonus: 0 }, startUnlocked: false },
+  dachshund: { id: 'dachshund', name: 'Такса', desc: '+200 мс к окну комбо', src: 'assets/dog-dachshund.webp', spriteBase: 'assets/sprites-v2/dog-dachshund-', walkFrames: 7, idleFrames: 7, sitdownFrames: 6, sitFrames: 7, standupFrames: 6, reactionFrames: 7, frameW: 192, frameH: 192, unlockCost: 450000, reqLifetime: 2.5e6, reqMedals: 1, bonuses: { clickMult: 1, idleMult: 1, comboWindowBonus: 200 }, startUnlocked: false },
+  shiba: { id: 'shiba', name: 'Сиба', desc: '+4% к почесушкам и +2% к автодоходу', src: 'assets/dog-shiba.webp', spriteBase: 'assets/sprites-v2/dog-shiba-', walkFrames: 7, idleFrames: 7, sitdownFrames: 6, sitFrames: 7, standupFrames: 6, reactionFrames: 7, frameW: 192, frameH: 192, unlockCost: 1.2e6, reqLifetime: 6e6, reqMedals: 2, bonuses: { clickMult: 1.04, idleMult: 1.02, comboWindowBonus: 0 }, startUnlocked: false },
+  poodle: { id: 'poodle', name: 'Пудель', desc: '+8% к автодоходу', src: 'assets/dog-poodle.webp', spriteBase: 'assets/sprites-v2/dog-poodle-', walkFrames: 7, idleFrames: 7, sitdownFrames: 6, sitFrames: 7, standupFrames: 6, reactionFrames: 7, frameW: 192, frameH: 192, unlockCost: 2.8e6, reqLifetime: 2.5e7, reqMedals: 3, bonuses: { clickMult: 1, idleMult: 1.08, comboWindowBonus: 0 }, startUnlocked: false },
+  beagle: { id: 'beagle', name: 'Бигль', desc: '+6% к почесушкам · +80 мс комбо', src: 'assets/dog-beagle.webp', spriteBase: 'assets/sprites-v2/dog-beagle-', walkFrames: 7, idleFrames: 7, sitdownFrames: 6, sitFrames: 7, standupFrames: 6, reactionFrames: 7, frameW: 192, frameH: 192, unlockCost: 7e6, reqLifetime: 8e7, reqMedals: 5, bonuses: { clickMult: 1.06, idleMult: 1, comboWindowBonus: 80 }, startUnlocked: false },
 };
+
+Object.values(BREEDS).forEach(function (breed) {
+  if (!breed.spriteBase) return;
+  breed.idleSrc = breed.spriteBase + 'idle-v2.webp';
+  breed.walkSrc = breed.spriteBase + 'walk-v2.webp';
+  breed.sitdownSrc = breed.spriteBase + 'sitdown-v2.webp';
+  breed.sitSrc = breed.spriteBase + 'sit-v2.webp';
+  breed.standupSrc = breed.spriteBase + 'standup-v2.webp';
+  breed.reactionSrc = breed.spriteBase + 'reaction-v2.webp';
+});
+// Render all Labrador states from one registered model, in 256px source cells.
+Object.assign(BREEDS.lab, { walkFrames: 24, idleFrames: 24, sitdownFrames: 12,
+  sitFrames: 24, standupFrames: 12, reactionFrames: 24, frameW: 256, frameH: 256,
+  walkStride: 104 / 256, walkDuration: 1.2, loopFps: 20, transitionFps: 20 });
+['walk', 'idle', 'sitdown', 'sit', 'standup', 'reaction'].forEach(function (state) {
+  BREEDS.lab[state + 'Src'] = 'assets/lab-v5/' + state + '.webp';
+});
+BREEDS.lab.sitReactionSrc = 'assets/lab-v5/sitReaction.webp';
 const BREED_COUNT = Object.keys(BREEDS).length;
 
 const YARDS = {
@@ -195,6 +220,13 @@ const YARDS = {
   winter: { id: 'winter', name: 'Зима', desc: 'Снежный дворик', src: 'assets/yard-winter.webp', unlockCost: 600000, reqLifetime: 3.5e6, reqMedals: 1, startUnlocked: false },
   autumn: { id: 'autumn', name: 'Осень', desc: 'Золотые листья фестиваля', src: 'assets/yard-autumn.webp', unlockCost: 0, startUnlocked: false, seasonOnly: true },
 };
+
+// Safe horizontal corridors in source-image coordinates (1536 x 1024).
+// Include the whole dog, in either facing direction, not just its centre.
+Object.assign(YARDS.sunny, { walkArea: { left: 0.30, right: 0.80, width: 1536, height: 1024 } });
+Object.assign(YARDS.evening, { walkArea: { left: 0.28, right: 0.72, width: 1536, height: 1024 } });
+Object.assign(YARDS.winter, { walkArea: { left: 0.32, right: 0.82, width: 1536, height: 1024 } });
+Object.assign(YARDS.autumn, { walkArea: { left: 0.37, right: 0.77, width: 1536, height: 1024 } });
 
 const FRIENDS = {
   cat: { id: 'cat', name: 'Котик', desc: '+3% к почесушкам', src: 'assets/pet-cat.webp', unlockCost: 70000, reqLifetime: 2.5e5, bonuses: { clickMult: 1.03, idleMult: 1 } },
@@ -345,9 +377,10 @@ const STORY = [
 ];
 
 const QUEST_POOL = [
-  { type: 'clicks', label: (n) => 'Почесать пёсика ' + n + ' раз', targets: [100, 180, 300, 500], rewardScale: 1.0 },
-  { type: 'earn', label: (n) => 'Заработать ' + fmtStatic(n) + ' косточек', targets: [4000, 15000, 60000, 2.5e5, 1e6], rewardScale: 0.28 },
-  { type: 'buy', label: (n) => 'Купить апгрейды: ' + n, targets: [3, 5, 8], rewardScale: 2.0 },
+  { type: 'clicks', label: n => 'Погладить собачку ' + n + ' раз', targets: [20, 35, 50] },
+  { type: 'earn', label: n => 'Заработать ' + fmtStatic(n) + ' косточек', targets: [180, 300, 480] },
+  { type: 'walks', label: n => 'Завершить прогулок: ' + n, targets: [1, 2, 3] },
+  { type: 'events', label: n => 'Поиграть с собакой: ' + n, targets: [1, 2, 3] },
 ];
 
 const MEDAL_SHOP = [
@@ -358,15 +391,15 @@ const MEDAL_SHOP = [
 ];
 
 const WALK_TIERS = [
-  { id: 'short', name: 'Короткая', icon: '🚶', energy: 18, boneCost: 40, durationMs: 60 * 1000, rewardMult: 0.5, stickerChance: 0.08, acornChance: 0.12, unlockStage: 1 },
-  { id: 'park', name: 'В парк', icon: '🌳', energy: 32, boneCost: 400, durationMs: 2.5 * 60 * 1000, rewardMult: 0.95, stickerChance: 0.14, acornChance: 0.22, unlockStage: 2 },
-  { id: 'long', name: 'Дальняя', icon: '🏞️', energy: 48, boneCost: 3200, durationMs: 4 * 60 * 1000, rewardMult: 1.75, stickerChance: 0.22, acornChance: 0.35, unlockStage: 4, unlockPrestige: 1 },
+  { id: 'short', name: 'Знакомая тропинка', icon: '🚶', energy: 18, boneCost: 0, durationMs: 60000, rewardMult: 1.1, minReward: 45, stickerChance: .15, acornChance: .12, unlockStage: 1 },
+  { id: 'park', name: 'Парк и новые запахи', icon: '🌳', energy: 32, boneCost: 0, durationMs: 150000, rewardMult: 1.2, minReward: 120, stickerChance: .25, acornChance: .22, unlockStage: 2 },
+  { id: 'long', name: 'Лесная разведка', icon: '🏞️', energy: 48, boneCost: 0, durationMs: 240000, rewardMult: 1.3, minReward: 210, stickerChance: .35, acornChance: .35, unlockStage: 3 },
 ];
 
 const YARD_STAGES = [
   { level: 1, title: 'Пустой дворик', reqLifetime: 0, reqPrestige: 0, incomeMult: 1, hook: 'Первые лапки на земле.' },
-  { level: 2, title: 'Уютный дворик', reqLifetime: 1.2e5, reqPrestige: 0, incomeMult: 1.03, hook: 'Появилась любимая тропинка.' },
-  { level: 3, title: 'Известный двор', reqLifetime: 1.8e6, reqPrestige: 0, incomeMult: 1.07, hook: 'Соседи заглядывают через забор.' },
+  { level: 2, title: 'Уютный дворик', reqLifetime: 2500, reqPrestige: 0, incomeMult: 1.03, hook: 'Появилась любимая тропинка.' },
+  { level: 3, title: 'Известный двор', reqLifetime: 35000, reqPrestige: 0, incomeMult: 1.07, hook: 'Соседи заглядывают через забор.' },
   { level: 4, title: 'Чемпионский', reqLifetime: 2.5e7, reqPrestige: 1, incomeMult: 1.12, hook: 'Медальки блестят на калитке.' },
   { level: 5, title: 'Легенда района', reqLifetime: 2.5e8, reqPrestige: 3, incomeMult: 1.18, hook: 'Гости приходят за почесушками.' },
   { level: 6, title: 'Эпоха дворика', reqLifetime: 2e9, reqPrestige: 6, incomeMult: 1.25, hook: 'История пишется вместе.' },

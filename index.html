@@ -60,18 +60,17 @@
 
   <section class="mine-area" id="mine-area">
     <div class="yard-bg" id="yard-bg" aria-hidden="true"></div>
-    <button type="button" id="mine-btn" class="yard-stage" aria-label="Почесать пёсика" data-i18n-aria="pet_aria">
+    <div id="mine-btn" class="yard-stage">
       <div class="kennel" aria-hidden="true">
         <img id="kennelArt" class="kennel-art" src="assets/kennel.webp" alt="" decoding="async" />
         <img id="friendArt" class="friend-art friend-on-roof" alt="" hidden />
       </div>
-      <div class="dog-actor" id="dogActor" data-mode="walk">
+      <button type="button" class="dog-actor" id="dogActor" data-mode="walk" aria-label="Погладить собачку" data-i18n-aria="pet_aria">
         <div id="dogSprite" class="dog-sprite" aria-hidden="true"></div>
         <img id="dogArt" class="dog-art" alt="" hidden />
-      </div>
-      <span class="mine-label" data-i18n="pet_btn">ПОЧЕСАТЬ</span>
-    </button>
-    <p class="hint-first" id="hint-first" hidden data-i18n="first_hint">Нажмите на пёсика — или пробел</p>
+      </button>
+    </div>
+    <p class="hint-first" id="hint-first" hidden data-i18n="first_hint">Нажми на собачку, чтобы погладить · или пробел</p>
     <div class="energy-wrap" id="energy-wrap" aria-label="Энергия пса" data-i18n-aria="energy_aria">
       <div class="energy-top"><span data-i18n="energy">Энергия</span><span id="energy-label">100 / 100</span></div>
       <div class="energy-bar"><span id="energy-fill" style="width:100%"></span></div>
@@ -79,14 +78,13 @@
   </section>
 
   <div class="actions actions-main">
-    <button type="button" class="btn btn-joy" id="btn-joy" data-i18n="joy">Радость x2 · 10с</button>
     <button type="button" class="btn btn-walk" id="btn-walk" data-walk-action="menu" data-i18n="walk">Прогулка</button>
     <button type="button" class="btn btn-rest" id="btn-rest" data-i18n="rest">Отдых</button>
     <button type="button" class="btn btn-event" id="btn-event" data-i18n="event">Событие</button>
     <button type="button" class="btn btn-ad" id="btn-ad" data-i18n="ad_video">Видео: двойные косточки</button>
     <button type="button" class="btn btn-save" id="btn-save" data-i18n="save">Сохранить</button>
   </div>
-  <p class="walk-meta" id="walk-meta" data-i18n="walk_meta">1–4 мин · энергия</p>
+  <p class="walk-meta" id="walk-meta" data-i18n="walk_meta">Маршруты на 1–4 мин · косточки или находки</p>
 
   <nav class="tabs" role="tablist" aria-label="Разделы" data-i18n-aria="sections">
     <button type="button" class="tab active" data-tab="shop" role="tab" aria-selected="true">
@@ -167,7 +165,7 @@
 
   <section class="panel-section" id="panel-cards" data-panel="cards" hidden>
     <h2 data-i18n="cards_h">Стая дворика</h2>
-    <div id="card-combo" class="card-combo" hidden></div>
+
     <div class="card-cats" id="card-cats" role="tablist" aria-label="Ветки стаи">
       <button type="button" class="card-cat active" data-card-cat="crew">
         <span class="card-cat-name" data-i18n="cat_crew">Команда</span>
@@ -227,7 +225,7 @@
 
   <section class="panel-section" id="panel-quests" data-panel="quests" hidden>
     <h2 data-i18n="quests_h">Квесты и цели</h2>
-    <p class="panel-hint" data-i18n="quests_hint">Ежедневные цели (Владивосток) и квесты. Серия сбрасывается, если день пропущен.</p>
+    <p class="panel-hint" data-i18n="quests_hint">Три задания в день: забота, прогулки и игры. Награды не выполняют другие задания.</p>
     <div id="quests"></div>
   </section>
 
@@ -287,12 +285,13 @@
 
   <div id="toy-modal" class="modal" hidden>
     <div class="modal-card modal-game" role="dialog" aria-labelledby="toy-title">
-      <h3 id="toy-title" data-i18n="toy_title">Пропала игрушка!</h3>
-      <p class="panel-hint" data-i18n="toy_hint">Тапайте быстро — 10 секунд!</p>
+      <h3 id="toy-title" data-i18n="toy_title">Поймай мяч!</h3>
+      <p class="panel-hint" data-i18n="toy_hint">Нажми, когда мяч в зелёной зоне. Между попытками — 1 секунда.</p>
       <div class="game-timer" id="toy-timer">10.0</div>
-      <div class="game-score"><span data-i18n="toy_taps">Тапов:</span> <strong id="toy-taps">0</strong></div>
-      <button type="button" class="btn btn-tap-frenzy" id="toy-tap" data-i18n="toy_find">НАЙТИ!</button>
-      <p class="game-hint" id="toy-hint" data-i18n="toy_reward">Награда = число тапов × бонус</p>
+      <div class="game-score"><span data-i18n="toy_taps">Поймано:</span> <strong id="toy-taps">0</strong></div>
+      <div class="fetch-track" aria-hidden="true"><span class="fetch-target"></span><span id="fetch-marker">🎾</span></div>
+      <button type="button" class="btn btn-tap-frenzy" id="toy-tap" data-i18n="toy_find">ЛОВИ!</button>
+      <p class="game-hint" id="toy-hint" data-i18n="toy_reward">Точность важнее скорости. Шесть попаданий — полная награда.</p>
     </div>
   </div>
 
@@ -310,7 +309,7 @@
   <div id="hide-modal" class="modal" hidden>
     <div class="modal-card modal-game" role="dialog" aria-labelledby="hide-title">
       <h3 id="hide-title" data-i18n="hide_title">Прятки</h3>
-      <p class="panel-hint" id="hide-hint" data-i18n="hide_hint">Найди косточку среди карточек!</p>
+      <p class="panel-hint" id="hide-hint" data-i18n="hide_hint">Запомни косточку и найди её после закрытия карточек.</p>
       <div class="hide-tries" id="hide-tries">Попыток: 2</div>
       <div class="hide-cards" id="hide-cards"></div>
       <p class="game-hint" id="hide-status"></p>
@@ -322,7 +321,7 @@
     <div class="more-sheet-panel" role="dialog" aria-modal="true" aria-labelledby="walk-sheet-title">
       <div class="more-sheet-handle" aria-hidden="true"></div>
       <h3 id="walk-sheet-title" class="more-sheet-title" data-i18n="walk_sheet">Прогулка</h3>
-      <p class="panel-hint" data-i18n="walk_sheet_hint">Тратит энергию и косточки. Идёт в фоне по таймеру.</p>
+      <p class="panel-hint" data-i18n="walk_sheet_hint">Выбери цель прогулки. Нужна энергия; косточки за выход не списываются.</p>
       <div id="walk-sheet-list" class="walk-sheet-list"></div>
       <button type="button" class="btn btn-ghost more-sheet-close" data-walk-close data-i18n="close">Закрыть</button>
     </div>
@@ -331,12 +330,12 @@
   <div id="race-modal" class="modal" hidden>
     <div class="modal-card modal-game" role="dialog" aria-labelledby="race-title">
       <h3 id="race-title" data-i18n="race_title">Гонка за белкой</h3>
-      <p class="panel-hint" data-i18n="race_hint">Тапайте в ритме 5 секунд — заполните полоску!</p>
+      <p class="panel-hint" data-i18n="race_hint">Держи ровный темп: примерно одно нажатие каждые 0,6 секунды.</p>
       <div class="game-timer" id="race-timer">5.0</div>
       <div class="race-bar"><span id="race-fill" style="width:0%"></span></div>
       <div class="game-score"><span data-i18n="race_score">Ритм:</span> <strong id="race-score">0%</strong></div>
       <button type="button" class="btn btn-tap-frenzy" id="race-tap" data-i18n="race_tap">ТАП!</button>
-      <p class="game-hint" id="race-hint" data-i18n="race_keep">Держите темп — не слишком редко!</p>
+      <p class="game-hint" id="race-hint" data-i18n="race_keep">Слишком частые нажатия сбивают ритм.</p>
     </div>
   </div>
 
@@ -352,12 +351,12 @@
     <div class="modal-card" role="dialog" aria-labelledby="help-title">
       <h3 id="help-title" data-i18n="help">Как играть</h3>
       <ul class="help-list">
-        <li data-i18n="help_1">Почешите пёсика — падают косточки. Пробел тоже работает.</li>
-        <li data-i18n="help_2">Энергия падает от кликов. «Отдых» или подождите.</li>
+        <li data-i18n="help_1">Погладь собаку — получи косточки. Спокойный темп: не чаще двух раз в секунду.</li>
+        <li data-i18n="help_2">Ласка и прогулки расходуют энергию. Во время прогулки собачка недоступна.</li>
         <li data-i18n="help_3">Магазин, стая и дрессировка усиливают почесушки и автодоход — кости капают сами, даже без кликов.</li>
-        <li data-i18n="help_4">Прогулка идёт в фоне. События — мини-игры с наградой.</li>
+        <li data-i18n="help_4">Выбери маршрут: больше косточек или больше шансов найти наклейку. Доход известен заранее.</li>
         <li data-i18n="help_5">Выставка сбрасывает апгрейды за медальки навсегда.</li>
-        <li data-i18n="help_6">Стая — как в Хомяке: каждый уровень даёт плюс к автодоходу. Поздние дела кормят лучше ранних.</li>
+        <li data-i18n="help_6">Открывай стаю прогулками и играми. Карточки дают постоянный доход, а не разовую награду за покупку.</li>
       </ul>
       <button type="button" class="btn" data-help-close data-i18n="help_ok">Понятно</button>
     </div>
@@ -424,6 +423,7 @@
   <script src="js/gp-bridge.js"></script>
   <script src="js/sounds.js"></script>
   <script src="js/game-core.js"></script>
+  <script src="js/economy.js"></script>
   <script src="js/content.js"></script>
   <script src="js/game.js"></script>
   <script>
