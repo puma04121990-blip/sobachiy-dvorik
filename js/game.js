@@ -970,7 +970,7 @@ function startGame() {
     let activeWalkSrc = '';
     const decodedSheets = new Map();
     function sheetsReady() {
-      return ['walk', 'idle', 'sitdown', 'sit', 'standup', 'reaction'].map(function (state) {
+      return ['walk', 'idle', 'sitdown', 'sit', 'standup', 'reaction', 'sitReaction'].map(function (state) {
         const src = actor.dataset[state + 'Src'];
         if (!src) return true;
         if (!decodedSheets.has(src)) {
@@ -1065,7 +1065,7 @@ function startGame() {
 
     function paintSheetFrame(frames) {
       if (!sprite) return;
-      const src = actor.dataset[sheet + 'Src'];
+      const src = actor.dataset[(sheet === 'sit' && performance.now() < reactionUntil && actor.dataset.sitReactionSrc ? 'sitReaction' : sheet) + 'Src'];
       if (src && sprite.dataset.sheetSrc !== src) {
         sprite.style.backgroundImage = 'url("' + src + '")';
         sprite.dataset.sheetSrc = src;
@@ -1228,7 +1228,7 @@ function startGame() {
     }
 
     function enterReaction(now) {
-      reactionUntil = now + 720;
+      reactionUntil = now + 1200;
       if (mode === 'reaction') return;
       mode = 'reaction';
       pendingDir = null;
@@ -1347,7 +1347,8 @@ function startGame() {
     }
 
     function onReact() {
-      // Do not replace a seated/transition pose with a standing reaction.
+      // Seated petting uses the same pose with only the tail animated.
+      if (mode === 'sit' && !prefersReduced()) { reactionUntil = performance.now() + 1200; modeUntil = Math.max(modeUntil, reactionUntil); }
       if (!prefersReduced() && (mode === 'walk' || mode === 'idle' || mode === 'reaction')) enterReaction(performance.now());
     }
     stage.addEventListener('dog:react', onReact);
@@ -1415,6 +1416,7 @@ function startGame() {
       actor.dataset.sitdownSrc = sitdownSrc;
       actor.dataset.standupSrc = standupSrc;
       actor.dataset.reactionSrc = reactionSrc;
+      actor.dataset.sitReactionSrc = breed.sitReactionSrc || '';
       actor.dataset.frameW = String(breed.frameW || 192);
       actor.dataset.frameH = String(breed.frameH || 192);
       actor.dataset.walkFrames = String(breed.walkFrames || 8);
@@ -3060,6 +3062,8 @@ function startGame() {
 
   function mineClick(ev) {
     if (!ready || destroyed) return;
+    const hint = $('#hint-first');
+    if (hint) hint.hidden = true;
     updateCombo();
     clampEnergy();
     const power = getClickPower() * state.pendingClickMult;
@@ -3086,7 +3090,8 @@ function startGame() {
     }
     let x = window.innerWidth / 2;
     let y = window.innerHeight * 0.35;
-    if (ev && typeof ev.clientX === 'number') { x = ev.clientX; y = ev.clientY - 20; }
+    const dog = $('#dogActor');
+    if (dog) { const rect = dog.getBoundingClientRect(); x = rect.left + rect.width / 2; y = rect.top + 24; }
     const comboTag = state.combo >= 1.2 ? ' x' + Math.min(COMBO_MAX, state.combo).toFixed(1) : '';
     spawnPopup(x, y, '+' + fmt(power) + ' 🦴' + comboTag);
     spawnClickFx(x, y + 10);
@@ -3657,7 +3662,7 @@ function startGame() {
 
     if (destroyed) return;
 
-    listen($('#mine-btn'), 'click', mineClick);
+    listen($('#dogActor'), 'click', mineClick);
     listen($('#quests'), 'click', onQuestsClick);
     listen($('#btn-ad'), 'click', onRewarded);
     listen($('#btn-save'), 'click', manualSave);
@@ -3919,7 +3924,7 @@ function startGame() {
     }
     if (firstHint) {
       const hideHint = function () { firstHint.hidden = true; };
-      listen($('#mine-btn'), 'click', hideHint, { once: true });
+      listen($('#dogActor'), 'click', hideHint, { once: true });
     }
 
     function onVisibility() {

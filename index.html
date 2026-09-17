@@ -60,18 +60,17 @@
 
   <section class="mine-area" id="mine-area">
     <div class="yard-bg" id="yard-bg" aria-hidden="true"></div>
-    <button type="button" id="mine-btn" class="yard-stage" aria-label="Почесать пёсика" data-i18n-aria="pet_aria">
+    <div id="mine-btn" class="yard-stage">
       <div class="kennel" aria-hidden="true">
         <img id="kennelArt" class="kennel-art" src="assets/kennel.webp" alt="" decoding="async" />
         <img id="friendArt" class="friend-art friend-on-roof" alt="" hidden />
       </div>
-      <div class="dog-actor" id="dogActor" data-mode="walk">
+      <button type="button" class="dog-actor" id="dogActor" data-mode="walk" aria-label="Погладить собачку" data-i18n-aria="pet_aria">
         <div id="dogSprite" class="dog-sprite" aria-hidden="true"></div>
         <img id="dogArt" class="dog-art" alt="" hidden />
-      </div>
-      <span class="mine-label" data-i18n="pet_btn">ПОЧЕСАТЬ</span>
-    </button>
-    <p class="hint-first" id="hint-first" hidden data-i18n="first_hint">Нажмите на пёсика — или пробел</p>
+      </button>
+    </div>
+    <p class="hint-first" id="hint-first" hidden data-i18n="first_hint">Нажми на собачку, чтобы погладить · или пробел</p>
     <div class="energy-wrap" id="energy-wrap" aria-label="Энергия пса" data-i18n-aria="energy_aria">
       <div class="energy-top"><span data-i18n="energy">Энергия</span><span id="energy-label">100 / 100</span></div>
       <div class="energy-bar"><span id="energy-fill" style="width:100%"></span></div>

@@ -17,7 +17,7 @@ const meshes=[
 const parts=meshes.map(([x,y,w,h,p])=>{const c=createCanvas(w,h),g=c.getContext('2d');g.translate(-x,-y);g.clip(new Path2D(p));g.drawImage(img,0,0);return c});
 const dark=parts.map(c=>{const a=createCanvas(c.width,c.height),g=a.getContext('2d');g.drawImage(c,0,0);g.globalCompositeOperation='source-atop';g.fillStyle='rgba(94,49,18,.28)';g.fillRect(0,0,c.width,c.height);return a});
 function render(ctx,t,state='walk',amount=0){
-const walking=state==='walk',sitting=state==='sit'||state==='sitdown'||state==='standup';
+const walking=state==='walk',sitting=state==='sit'||state==='sitReaction'||state==='sitdown'||state==='standup';
 const blend=sitting?amount:0;
 const bob=walking?2:0.7;
 const hip={x:90+18*blend,y:192+66*blend+bob*Math.cos(TAU*2*t)},sh={x:240-8*blend,y:189+8*blend+bob*Math.cos(TAU*2*t+.8)};
@@ -39,18 +39,19 @@ function leg(front,far,offset){
  ctx.strokeStyle=far?'#a16d30':'#cc9648';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(f.x+14,f.y-10);ctx.quadraticCurveTo(f.x+17,f.y-6,f.x+16,f.y-2);ctx.stroke();
 }
 leg(false,true,.5);leg(true,true,.75);
-ctx.save();ctx.translate(hip.x-5,hip.y-16);ctx.rotate(.07*Math.sin(TAU*t-.5));ctx.drawImage(parts[2],-94,-22,104,36);ctx.restore();
+ctx.save();ctx.translate(hip.x-5,hip.y-16);ctx.rotate((state==='reaction'||state==='sitReaction'?.30:.07)*Math.sin(TAU*t*(state==='reaction'||state==='sitReaction'?3:1)));ctx.drawImage(parts[2],-94,-22,104,36);ctx.restore();
 // Far legs -> torso -> near legs -> head.
 ctx.save();ctx.translate(hip.x,hip.y);ctx.rotate(Math.atan2(sh.y-hip.y,sh.x-hip.x));ctx.drawImage(parts[0],-35,-48,220,117);ctx.restore();
 leg(false,false,0);leg(true,false,.25);
 // The head is the same texture in every frame; only its secondary rotation changes.
 ctx.save();ctx.translate(sh.x+6,sh.y-31);ctx.rotate(.025*Math.sin(TAU*t-.4));ctx.drawImage(parts[1],-40,-82,135,120);ctx.restore();}
 
-const states={walk:24,idle:24,sitdown:12,sit:24,standup:12,reaction:24};
+const states={walk:24,idle:24,sitdown:12,sit:24,standup:12,reaction:24,sitReaction:24};
 const target=path.join(__dirname,'../assets/lab-v5');fs.mkdirSync(target,{recursive:true});
 for(const [state,count] of Object.entries(states)){
+ if(process.argv.includes('--pet-only') && state!=='reaction' && state!=='sitReaction')continue;
  const strip=createCanvas(count*256,256),g=strip.getContext('2d');
- for(let i=0;i<count;i++){let amount=state==='sit'?1:0;if(state==='sitdown'||state==='standup'){let u=i/(count-1);amount=u*u*(3-2*u);if(state==='standup')amount=1-amount}g.save();g.translate(i*256,0);g.scale(.62,.62);g.translate(25,38);render(g,(state==='sitdown'||state==='standup')?0:i/count,state,amount);g.restore()}
+ for(let i=0;i<count;i++){let amount=(state==='sit'||state==='sitReaction')?1:0;if(state==='sitdown'||state==='standup'){let u=i/(count-1);amount=u*u*(3-2*u);if(state==='standup')amount=1-amount}g.save();g.translate(i*256,0);g.scale(.62,.62);g.translate(25,38);render(g,(state==='sitdown'||state==='standup')?0:i/count,state,amount);g.restore()}
  await sharp(strip.toBuffer('image/png')).webp({lossless:true}).toFile(path.join(target,state+'.webp'));
  if(state==='sit'){const qa=createCanvas(512,512),q=qa.getContext('2d');q.fillStyle='#e8f0df';q.fillRect(0,0,512,512);q.drawImage(strip,0,0,256,256,0,0,512,512);fs.writeFileSync('/tmp/lab-sit.png',qa.toBuffer('image/png'))}
 }

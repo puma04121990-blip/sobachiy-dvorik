@@ -2147,3 +2147,9 @@ header h1 {
 }
 .confirm-card h3 { color: var(--accent); margin-bottom: 8px; }
 
+
+/* Only the dog is interactive; the invisible margin helps touch input. */
+#mine-btn.yard-stage { cursor: default; }
+#dogActor { padding: 0; border: 0; background: transparent; border-radius: 18px; cursor: pointer; pointer-events: auto; overflow: visible; touch-action: manipulation; }
+#dogActor::before { content: ''; position: absolute; inset: -12px; }
+#dogActor:focus-visible { outline: 3px solid #876030; outline-offset: 5px; }

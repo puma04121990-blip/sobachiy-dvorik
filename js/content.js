@@ -204,6 +204,7 @@ Object.assign(BREEDS.lab, { walkFrames: 24, idleFrames: 24, sitdownFrames: 12,
 ['walk', 'idle', 'sitdown', 'sit', 'standup', 'reaction'].forEach(function (state) {
   BREEDS.lab[state + 'Src'] = 'assets/lab-v5/' + state + '.webp';
 });
+BREEDS.lab.sitReactionSrc = 'assets/lab-v5/sitReaction.webp';
 const BREED_COUNT = Object.keys(BREEDS).length;
 
 const YARDS = {
