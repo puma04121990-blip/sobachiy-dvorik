@@ -250,10 +250,6 @@ header h1 {
   transition: none;
 }
 
-.dog-actor[data-mode="sit"] .dog-sprite {
-  background-size: 100% 100%;
-  background-position: 0 0;
-}
 
 @keyframes dog-sit-idle {
   0%, 100% { transform: translateY(0); }

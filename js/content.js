@@ -213,6 +213,13 @@ const YARDS = {
   autumn: { id: 'autumn', name: 'Осень', desc: 'Золотые листья фестиваля', src: 'assets/yard-autumn.webp', unlockCost: 0, startUnlocked: false, seasonOnly: true },
 };
 
+// Safe horizontal corridors in source-image coordinates (1536 x 1024).
+// Include the whole dog, in either facing direction, not just its centre.
+Object.assign(YARDS.sunny, { walkArea: { left: 0.30, right: 0.80, width: 1536, height: 1024 } });
+Object.assign(YARDS.evening, { walkArea: { left: 0.28, right: 0.72, width: 1536, height: 1024 } });
+Object.assign(YARDS.winter, { walkArea: { left: 0.32, right: 0.82, width: 1536, height: 1024 } });
+Object.assign(YARDS.autumn, { walkArea: { left: 0.37, right: 0.77, width: 1536, height: 1024 } });
+
 const FRIENDS = {
   cat: { id: 'cat', name: 'Котик', desc: '+3% к почесушкам', src: 'assets/pet-cat.webp', unlockCost: 70000, reqLifetime: 2.5e5, bonuses: { clickMult: 1.03, idleMult: 1 } },
   rabbit: { id: 'rabbit', name: 'Кролик', desc: '+3% к автодоходу', src: 'assets/pet-rabbit.webp', unlockCost: 180000, reqLifetime: 7e5, bonuses: { clickMult: 1, idleMult: 1.03 } },

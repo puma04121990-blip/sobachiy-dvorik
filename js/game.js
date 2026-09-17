@@ -947,7 +947,6 @@ function startGame() {
     }
 
     const ACTOR_W = 96;
-    const KENNEL_RESERVE = 102;
     const WALK_SPEED = 50;
     const FRAME_FPS = 11;
     const IDLE_FPS = 6;
@@ -969,6 +968,23 @@ function startGame() {
     let transStart = 0;
     let reactionUntil = 0;
     let activeWalkSrc = '';
+    const decodedSheets = new Map();
+    function sheetsReady() {
+      return ['walk', 'idle', 'sitdown', 'sit', 'standup', 'reaction'].map(function (state) {
+        const src = actor.dataset[state + 'Src'];
+        if (!src) return true;
+        if (!decodedSheets.has(src)) {
+          const entry = { ready: false, image: new Image() };
+          decodedSheets.set(src, entry);
+          entry.image.onload = function () {
+            if (entry.image.decode) entry.image.decode().then(function () { entry.ready = true; }).catch(function () { entry.ready = true; });
+            else entry.ready = true;
+          };
+          entry.image.src = src;
+        }
+        return decodedSheets.get(src).ready;
+      }).every(Boolean);
+    }
     function walkSpeed() {
       return Number(actor.dataset.walkStride) > 0 ? (actor.clientWidth || ACTOR_W) * Number(actor.dataset.walkStride) / Number(actor.dataset.walkDuration || 1.2) : WALK_SPEED;
     }
@@ -990,8 +1006,24 @@ function startGame() {
 
     function walkBounds() {
       const w = stage.clientWidth || 280;
-      const minX = 8;
-      const maxX = Math.max(minX, w - ACTOR_W - KENNEL_RESERVE);
+      const actorW = actor.clientWidth || ACTOR_W;
+      const bg = $('#yard-bg');
+      const kennel = stage.querySelector('.kennel');
+      const h = (bg && bg.clientHeight) || stage.clientHeight || 300;
+      const data = (bg && bg.dataset) || {};
+      const sourceW = Number(data.sourceWidth) || 1536;
+      const sourceH = Number(data.sourceHeight) || 1024;
+      const scale = Math.max(w / sourceW, h / sourceH);
+      const renderedW = sourceW * scale;
+      const cropX = (w - renderedW) / 2;
+      const left = cropX + (Number(data.walkLeft) || 0.30) * renderedW + 6;
+      const right = cropX + (Number(data.walkRight) || 0.80) * renderedW - 6;
+      const kennelW = kennel ? kennel.clientWidth : Math.min(w * 0.42, 150);
+      const kennelLeft = kennel ? kennel.offsetLeft : w * 0.98 - kennelW;
+      // Stop just before the entrance, not in the building's wall.
+      const door = kennelLeft + kennelW * 0.34;
+      const minX = Math.max(6, Math.min(left, w - actorW - 6));
+      const maxX = Math.max(minX, Math.min(right - actorW, door - actorW, w - actorW - 6));
       return { minX: minX, maxX: maxX, sitX: maxX };
     }
 
@@ -1034,7 +1066,10 @@ function startGame() {
     function paintSheetFrame(frames) {
       if (!sprite) return;
       const src = actor.dataset[sheet + 'Src'];
-      if (src) sprite.style.backgroundImage = 'url("' + src + '")';
+      if (src && sprite.dataset.sheetSrc !== src) {
+        sprite.style.backgroundImage = 'url("' + src + '")';
+        sprite.dataset.sheetSrc = src;
+      }
       const w = sprite.clientWidth || 96;
       const f = Math.min(frames - 1, Math.max(0, frame | 0));
       sprite.style.backgroundSize = (frames * w) + 'px 100%';
@@ -1048,7 +1083,6 @@ function startGame() {
     function applyWalkSheet() {
       if (!sprite) return;
       const walkSrc = actor.dataset.walkSrc || '';
-      if (walkSrc) sprite.style.backgroundImage = 'url("' + walkSrc + '")';
       sheet = 'walk';
       paintWalkFrame();
     }
@@ -1056,7 +1090,6 @@ function startGame() {
     function applyIdleSheet() {
       if (!sprite) return;
       const src = actor.dataset.idleSrc || '';
-      if (src) sprite.style.backgroundImage = 'url("' + src + '")';
       frame = 0;
       frameAcc = 0;
       sheet = 'idle';
@@ -1066,7 +1099,6 @@ function startGame() {
     function applySitSheet() {
       if (!sprite) return;
       const sitSrc = actor.dataset.sitSrc || '';
-      if (sitSrc) sprite.style.backgroundImage = 'url("' + sitSrc + '")';
       frame = 0;
       frameAcc = 0;
       sheet = 'sit';
@@ -1076,7 +1108,6 @@ function startGame() {
     function applySitdownSheet() {
       if (!sprite) return;
       const src = actor.dataset.sitdownSrc || '';
-      if (src) sprite.style.backgroundImage = 'url("' + src + '")';
       frame = 0;
       frameAcc = 0;
       sheet = 'sitdown';
@@ -1086,7 +1117,6 @@ function startGame() {
     function applyStandupSheet() {
       if (!sprite) return;
       const src = actor.dataset.standupSrc || '';
-      if (src) sprite.style.backgroundImage = 'url("' + src + '")';
       frame = 0;
       frameAcc = 0;
       sheet = 'standup';
@@ -1096,7 +1126,6 @@ function startGame() {
     function applyReactionSheet() {
       if (!sprite) return;
       const src = actor.dataset.reactionSrc || '';
-      if (src) sprite.style.backgroundImage = 'url("' + src + '")';
       frame = 0;
       frameAcc = 0;
       sheet = 'reaction';
@@ -1214,10 +1243,8 @@ function startGame() {
       setSpriteXform(null);
       if (sprite) sprite.style.transform = '';
       applyWalkSheet();
-      // Apply flip on sit exit (stride restart) so scaleX does not mid-stride flip
-      if (flipMaybe && Math.random() < 0.55) {
-        dir *= -1;
-      }
+      // Leave the kennel facing away; never flip right and immediately back left.
+      if (flipMaybe) dir = x >= walkBounds().maxX - 1 ? -1 : 1;
       pendingDir = null;
       frame = 0;
       frameAcc = 0;
@@ -1231,6 +1258,9 @@ function startGame() {
         lastTs = 0;
         return;
       }
+      if (!sheetsReady()) { lastTs = 0; return; }
+      const bounds = walkBounds();
+      x = Math.max(bounds.minX, Math.min(bounds.maxX, x));
       if (!lastTs) lastTs = ts;
       const dt = Math.min(0.05, (ts - lastTs) / 1000);
       lastTs = ts;
@@ -1245,7 +1275,8 @@ function startGame() {
         x = b.sitX;
         dir = 1;
         pendingDir = null;
-        applySitSheet();
+        if (sheet !== 'sit') applySitSheet();
+        frame = 0;
         setSitIdle(false);
         setSpriteXform(null);
         paint();
@@ -1393,39 +1424,21 @@ function startGame() {
       actor.dataset.standupFrames = String(breed.standupFrames || 6);
       actor.dataset.reactionFrames = String(breed.reactionFrames || 7);
     }
-    if (sprite) {
-      const mode = (actor && actor.dataset.mode) || 'walk';
-      if (mode === 'sit' && sitSrc) {
-        sprite.style.backgroundImage = 'url("' + sitSrc + '")';
-        const frames = Number((actor && actor.dataset.sitFrames) || 7) || 7;
-        const w = sprite.clientWidth || 96;
-        sprite.style.backgroundSize = (frames * w) + 'px 100%';
-        sprite.style.backgroundPosition = '0 0';
-      } else if (mode === 'idle' && idleSrc) {
-        sprite.style.backgroundImage = 'url("' + idleSrc + '")';
-        const frames = Number((actor && actor.dataset.idleFrames) || 7) || 7;
-        const w = sprite.clientWidth || 96;
-        sprite.style.backgroundSize = (frames * w) + 'px 100%';
-        sprite.style.backgroundPosition = '0 0';
-      } else if (mode === 'reaction' && reactionSrc) {
-        sprite.style.backgroundImage = 'url("' + reactionSrc + '")';
-        const frames = Number((actor && actor.dataset.reactionFrames) || 7) || 7;
-        const w = sprite.clientWidth || 96;
-        sprite.style.backgroundSize = (frames * w) + 'px 100%';
-        sprite.style.backgroundPosition = '0 0';
-      } else if (walkSrc) {
-        sprite.style.backgroundImage = 'url("' + walkSrc + '")';
-        const frames = Number((actor && actor.dataset.walkFrames) || 8) || 8;
-        const w = sprite.clientWidth || 96;
-        sprite.style.backgroundSize = (frames * w) + 'px 100%';
-        sprite.style.backgroundPosition = '0 0';
-      }
-    }
+    // Only createYardDog owns sprite image, sheet width and frame position.
+    // UI refreshes and clicks must never reset an active animation.
   }
+
   function applyYardArt() {
     const bg = $('#yard-bg');
     const yard = getYard();
-    if (bg && yard) bg.style.backgroundImage = 'url("' + yard.src + '")';
+    if (bg && yard) {
+      bg.style.backgroundImage = 'url("' + yard.src + '")';
+      const area = yard.walkArea || { left: 0.3, right: 0.8, width: 1536, height: 1024 };
+      bg.dataset.walkLeft = String(area.left);
+      bg.dataset.walkRight = String(area.right);
+      bg.dataset.sourceWidth = String(area.width);
+      bg.dataset.sourceHeight = String(area.height);
+    }
   }
   function applyFriendArt() {
     const img = $('#friendArt');
