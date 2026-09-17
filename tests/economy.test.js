@@ -71,3 +71,18 @@ console.log('economy: reward basis, no boost stacking, quoted walks, single clai
  let now=1000;Object.assign(c,{Date:{now:()=>now},toyActive:true,toyTaps:0,toyLastAttempt:-Infinity,toyEndsAt:1000+G.TOY_DURATION_MS-490});
  vm.runInContext(fn('toyTap'),c);c.toyTap();c.toyTap();assert.equal(c.toyTaps,1);
 }
+
+// Notification opens and reveals the claim button; periodic checks keep it stable.
+{
+ const c=fixture();let tab=null,scrolled=0,focused=0,renders=0;
+ const card={scrollIntoView(){scrolled++;}},button={closest(){return card;},focus(){focused++;}};
+ const panel={querySelector(){return button;}},alert={textContent:'',hidden:true};
+ c.$=id=>id==='#panel-achievements'?panel:id==='#achievement-alert'?alert:null;
+ c.setTab=name=>{tab=name;};vm.runInContext(fn('openAchievementRewards'),c);c.openAchievementRewards();
+ assert.equal(tab,'achievements');assert.equal(scrolled,1);assert.equal(focused,1);
+ c.ACHIEVEMENTS=[{id:'one',name:'First',check:()=>true}];c.state.achievementsClaimed={};
+ c.activeTab='achievements';c.lastAchievementSignature='';c.renderAchievements=()=>{renders++;};
+ vm.runInContext(fn('checkAchievements'),c);c.checkAchievements();c.checkAchievements();c.checkAchievements();
+ assert.equal(renders,1,'do not replace claim buttons once per second');
+ c.state.achievementsClaimed.one=true;c.checkAchievements();assert.equal(alert.hidden,true);
+}

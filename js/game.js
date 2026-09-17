@@ -44,6 +44,7 @@ function startGame() {
 
   const Economy = window.DogEconomy;
   let lastAchievementCheck = 0;
+  let lastAchievementSignature = '';
   let eventUnit = .5;
   let toyLastAttempt = -Infinity;
   let trainMistakes = 0;
@@ -1904,7 +1905,18 @@ function startGame() {
       const message = available.length ? tr('achievement_notice', {name:locn(available[0]),count:available.length}) : '';
       if (alert.textContent !== message) alert.textContent = message;
     }
-    if (available.length && activeTab === 'achievements') renderAchievements();
+    const signature = available.map(function(a) { return a.id; }).join(',');
+    if (signature !== lastAchievementSignature && activeTab === 'achievements') renderAchievements();
+    lastAchievementSignature = signature;
+  }
+  function openAchievementRewards() {
+    setTab('achievements');
+    const panel = $('#panel-achievements');
+    if (!panel) return;
+    const reward = panel.querySelector('[data-ach]');
+    const target = reward ? reward.closest('.ach-card') : panel;
+    if (target) target.scrollIntoView({ block: 'center', behavior: 'auto' });
+    if (reward) reward.focus({ preventScroll: true });
   }
   function achievementReward(a) { return a.reward; }
   function albumReward(set) { return Math.min(set.reward, Math.floor(Math.max(90, economyRate() * 180))); }
@@ -3673,7 +3685,7 @@ function startGame() {
     });
     listen($('#pack-buy-modal'), 'click', function (e) { if (e.target === e.currentTarget) hidePackBuyModal(); });
     listen($('#event-banner-go'), 'click', function () { startEvent(state.eventReadyType); });
-    listen($('#achievement-alert'), 'click', function () { setTab('achievements'); });
+    listen($('#achievement-alert'), 'click', openAchievementRewards);
     listen($('#activity-result-close'), 'click', function () { $('#activity-result').hidden = true; });
     listen($('#toy-tap'), 'click', toyTap);
     listen($('#train-modal'), 'click', function (e) {
