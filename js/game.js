@@ -53,6 +53,7 @@ function startGame() {
     ore: 0,
     incomeBySource: {},
     exploration: {},
+    care: { trust: 0, dayKey: '', pettingToday: 0, walksToday: 0, eventsToday: 0, planBonusDay: '' },
     levels: defaultLevels(),
     levelsTraining: defaultTrainingLevels(),
     levelsCards: defaultCardLevels(),
@@ -375,6 +376,73 @@ function startGame() {
       const local = new Date(d.getTime() + 10 * 60 * 60 * 1000);
       return local.getUTCFullYear() + '-' + String(local.getUTCMonth() + 1).padStart(2, '0') + '-' + String(local.getUTCDate()).padStart(2, '0');
     }
+  }
+  function normalizeCare(input) {
+    const src = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+    function num(key) {
+      const n = Number(src[key]);
+      return isFinite(n) && n > 0 ? n : 0;
+    }
+    return {
+      trust: num('trust'),
+      dayKey: typeof src.dayKey === 'string' ? src.dayKey : '',
+      pettingToday: Math.floor(num('pettingToday')),
+      walksToday: Math.floor(num('walksToday')),
+      eventsToday: Math.floor(num('eventsToday')),
+      planBonusDay: typeof src.planBonusDay === 'string' ? src.planBonusDay : '',
+    };
+  }
+  function ensureCareDay() {
+    state.care = normalizeCare(state.care);
+    const key = localDayKey();
+    if (state.care.dayKey !== key) {
+      state.care.dayKey = key;
+      state.care.pettingToday = 0;
+      state.care.walksToday = 0;
+      state.care.eventsToday = 0;
+    }
+    return state.care;
+  }
+  function getCareInfo() {
+    ensureCareDay();
+    return Economy.trustNext ? Economy.trustNext(state.care.trust || 0) : { level: 0, points: 0, next: 20, progress: 0 };
+  }
+  function getCareBonus() {
+    ensureCareDay();
+    return Economy.trustBonus ? Economy.trustBonus(state.care.trust || 0) : 0;
+  }
+  function addCareTrust(amount, reason) {
+    ensureCareDay();
+    const gain = Math.max(0, Number(amount) || 0);
+    if (!gain) return 0;
+    const before = Economy.trustLevel ? Economy.trustLevel(state.care.trust || 0) : 0;
+    state.care.trust = Math.max(0, (Number(state.care.trust) || 0) + gain);
+    const after = Economy.trustLevel ? Economy.trustLevel(state.care.trust || 0) : before;
+    if (after > before) showToast(tr('trust_level_up', { n: after }));
+    if (reason && activeTab === 'quests') renderQuests();
+    return gain;
+  }
+  function noteCarePetting() {
+    const care = ensureCareDay();
+    if (care.pettingToday >= 40) return 0;
+    care.pettingToday += 1;
+    if (care.pettingToday % 5 === 0) return addCareTrust(1, 'petting');
+    return 0;
+  }
+  function noteCareWalk(style) {
+    const care = ensureCareDay();
+    if (care.walksToday >= 4) return 0;
+    care.walksToday += 1;
+    return addCareTrust(style === 'sniff' ? 4 : 3, 'walk');
+  }
+  function noteCareEvent(quality) {
+    const care = ensureCareDay();
+    if (care.eventsToday >= 4) return 0;
+    care.eventsToday += 1;
+    return addCareTrust(quality >= .85 ? 4 : 3, 'event');
+  }
+  function activityReward(quality) {
+    return Math.floor(Economy.activity(eventUnit, quality) * (1 + getCareBonus()));
   }
   function upgradeCost(id) {
     const u = UPGRADES[id];
@@ -1787,6 +1855,11 @@ function startGame() {
       state.questStreak = (state.questStreak || 0) + 1;
       state.questLastClearDay = daySeed();
       state.dailyStreak = Math.max(state.dailyStreak || 0, state.questStreak);
+      ensureCareDay();
+      if (state.care.planBonusDay !== daySeed()) {
+        state.care.planBonusDay = daySeed();
+        addCareTrust(5, 'plan');
+      }
       showToast(tr('quest_streak', { n: state.questStreak }));
     }
     if (window.Sounds) window.Sounds.playBuy();
@@ -1857,6 +1930,7 @@ function startGame() {
     const root = $('#quests');
     if (!root) return;
     root.innerHTML = '';
+    renderCareSummary(root);
     renderExploration(root);
     const requests = document.createElement('section');
     requests.className = 'requests-board';
@@ -2153,15 +2227,16 @@ function startGame() {
     const taps = toyTaps;
     toyTaps = 0;
     if (taps > 0) {
-      const base = Math.max(1, getClickPower());
-      const reward = Economy.activity(eventUnit, Math.min(1, taps / 6));
+      const quality = Math.min(1, taps / 6);
+      const reward = activityReward(quality);
       creditBones(reward, 'events', true);
       state.stats.eventsDone = (state.stats.eventsDone || 0) + 1;
       bumpQuest('events', 1);
+      const careGain = noteCareEvent(quality);
       grantSticker('ball', true);
       addEventAcorns(0.8);
       if (window.Sounds) window.Sounds.playOffline();
-      showActivityResult(tr('toy_found', { n: fmt(reward), taps: taps }));
+      showActivityResult(tr('toy_found', { n: fmt(reward), taps: taps }) + (careGain ? ' · 🤝+' + careGain : ''));
       checkAchievements(); maybeUnlockStory();
 
     } else {
@@ -2251,14 +2326,16 @@ function startGame() {
     const modal = $('#train-modal');
     if (modal) modal.hidden = true;
     if (success) {
-      const reward = Economy.activity(eventUnit, Math.max(0, 1 - trainMistakes * .2));
+      const quality = Math.max(0, 1 - trainMistakes * .2);
+      const reward = activityReward(quality);
       creditBones(reward, 'events', true);
       state.stats.eventsDone = (state.stats.eventsDone || 0) + 1;
       bumpQuest('events', 1);
+      const careGain = noteCareEvent(quality);
       grantSticker('star', true);
       addEventAcorns(1);
       if (window.Sounds) window.Sounds.playOffline();
-      showActivityResult(tr('train_win', { n: fmt(reward) }));
+      showActivityResult(tr('train_win', { n: fmt(reward) }) + (careGain ? ' · 🤝+' + careGain : ''));
 
     }
     if (!success) showActivityResult(tr('train_failed'));
@@ -2327,14 +2404,16 @@ function startGame() {
     const modal = $('#hide-modal');
     if (modal) modal.hidden = true;
     if (success) {
-      const reward = Economy.activity(eventUnit, hideTriesLeft / HIDE_TRIES);
+      const quality = hideTriesLeft / HIDE_TRIES;
+      const reward = activityReward(quality);
       creditBones(reward, 'events', true);
       state.stats.eventsDone = (state.stats.eventsDone || 0) + 1;
       bumpQuest('events', 1);
+      const careGain = noteCareEvent(quality);
       grantSticker('hide');
       const ac = addEventAcorns(1.1);
       if (window.Sounds) window.Sounds.playOffline();
-      showActivityResult(tr('hide_win', { n: fmt(reward) }) + (ac ? ' · 🌰+' + ac : ''));
+      showActivityResult(tr('hide_win', { n: fmt(reward) }) + (ac ? ' · 🌰+' + ac : '') + (careGain ? ' · 🤝+' + careGain : ''));
 
     } else {
       showActivityResult(tr('hide_miss'));
@@ -2397,10 +2476,12 @@ function startGame() {
     if (modal) modal.hidden = true;
     const pct = Math.min(100, raceFill);
     if (!forceFail && pct >= 55) {
-      const reward = Economy.activity(eventUnit, pct / 100);
+      const quality = pct / 100;
+      const reward = activityReward(quality);
       creditBones(reward, 'events', true);
       state.stats.eventsDone = (state.stats.eventsDone || 0) + 1;
       bumpQuest('events', 1);
+      noteCareEvent(quality);
       const ac = addEventAcorns(0.9 + pct / 100);
       if (window.Sounds) window.Sounds.playOffline();
       showToast(tr('race_win', { n: fmt(reward), pct: Math.floor(pct) }) + (ac ? ' · 🌰+' + ac : ''));
@@ -2623,12 +2704,40 @@ function startGame() {
     return true;
   }
   function explorationQuote(tier, style) {
-    const quote = Economy.walk(tier, economyRate(), getTrainingSum('walkRewardPct'), style);
+    const quote = Economy.walk(tier, economyRate(), getTrainingSum('walkRewardPct') + getCareBonus(), style);
     const progress = Economy.exploration((state.exploration || {})[tier.id], quote.style);
     quote.energy = Math.max(10, quote.energy - progress.rank);
     quote.discoveryBonus = progress.discovered ? Math.floor(quote.reward * .25) : 0;
     quote.reward += quote.discoveryBonus;
     return quote;
+  }
+  function renderCareSummary(root) {
+    const info = getCareInfo();
+    const bonus = getCareBonus();
+    const nextText = info.next ? fmt(Math.max(0, Math.ceil(info.next - info.points))) : tr('trust_max');
+    const pct = Math.round((info.progress || 0) * 100);
+    const card = document.createElement('section');
+    card.className = 'quest-card care-card';
+    card.innerHTML = '<h3>' + tr('trust_h', { n: info.level }) + '</h3><p>' + tr('trust_desc') + '</p><div class="quest-bar"><span style="width:' + pct + '%"></span></div><p class="care-bonus">' + tr('trust_bonus', { n: Math.round(bonus * 100), next: nextText }) + '</p><div class="care-stats"><span class="care-stat"><strong>' + Math.min(40, state.care.pettingToday || 0) + '/40</strong>' + tr('trust_pet') + '</span><span class="care-stat"><strong>' + Math.min(4, state.care.walksToday || 0) + '/4</strong>' + tr('trust_walk') + '</span><span class="care-stat"><strong>' + Math.min(4, state.care.eventsToday || 0) + '/4</strong>' + tr('trust_game') + '</span></div>';
+    const actions = document.createElement('div');
+    actions.className = 'modal-actions';
+    const pet = document.createElement('button');
+    pet.type = 'button'; pet.className = 'btn btn-sm btn-ghost'; pet.textContent = tr('trust_pet_action');
+    pet.addEventListener('click', function () {
+      const dog = $('#dogActor') || $('#mine-area');
+      if (dog && dog.scrollIntoView) dog.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (dog && dog.focus) dog.focus({ preventScroll: true });
+    });
+    const walk = document.createElement('button');
+    walk.type = 'button'; walk.className = 'btn btn-sm'; walk.textContent = tr('walk');
+    walk.disabled = !!state.activeWalk;
+    walk.addEventListener('click', openWalkSheet);
+    const game = document.createElement('button');
+    game.type = 'button'; game.className = 'btn btn-sm'; game.textContent = tr('event');
+    game.addEventListener('click', onEventButton);
+    actions.appendChild(pet); actions.appendChild(walk); actions.appendChild(game);
+    card.appendChild(actions);
+    root.appendChild(card);
   }
   function renderExploration(root) {
     const section = document.createElement('div');
@@ -2675,7 +2784,7 @@ function startGame() {
     updateEnergyUI(); renderStats(); scheduleSave();
   }
   function walkRewardBones(tier) {
-    return Economy.walk(tier, economyRate(), getTrainingSum('walkRewardPct'), 'trail').reward;
+    return Economy.walk(tier, economyRate(), getTrainingSum('walkRewardPct') + getCareBonus(), 'trail').reward;
   }
 
   function completeWalk(fromClaim) {
@@ -2691,7 +2800,9 @@ function startGame() {
     creditBones(reward, 'walks', true);
     state.stats.walksDone = (state.stats.walksDone || 0) + 1;
     bumpQuest('walks', 1);
+    const careGain = noteCareWalk(walk.style);
     let extra = discovery.discovered ? ' · ' + tr('exploration_found') : '';
+    if (careGain) extra += ' · 🤝+' + careGain;
     if (Math.random() < (walk.stickerChance == null ? tier.stickerChance : walk.stickerChance)) {
       const pool = ['paw', 'bone', 'leaf', 'ball'];
       const missing = pool.filter(function (id) { return !hasSticker(id); });
@@ -2865,6 +2976,11 @@ function startGame() {
       if (state.dailyLastClearDay !== state.dailyDayKey) {
         state.dailyStreak = (state.dailyStreak || 0) + 1;
         state.dailyLastClearDay = state.dailyDayKey;
+        ensureCareDay();
+        if (state.care.planBonusDay !== state.dailyDayKey) {
+          state.care.planBonusDay = state.dailyDayKey;
+          addCareTrust(5, 'plan');
+        }
       }
       showToast(tr('daily_all', { n: state.dailyStreak }));
     }
@@ -2984,12 +3100,14 @@ function startGame() {
     const comboEl = $('#combo-badge');
     const itemEl = $('#item-badge');
     const medalsEl = $('#stat-medals');
+    const trustEl = $('#stat-trust');
     const acornsEl = $('#stat-acorns');
     const joyBtn = $('#btn-joy');
     if (oreEl) oreEl.textContent = fmt(state.ore);
     if (opsEl) opsEl.textContent = fmt(getOrePerSec()) + tr('per_sec');
     if (clickEl) clickEl.textContent = fmt(getClickPower() * (state.pendingClickMult > 1 ? state.pendingClickMult : 1));
     if (medalsEl) medalsEl.textContent = String(state.medals);
+    if (trustEl) trustEl.textContent = String(getCareInfo().level);
     if (acornsEl) acornsEl.textContent = fmt(isFinite(state.acorns) ? state.acorns : 0);
     updateSeasonUI();
     if (boostEl) {
@@ -3076,6 +3194,7 @@ function startGame() {
       if (state.stats.totalClicks % 25 === 0) maybeGrantLeafSticker();
     }
     bumpQuest('clicks', 1);
+    noteCarePetting();
 
     if (state.pendingClickMult > 1) { state.pendingClickMult = 1; showToast(tr('double_used')); }
     const btn = $('#mine-btn');
@@ -3187,6 +3306,7 @@ function startGame() {
       ore: state.ore,
       incomeBySource: Object.assign({}, state.incomeBySource),
       exploration: Object.assign({}, state.exploration),
+      care: normalizeCare(state.care),
       levels: Object.assign(defaultLevels(), state.levels),
       levelsTraining: Object.assign(defaultTrainingLevels(), state.levelsTraining || {}),
       levelsCards: Object.assign(defaultCardLevels(), state.levelsCards || {}),
@@ -3304,6 +3424,8 @@ function startGame() {
     state.exploration = {};
     WALK_TIERS.forEach(function(t) { const n = Number((data.exploration || {})[t.id]); state.exploration[t.id] = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0; });
     state.incomeBySource = Object.assign({}, data.incomeBySource || {});
+    state.care = normalizeCare(data.care);
+    ensureCareDay();
     state.ore = Number(data.ore) || 0;
     if (!isFinite(state.ore) || state.ore < 0) state.ore = 0;
     state.levels = defaultLevels();

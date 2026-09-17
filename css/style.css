@@ -704,7 +704,8 @@ header h1 {
   box-shadow: 0 4px 14px var(--accent-glow);
 }
 
-#medal-badge {
+#medal-badge,
+#trust-badge {
   background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--ore);
@@ -2163,3 +2164,8 @@ header h1 {
 .pack-offer {grid-column:1/-1;}
 .requests-board {margin-top:24px;padding-top:16px;border-top:1px solid var(--border);}
 #toy-feedback {min-height:2.5em;}
+.care-card {background:linear-gradient(180deg,#fffdf6,#fff0db);border-color:#e5b56a;}
+.care-stats {display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0;}
+.care-stat {background:rgba(255,255,255,.72);border:1px solid var(--border);border-radius:12px;padding:8px;text-align:center;font-size:.75rem;color:var(--muted);}
+.care-stat strong {display:block;color:var(--ore);font-size:.92rem;margin-bottom:2px;}
+.care-bonus {font-size:.78rem;color:var(--muted);margin:8px 0 0;}

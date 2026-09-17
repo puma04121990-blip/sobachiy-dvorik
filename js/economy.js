@@ -6,20 +6,32 @@
   const nonnegative=x=>Number.isFinite(Number(x))?Math.max(0,Number(x)):0;
   // One second of sustainable play: idle plus one pet every two seconds.
   function rate(idle,pet){return Math.max(.5,nonnegative(idle)+nonnegative(pet)*.5);}
+  const trustSteps=[0,20,55,105,170,250,345,455,580,720,880];
+  function trustLevel(points){
+    const p=nonnegative(points);
+    let level=0;
+    for(let i=0;i<trustSteps.length;i++)if(p>=trustSteps[i])level=i;
+    return level;
+  }
+  function trustNext(points){
+    const p=nonnegative(points),level=trustLevel(p),next=trustSteps[level+1]||null;
+    return {level,points:p,next,progress:next?Math.min(1,(p-trustSteps[level])/(next-trustSteps[level])):1};
+  }
+  function trustBonus(points){return Math.min(.35,trustLevel(points)*.035);}
   function walk(tier,unit,bonus,style){
     const sniff=style==='sniff';
     return {
-      reward:Math.floor(Math.max(tier.minReward,nonnegative(unit)*tier.durationMs/1000*tier.rewardMult)*(1+Math.min(1,nonnegative(bonus)))*(sniff?.8:1)),
+      reward:Math.floor(Math.max(tier.minReward,nonnegative(unit)*tier.durationMs/1000*tier.rewardMult)*(1+Math.min(1.35,nonnegative(bonus)))*(sniff?.85:1)),
       energy:tier.energy+(sniff?0:8),
       stickerChance:Math.min(.85,tier.stickerChance+(sniff?.25:0)),
       style:sniff?'sniff':'trail'
     };
   }
-  function activity(unit,quality){return Math.floor(Math.max(25,nonnegative(unit)*60)*(.5+.5*Math.min(1,nonnegative(quality))));}
+  function activity(unit,quality){return Math.floor(Math.max(40,nonnegative(unit)*75)*(.45+.55*Math.min(1,nonnegative(quality))));}
   function quest(type,target,unit,pet,streak){
     const r=nonnegative(unit),n=nonnegative(target);
-    const base=type==='earn'?n*.12:type==='clicks'?n*nonnegative(pet)*.35:type==='walks'?r*n*35:type==='events'?r*n*30:r*30;
-    return Math.floor(Math.max(10,base)*(1+Math.min(.25,nonnegative(streak)*.025)));
+    const base=type==='earn'?n*.15:type==='clicks'?n*nonnegative(pet)*.32:type==='walks'?r*n*75:type==='events'?r*n*65:r*40;
+    return Math.floor(Math.max(25,base)*(1+Math.min(.25,nonnegative(streak)*.025)));
   }
   function credit(state,amount,source){
     const value=nonnegative(amount);if(!value)return 0;
@@ -39,5 +51,5 @@
     const nextRank = discoverySteps.filter(n => after >= n).length;
     return {before, after, rank, nextRank, discovered: nextRank > rank, next: discoverySteps.find(n => n > before) || null};
   }
-  return {exploration, discoverySteps, rate,walk,activity,quest,credit,petAllowed,timing,rhythmGain};
+  return {trustLevel,trustNext,trustBonus,exploration, discoverySteps, rate,walk,activity,quest,credit,petAllowed,timing,rhythmGain};
 });

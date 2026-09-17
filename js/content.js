@@ -391,9 +391,9 @@ const MEDAL_SHOP = [
 ];
 
 const WALK_TIERS = [
-  { id: 'short', name: 'Знакомая тропинка', icon: '🚶', energy: 18, boneCost: 0, durationMs: 60000, rewardMult: 1.1, minReward: 45, stickerChance: .15, acornChance: .12, unlockStage: 1 },
-  { id: 'park', name: 'Парк и новые запахи', icon: '🌳', energy: 32, boneCost: 0, durationMs: 150000, rewardMult: 1.2, minReward: 120, stickerChance: .25, acornChance: .22, unlockStage: 2 },
-  { id: 'long', name: 'Лесная разведка', icon: '🏞️', energy: 48, boneCost: 0, durationMs: 240000, rewardMult: 1.3, minReward: 210, stickerChance: .35, acornChance: .35, unlockStage: 3 },
+  { id: 'short', name: 'Знакомая тропинка', icon: '🚶', energy: 18, boneCost: 0, durationMs: 60000, rewardMult: 1.6, minReward: 70, stickerChance: .18, acornChance: .12, unlockStage: 1 },
+  { id: 'park', name: 'Парк и новые запахи', icon: '🌳', energy: 30, boneCost: 0, durationMs: 150000, rewardMult: 1.85, minReward: 210, stickerChance: .28, acornChance: .22, unlockStage: 2 },
+  { id: 'long', name: 'Лесная разведка', icon: '🏞️', energy: 44, boneCost: 0, durationMs: 240000, rewardMult: 2.1, minReward: 420, stickerChance: .38, acornChance: .35, unlockStage: 3 },
 ];
 
 const YARD_STAGES = [

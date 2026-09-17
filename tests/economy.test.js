@@ -18,9 +18,9 @@ for(const [name,level] of [['new',0],['early',3],['middle',10],['late',20]]){
 }
 // Exactly one payout; departure quote survives JSON save/reload and economy changes.
 {
- const c=fixture(),s=c.state;c.startWalk('short','sniff');const quote=JSON.parse(JSON.stringify(c.serialize())).activeWalk;assert.equal(s.ore,10000);assert.equal(s.energy,82);assert.equal(quote.reward,36);
+ const c=fixture(),s=c.state;c.startWalk('short','sniff');const quote=JSON.parse(JSON.stringify(c.serialize())).activeWalk;assert.equal(s.ore,10000);assert.equal(s.energy,82);assert.equal(quote.reward,59);
  s.activeWalk=quote;s.activeWalk.endsAt=Date.now()-1;s.levels.miner=1000;
- c.completeWalk(true);assert.equal(s.ore,10036);assert.equal(s.stats.walksDone,1);c.completeWalk(true);assert.equal(s.ore,10036);
+ c.completeWalk(true);assert.equal(s.ore,10059);assert.equal(s.stats.walksDone,1);c.completeWalk(true);assert.equal(s.ore,10059);
 }
 // No regeneration of claimed quests; no bonus-to-quest feedback loop.
 {
@@ -32,6 +32,7 @@ for(const [name,level] of [['new',0],['early',3],['middle',10],['late',20]]){
 assert(!E.petAllowed(1000,900,100,false));assert(!E.petAllowed(1000,null,0,false));assert(!E.petAllowed(1000,null,100,true));assert(E.petAllowed(1000,500,100,false));
 assert(E.rhythmGain(600)>0);assert(E.rhythmGain(50)<0);assert(E.rhythmGain(1000)<0);
 assert(E.activity(100,1)>E.activity(100,0));assert.equal(E.activity(100,1000),E.activity(100,1));
+assert.equal(E.trustLevel(0),0);assert.equal(E.trustLevel(20),1);assert(E.trustBonus(880)<=.35);
 for(const n of [NaN,Infinity,-1]){const s={ore:0,stats:{lifetimeBones:0}};assert.equal(E.credit(s,n,'test'),0);assert.equal(s.ore,0);}
 for(const t of G.WALK_TIERS){const s=Core.applyVersionMigrations({v:8,ore:123,activeWalk:{tierId:t.id,endsAt:100},levels:{miner:7}},9);assert.equal(s.ore,123);assert.equal(s.levels.miner,7);assert(s.activeWalk.legacyEntryCost>0);}
 for(const u of Object.values(G.UPGRADES))if(u.orePerSec)assert(u.baseCost/u.orePerSec<=900,'helper ROI '+u.id);
@@ -43,13 +44,24 @@ console.log('economy: reward basis, no boost stacking, quoted walks, single clai
 // Exploration is persistent and only awards newly crossed discoveries.
 {
  const c=fixture(),s=c.state;s.exploration={short:2};
- const q=c.explorationQuote(G.WALK_TIERS[0],'trail');assert.equal(q.reward,56);assert.equal(q.discoveryBonus,11);
+ const q=c.explorationQuote(G.WALK_TIERS[0],'trail');assert.equal(q.reward,87);assert.equal(q.discoveryBonus,17);
  c.startWalk('short','trail');s.activeWalk.endsAt=Date.now()-1;c.completeWalk(true);
  assert.equal(s.exploration.short,3);assert.equal(c.serialize().exploration.short,3);
  assert.equal(c.explorationQuote(G.WALK_TIERS[0],'trail').discoveryBonus,0);
  assert.equal(c.explorationQuote(G.WALK_TIERS[0],'trail').energy,25);
  assert.equal(E.exploration(9,'sniff').after,11);assert(E.exploration(9,'sniff').discovered);
  c.completeWalk(true);assert.equal(s.exploration.short,3);
+}
+
+// Trust rewards varied care, is capped per day, is saved, and boosts active play.
+{
+ const c=fixture(),s=c.state;
+ for(let i=0;i<45;i++)c.noteCarePetting();
+ assert.equal(s.care.pettingToday,40);assert.equal(s.care.trust,8);
+ for(let i=0;i<5;i++)c.noteCareWalk('sniff');
+ assert.equal(s.care.walksToday,4);assert.equal(s.care.trust,24);assert.equal(c.getCareInfo().level,1);
+ assert(c.explorationQuote(G.WALK_TIERS[0],'trail').reward>G.WALK_TIERS[0].minReward);
+ assert.equal(c.serialize().care.trust,24);
 }
 
 // Paid branches cannot be unlocked by walking, yard progress or free card levels.
