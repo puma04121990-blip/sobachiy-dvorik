@@ -968,6 +968,13 @@ function startGame() {
     let sheet = '';
     let transStart = 0;
     let reactionUntil = 0;
+    let activeWalkSrc = '';
+    function walkSpeed() {
+      return Number(actor.dataset.walkStride) > 0 ? (actor.clientWidth || ACTOR_W) * Number(actor.dataset.walkStride) / Number(actor.dataset.walkDuration || 1.2) : WALK_SPEED;
+    }
+    function walkFps() { return Number(actor.dataset.walkDuration) > 0 ? walkFrameCount() / Number(actor.dataset.walkDuration) : FRAME_FPS; }
+    function loopFps(fallback) { return Number(actor.dataset.loopFps) || fallback; }
+    function transitionFps() { return Number(actor.dataset.transitionFps) || TRANS_FPS; }
 
     function prefersReduced() {
       try {
@@ -1026,6 +1033,8 @@ function startGame() {
 
     function paintSheetFrame(frames) {
       if (!sprite) return;
+      const src = actor.dataset[sheet + 'Src'];
+      if (src) sprite.style.backgroundImage = 'url("' + src + '")';
       const w = sprite.clientWidth || 96;
       const f = Math.min(frames - 1, Math.max(0, frame | 0));
       sprite.style.backgroundSize = (frames * w) + 'px 100%';
@@ -1040,8 +1049,8 @@ function startGame() {
       if (!sprite) return;
       const walkSrc = actor.dataset.walkSrc || '';
       if (walkSrc) sprite.style.backgroundImage = 'url("' + walkSrc + '")';
-      paintWalkFrame();
       sheet = 'walk';
+      paintWalkFrame();
     }
 
     function applyIdleSheet() {
@@ -1117,15 +1126,7 @@ function startGame() {
       }
     }
 
-    function requestDir(next) {
-      if (next === dir && pendingDir == null) return;
-      if (frame === 0) {
-        dir = next;
-        pendingDir = null;
-      } else {
-        pendingDir = next;
-      }
-    }
+    function requestDir(next) { dir = next; pendingDir = null; }
 
     function paint() {
       const sx = dir < 0 ? -1 : 1;
@@ -1202,7 +1203,6 @@ function startGame() {
       if (mode === 'reaction') return;
       mode = 'reaction';
       pendingDir = null;
-      dir = 1;
       applyReactionSheet();
       setSitIdle(false);
       setSpriteXform(null);
@@ -1235,6 +1235,10 @@ function startGame() {
       const dt = Math.min(0.05, (ts - lastTs) / 1000);
       lastTs = ts;
 
+      if (activeWalkSrc !== actor.dataset.walkSrc) {
+        activeWalkSrc = actor.dataset.walkSrc;
+        enterWalk(ts, false);
+      }
       if (prefersReduced()) {
         const b = walkBounds();
         mode = 'sit';
@@ -1253,10 +1257,12 @@ function startGame() {
           enterApproach();
         } else {
           const b = walkBounds();
-          x += dir * WALK_SPEED * dt;
-          if (x <= b.minX) { x = b.minX; requestDir(1); }
-          if (x >= b.maxX) { x = b.maxX; requestDir(-1); }
-          advanceWalkFrames(dt, FRAME_FPS);
+          const oldX = x;
+          x = Math.max(b.minX, Math.min(b.maxX, x + dir * walkSpeed() * dt));
+          advanceWalkFrames(Math.abs(x - oldX) / walkSpeed(), walkFps());
+          if (x <= b.minX) requestDir(1);
+          if (x >= b.maxX) requestDir(-1);
+          if (b.maxX === b.minX) enterIdle(ts);
         }
       }
 
@@ -1269,40 +1275,40 @@ function startGame() {
           enterSitdown(ts);
         } else {
           requestDir(x < b.sitX ? 1 : -1);
-          x += dir * WALK_SPEED * dt;
+          x += dir * walkSpeed() * dt;
           if ((dir > 0 && x >= b.sitX) || (dir < 0 && x <= b.sitX)) {
             x = b.sitX;
             dir = 1;
             pendingDir = null;
             enterSitdown(ts);
           } else {
-            advanceWalkFrames(dt, FRAME_FPS);
+            advanceWalkFrames(dt, walkFps());
           }
         }
       }
 
       if (mode === 'idle') {
-        advanceLoopFrames(dt, IDLE_FPS, frameCount('idle', 7));
+        advanceLoopFrames(dt, loopFps(IDLE_FPS), frameCount('idle', 7));
         if (ts >= modeUntil) enterWalk(ts, true);
       }
 
       if (mode === 'sitdown') {
         const frames = sitdownFrameCount();
         const elapsed = (ts - transStart) / 1000;
-        frame = Math.min(frames - 1, Math.floor(elapsed * TRANS_FPS));
-        if (elapsed >= frames / TRANS_FPS) enterSit(ts);
+        frame = Math.min(frames - 1, Math.floor(elapsed * transitionFps()));
+        if (elapsed >= frames / transitionFps()) enterSit(ts);
       } else if (mode === 'sit') {
         x = walkBounds().sitX;
         dir = 1;
-        advanceLoopFrames(dt, SIT_FPS, frameCount('sit', 7));
+        advanceLoopFrames(dt, loopFps(SIT_FPS), frameCount('sit', 7));
         if (ts >= modeUntil) enterStandup(ts);
       } else if (mode === 'standup') {
         const frames = frameCount('standup', 6);
         const elapsed = (ts - transStart) / 1000;
-        frame = Math.min(frames - 1, Math.floor(elapsed * TRANS_FPS));
-        if (elapsed >= frames / TRANS_FPS) enterIdle(ts);
+        frame = Math.min(frames - 1, Math.floor(elapsed * transitionFps()));
+        if (elapsed >= frames / transitionFps()) enterIdle(ts);
       } else if (mode === 'reaction') {
-        advanceLoopFrames(dt, REACTION_FPS, frameCount('reaction', 7));
+        advanceLoopFrames(dt, loopFps(REACTION_FPS), frameCount('reaction', 7));
         if (ts >= reactionUntil) enterWalk(ts, false);
       }
 
@@ -1310,7 +1316,8 @@ function startGame() {
     }
 
     function onReact() {
-      if (!prefersReduced()) enterReaction(performance.now());
+      // Do not replace a seated/transition pose with a standing reaction.
+      if (!prefersReduced() && (mode === 'walk' || mode === 'idle' || mode === 'reaction')) enterReaction(performance.now());
     }
     stage.addEventListener('dog:react', onReact);
 
@@ -1367,6 +1374,10 @@ function startGame() {
     const standupSrc = breed.standupSrc || '';
     const reactionSrc = breed.reactionSrc || '';
     if (actor) {
+      actor.dataset.walkStride = String(breed.walkStride || 0);
+      actor.dataset.walkDuration = String(breed.walkDuration || 0);
+      actor.dataset.loopFps = String(breed.loopFps || 0);
+      actor.dataset.transitionFps = String(breed.transitionFps || 0);
       actor.dataset.walkSrc = walkSrc;
       actor.dataset.idleSrc = idleSrc;
       actor.dataset.sitSrc = sitSrc;

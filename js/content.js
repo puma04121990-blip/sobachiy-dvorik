@@ -197,6 +197,13 @@ Object.values(BREEDS).forEach(function (breed) {
   breed.standupSrc = breed.spriteBase + 'standup-v2.webp';
   breed.reactionSrc = breed.spriteBase + 'reaction-v2.webp';
 });
+// Render all Labrador states from one registered model, in 256px source cells.
+Object.assign(BREEDS.lab, { walkFrames: 24, idleFrames: 24, sitdownFrames: 12,
+  sitFrames: 24, standupFrames: 12, reactionFrames: 24, frameW: 256, frameH: 256,
+  walkStride: 104 / 256, walkDuration: 1.2, loopFps: 20, transitionFps: 20 });
+['walk', 'idle', 'sitdown', 'sit', 'standup', 'reaction'].forEach(function (state) {
+  BREEDS.lab[state + 'Src'] = 'assets/lab-v5/' + state + '.webp';
+});
 const BREED_COUNT = Object.keys(BREEDS).length;
 
 const YARDS = {

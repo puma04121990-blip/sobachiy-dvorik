@@ -61,7 +61,7 @@ Object.values(Game.BREEDS).forEach(function (breed) {
   ['idle', 'walk', 'sitdown', 'sit', 'standup', 'reaction'].forEach(function (state) {
     const src = breed[state + 'Src'];
     const frames = breed[state + 'Frames'];
-    assert.ok(src && src.indexOf('assets/sprites-v2/') === 0, breed.id + ' ' + state + ' src');
+    assert.ok(src && src.indexOf('assets/') === 0, breed.id + ' ' + state + ' src');
     assert.ok(frames >= 6, breed.id + ' ' + state + ' frames');
     assert.ok(fs.existsSync(path.join(__dirname, '..', src)), breed.id + ' ' + state + ' file');
   });
