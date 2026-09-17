@@ -31,5 +31,13 @@
   function petAllowed(now,last,energy,walking){return !walking&&energy>=1.6&&(last==null||now-last>=500);}
   function timing(elapsed){const t=((nonnegative(elapsed)%1400)/700);return t<=1?t:2-t;}
   function rhythmGain(gap){return gap>=450&&gap<=750?14:-8;}
-  return {rate,walk,activity,quest,credit,petAllowed,timing,rhythmGain};
+  const discoverySteps = [3, 10, 25, 60, 120];
+  function exploration(progress, style) {
+    const before = Math.floor(nonnegative(progress));
+    const after = before + (style === 'sniff' ? 2 : 1);
+    const rank = discoverySteps.filter(n => before >= n).length;
+    const nextRank = discoverySteps.filter(n => after >= n).length;
+    return {before, after, rank, nextRank, discovered: nextRank > rank, next: discoverySteps.find(n => n > before) || null};
+  }
+  return {exploration, discoverySteps, rate,walk,activity,quest,credit,petAllowed,timing,rhythmGain};
 });

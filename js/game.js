@@ -51,6 +51,7 @@ function startGame() {
   const state = {
     ore: 0,
     incomeBySource: {},
+    exploration: {},
     levels: defaultLevels(),
     levelsTraining: defaultTrainingLevels(),
     levelsCards: defaultCardLevels(),
@@ -1855,10 +1856,14 @@ function startGame() {
     const root = $('#quests');
     if (!root) return;
     root.innerHTML = '';
+    renderExploration(root);
+    const requests = document.createElement('details');
+    requests.innerHTML = '<summary>' + tr('optional_requests') + '</summary>';
+    root.appendChild(requests);
     const dailyHead = document.createElement('div');
     dailyHead.className = 'section-subhead';
     dailyHead.innerHTML = '<strong>' + tr('daily_h') + '</strong> · ' + (state.dailyStreak || 0);
-    if ((state.dailyGoals || []).length) root.appendChild(dailyHead);
+    if ((state.dailyGoals || []).length) requests.appendChild(dailyHead);
     (state.dailyGoals || []).forEach(function (g) {
       const done = !g.claimed && g.progress >= g.target;
       const card = document.createElement('div');
@@ -1869,12 +1874,12 @@ function startGame() {
       if (g.claimed) btn = '<span class="breed-active">' + tr('claimed') + '</span>';
       else if (done) btn = '<button type="button" class="btn btn-sm" data-claim-daily="' + escapeHtml(g.id) + '">' + tr('claim') + '</button>';
       card.innerHTML = '<div class="quest-title">' + escapeHtml(dLabel(g)) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(g.progress, g.target)) + ' / ' + fmt(g.target) + ' · 🦴 ' + fmt(g.reward) + '</div>' + btn;
-      root.appendChild(card);
+      requests.appendChild(card);
     });
     const qHead = document.createElement('div');
     qHead.className = 'section-subhead';
     qHead.innerHTML = '<strong>' + tr('tab_quests') + '</strong> · ' + (state.questStreak || 0);
-    root.appendChild(qHead);
+    requests.appendChild(qHead);
     state.quests.forEach(function (q) {
       const done = !q.claimed && q.progress >= q.target;
       const card = document.createElement('div');
@@ -1882,7 +1887,7 @@ function startGame() {
       card.setAttribute('data-quest-id', q.id);
       const pct = questBarPct(q);
       card.innerHTML = '<div class="quest-title">' + escapeHtml(qLabel(q)) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(q.progress, q.target)) + ' / ' + fmt(q.target) + ' · ' + tr('reward_bones', { n: fmt(q.reward) }) + '</div>' + (q.claimed ? '<span class="breed-active">' + tr('claimed') + '</span>' : done ? '<button type="button" class="btn btn-sm" data-claim="' + escapeHtml(q.id) + '">' + tr('claim') + '</button>' : '');
-      root.appendChild(card);
+      requests.appendChild(card);
     });
   }
 
@@ -2583,6 +2588,35 @@ function startGame() {
     if (tier.unlockPrestige && (state.prestigeLevel || 0) < tier.unlockPrestige) return false;
     return true;
   }
+  function explorationQuote(tier, style) {
+    const quote = Economy.walk(tier, economyRate(), getTrainingSum('walkRewardPct'), style);
+    const progress = Economy.exploration((state.exploration || {})[tier.id], quote.style);
+    quote.energy = Math.max(10, quote.energy - progress.rank);
+    quote.discoveryBonus = progress.discovered ? Math.floor(quote.reward * .25) : 0;
+    quote.reward += quote.discoveryBonus;
+    return quote;
+  }
+  function renderExploration(root) {
+    const section = document.createElement('div');
+    section.className = 'exploration-journal';
+    const names = {
+      short: ['discovery_bench','discovery_cat','discovery_fountain','discovery_courtyard','discovery_home'],
+      park: ['discovery_oak','discovery_ducks','discovery_bridge','discovery_meadow','discovery_friends'],
+      long: ['discovery_tracks','discovery_stream','discovery_hill','discovery_lake','discovery_overlook']
+    };
+    WALK_TIERS.forEach(function(tier) {
+      const p = Economy.exploration((state.exploration || {})[tier.id], 'trail');
+      const card = document.createElement('div');
+      card.className = 'quest-card';
+      const found = names[tier.id].slice(0,p.rank).map(function(key) { return tr(key); });
+      const nextName = p.rank < 5 ? tr(names[tier.id][p.rank]) : tr('exploration_complete');
+      card.innerHTML = '<h3>' + tier.icon + ' ' + escapeHtml(locn(tier)) + '</h3><p>' + escapeHtml(tr('exploration_progress', {count:p.before,next:p.next || 120,found:p.rank})) + '</p><p>' + escapeHtml(found.join(' · ') || tr('exploration_empty')) + '</p><p>' + escapeHtml(tr('exploration_next', {name:nextName})) + '</p>';
+      const go = document.createElement('button'); go.type = 'button'; go.className = 'btn btn-sm'; go.textContent = tr('walk');
+      go.disabled = !isWalkUnlocked(tier) || !!state.activeWalk;
+      go.addEventListener('click', openWalkSheet);card.appendChild(go);section.appendChild(card);
+    });
+    root.appendChild(section);
+  }
   function startWalk(tierId, style) {
     if (toyActive || trainActive || hideActive || raceActive) { showToast(tr('event_running')); return; }
     if (state.activeWalk && state.activeWalk.endsAt > Date.now()) {
@@ -2597,7 +2631,7 @@ function startGame() {
       showToast(tier.unlockPrestige ? tr('need_stage_show', { n: tier.unlockStage }) : tr('need_stage', { n: tier.unlockStage }));
       return;
     }
-    const quote = Economy.walk(tier, economyRate(), getTrainingSum('walkRewardPct'), style);
+    const quote = explorationQuote(tier, style);
     if (state.energy < quote.energy) { showToast(tr('low_energy')); return; }
     if (state.ore < tier.boneCost) { showToast(tr('need') + ' 🦴'); return; }
     state.energy -= quote.energy;
@@ -2616,11 +2650,14 @@ function startGame() {
     if (Date.now() < walk.endsAt) return;
     const tier = WALK_TIERS.find(function (t) { return t.id === walk.tierId; }) || WALK_TIERS[0];
     state.activeWalk = null;
+    if (!state.exploration) state.exploration = {};
+    const discovery = Economy.exploration(state.exploration[tier.id], walk.style);
+    state.exploration[tier.id] = discovery.after;
     const reward = Number.isFinite(walk.reward) ? walk.reward : walkRewardBones(tier) + (walk.legacyEntryCost || 0);
     creditBones(reward, 'walks', true);
     state.stats.walksDone = (state.stats.walksDone || 0) + 1;
     bumpQuest('walks', 1);
-    let extra = '';
+    let extra = discovery.discovered ? ' · ' + tr('exploration_found') : '';
     if (Math.random() < (walk.stickerChance == null ? tier.stickerChance : walk.stickerChance)) {
       const pool = ['paw', 'bone', 'leaf', 'ball'];
       const missing = pool.filter(function (id) { return !hasSticker(id); });
@@ -2689,7 +2726,7 @@ function startGame() {
     list.innerHTML = '';
     WALK_TIERS.forEach(function (t) {
       ['trail', 'sniff'].forEach(function (style) {
-      const quote = Economy.walk(t, economyRate(), getTrainingSum('walkRewardPct'), style);
+      const quote = explorationQuote(t, style);
       if (['paw','bone','leaf','ball'].every(hasSticker)) quote.stickerChance = 0;
       const unlocked = isWalkUnlocked(t);
       const row = document.createElement('button');
@@ -2697,7 +2734,7 @@ function startGame() {
       row.className = 'walk-tier-btn' + (unlocked ? '' : ' locked');
       row.disabled = !unlocked;
       const mins = (t.durationMs / 60000).toFixed(t.durationMs % 60000 ? 1 : 0);
-      row.innerHTML = '<span class="walk-tier-ico">' + t.icon + '</span><span class="walk-tier-body"><strong>' + locn(t) + ' · ' + tr('walk_' + style) + '</strong><small>' + tr('walk_quote', { mins: mins, energy: quote.energy, reward: fmt(quote.reward), chance: Math.round(quote.stickerChance * 100) }) + (!unlocked ? ' · ' + tr('walk_stage', { n: t.unlockStage }) : '') + '</small></span>';
+      row.innerHTML = '<span class="walk-tier-ico">' + t.icon + '</span><span class="walk-tier-body"><strong>' + locn(t) + ' · ' + tr('walk_' + style) + '</strong><small>' + tr('walk_quote', { mins: mins, energy: quote.energy, reward: fmt(quote.reward), chance: Math.round(quote.stickerChance * 100) }) + ' · ' + tr('exploration_quote', {n:style === 'sniff' ? 2 : 1}) + (quote.discoveryBonus ? ' · ' + tr('exploration_bonus', {n:fmt(quote.discoveryBonus)}) : '') + (!unlocked ? ' · ' + tr('walk_stage', { n: t.unlockStage }) : '') + '</small></span>';
       if (unlocked) row.addEventListener('click', function () { sheet.hidden = true; startWalk(t.id, style); });
       list.appendChild(row);
       });
@@ -3118,6 +3155,7 @@ function startGame() {
       v: SAVE_VERSION,
       ore: state.ore,
       incomeBySource: Object.assign({}, state.incomeBySource),
+      exploration: Object.assign({}, state.exploration),
       levels: Object.assign(defaultLevels(), state.levels),
       levelsTraining: Object.assign(defaultTrainingLevels(), state.levelsTraining || {}),
       levelsCards: Object.assign(defaultCardLevels(), state.levelsCards || {}),
@@ -3232,6 +3270,8 @@ function startGame() {
   function applySave(data) {
     data = migrateSave(data);
     if (!data) return 0;
+    state.exploration = {};
+    WALK_TIERS.forEach(function(t) { const n = Number((data.exploration || {})[t.id]); state.exploration[t.id] = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0; });
     state.incomeBySource = Object.assign({}, data.incomeBySource || {});
     state.ore = Number(data.ore) || 0;
     if (!isFinite(state.ore) || state.ore < 0) state.ore = 0;
@@ -3364,6 +3404,7 @@ function startGame() {
         startedAt: Number(data.activeWalk.startedAt) || 0,
         reward: Number.isFinite(data.activeWalk.reward) ? Math.max(0, data.activeWalk.reward) : undefined,
         stickerChance: Number.isFinite(data.activeWalk.stickerChance) ? Math.min(.85, Math.max(0, data.activeWalk.stickerChance)) : undefined,
+        discoveryBonus: Math.max(0, Number(data.activeWalk.discoveryBonus) || 0),
         legacyEntryCost: Math.max(0, Number(data.activeWalk.legacyEntryCost) || 0),
         style: data.activeWalk.style === 'sniff' ? 'sniff' : 'trail',
       };

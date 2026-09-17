@@ -38,3 +38,15 @@ console.table(results);
 console.log('economy: reward basis, no boost stacking, quoted walks, single claims, quests, migration, input cadence, helper ROI OK');
 
 {const c=fixture();c.hiddenAt=12345;assert.equal(c.serialize().lastSaveAt,12345,'background saves keep the start of absence');}
+
+// Exploration is persistent and only awards newly crossed discoveries.
+{
+ const c=fixture(),s=c.state;s.exploration={short:2};
+ const q=c.explorationQuote(G.WALK_TIERS[0],'trail');assert.equal(q.reward,56);assert.equal(q.discoveryBonus,11);
+ c.startWalk('short','trail');s.activeWalk.endsAt=Date.now()-1;c.completeWalk(true);
+ assert.equal(s.exploration.short,3);assert.equal(c.serialize().exploration.short,3);
+ assert.equal(c.explorationQuote(G.WALK_TIERS[0],'trail').discoveryBonus,0);
+ assert.equal(c.explorationQuote(G.WALK_TIERS[0],'trail').energy,25);
+ assert.equal(E.exploration(9,'sniff').after,11);assert(E.exploration(9,'sniff').discovered);
+ c.completeWalk(true);assert.equal(s.exploration.short,3);
+}
