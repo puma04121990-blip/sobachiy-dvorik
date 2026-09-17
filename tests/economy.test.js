@@ -1,7 +1,8 @@
 'use strict';
 const assert=require('node:assert/strict');
 const E=require('../js/economy'),G=require('../js/content'),Core=require('../js/game-core');
-const {fixture}=require('./helpers/economy-fixture.cjs');
+const {fixture,fn}=require('./helpers/economy-fixture.cjs');
+const vm=require('node:vm');
 const results=[];
 for(const [name,level] of [['new',0],['early',3],['middle',10],['late',20]]){
  const c=fixture(),s=c.state;
@@ -49,4 +50,24 @@ console.log('economy: reward basis, no boost stacking, quoted walks, single clai
  assert.equal(c.explorationQuote(G.WALK_TIERS[0],'trail').energy,25);
  assert.equal(E.exploration(9,'sniff').after,11);assert(E.exploration(9,'sniff').discovered);
  c.completeWalk(true);assert.equal(s.exploration.short,3);
+}
+
+// Paid branches cannot be unlocked by walking, yard progress or free card levels.
+{
+ const c=fixture(),s=c.state;s.stats.walksDone=999;s.stats.eventsDone=999;s.yardStage=6;s.levelsCards.walker=10;s.packUnlocked.crew=true;
+ assert.equal(c.isPackCatOwned('crew'),false);s.packPaid={crew:true};assert.equal(c.isPackCatOwned('crew'),true);
+ vm.runInContext(fn('achievementReward'),c);const reward=c.achievementReward(G.ACHIEVEMENTS[0]);s.levels.miner=10000;assert.equal(c.achievementReward(G.ACHIEVEMENTS[0]),reward);
+}
+// Every direct pet is processed, including rapid clicks and exhausted energy.
+{
+ const c=fixture(),s=c.state;Object.assign(c,{ready:true,destroyed:false,updateCombo(){},clampEnergy(){},spawnPopup(){},spawnClickFx(){}});s.pendingClickMult=1;
+ vm.runInContext(fn('mineClick'),c);const before=s.stats.totalClicks;
+ c.mineClick();c.mineClick();s.energy=0;c.mineClick();assert.equal(s.stats.totalClicks,before+3);
+}
+// Training ends after two mistakes; one ball sweep cannot be farmed with clicks.
+{
+ const c=fixture();let ended=null;Object.assign(c,{trainActive:true,trainShowing:false,trainSeq:['sit','paw','spin'],trainIndex:0,trainMistakes:0,endTrainGame:success=>{ended=success;}});
+ vm.runInContext(fn('answerTrain'),c);c.answerTrain('wrong');assert.equal(ended,null);c.answerTrain('wrong');assert.equal(ended,false);
+ let now=1000;Object.assign(c,{Date:{now:()=>now},toyActive:true,toyTaps:0,toyLastAttempt:-Infinity,toyEndsAt:1000+G.TOY_DURATION_MS-490});
+ vm.runInContext(fn('toyTap'),c);c.toyTap();c.toyTap();assert.equal(c.toyTaps,1);
 }

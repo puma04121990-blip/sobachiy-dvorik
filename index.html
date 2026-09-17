@@ -58,6 +58,7 @@
     <div id="medal-badge" title="Медальки выставки" data-i18n-title="medals">🏅 <span id="stat-medals">0</span></div>
   </div>
 
+  <button type="button" id="achievement-alert" class="achievement-alert" aria-live="polite" hidden></button>
   <section class="mine-area" id="mine-area">
     <div class="yard-bg" id="yard-bg" aria-hidden="true"></div>
     <div id="mine-btn" class="yard-stage">
@@ -227,7 +228,7 @@
 
   <section class="panel-section" id="panel-achievements" data-panel="achievements" hidden>
     <h2 data-i18n="ach_h">Достижения</h2>
-    <p class="panel-hint" data-i18n="ach_hint">Заберите награду один раз.</p>
+    <p class="panel-hint" data-i18n="ach_hint">Каждая награда фиксирована и выдаётся один раз. Сумма не зависит от дохода или бустов. Выполни условие и нажми «Забрать».</p>
     <div id="achievements"></div>
   </section>
 
@@ -279,22 +280,30 @@
     <button type="button" class="btn btn-sm" id="event-banner-go" data-i18n="play">Играть</button>
   </div>
 
+  <div id="activity-result" class="modal" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="activity-result-title">
+      <h3 id="activity-result-title" data-i18n="activity_result">Результат игры</h3>
+      <p id="activity-result-text"></p>
+      <button type="button" class="btn" id="activity-result-close" data-i18n="close">Закрыть</button>
+    </div>
+  </div>
   <div id="toy-modal" class="modal" hidden>
     <div class="modal-card modal-game" role="dialog" aria-labelledby="toy-title">
       <h3 id="toy-title" data-i18n="toy_title">Поймай мяч!</h3>
-      <p class="panel-hint" data-i18n="toy_hint">Нажми, когда мяч в зелёной зоне. Между попытками — 1 секунда.</p>
+      <p class="panel-hint" data-i18n="toy_hint">Шесть бросков, по одной попытке. Нажми, когда мяч в зелёной зоне.</p>
       <div class="game-timer" id="toy-timer">10.0</div>
       <div class="game-score"><span data-i18n="toy_taps">Поймано:</span> <strong id="toy-taps">0</strong></div>
+      <p id="toy-feedback" aria-live="polite"></p>
       <div class="fetch-track" aria-hidden="true"><span class="fetch-target"></span><span id="fetch-marker">🎾</span></div>
       <button type="button" class="btn btn-tap-frenzy" id="toy-tap" data-i18n="toy_find">ЛОВИ!</button>
-      <p class="game-hint" id="toy-hint" data-i18n="toy_reward">Точность важнее скорости. Шесть попаданий — полная награда.</p>
+      <p class="game-hint" id="toy-hint" data-i18n="toy_reward">За 6 попаданий — полная награда. Результат появится после игры.</p>
     </div>
   </div>
 
   <div id="train-modal" class="modal" hidden>
     <div class="modal-card modal-game" role="dialog" aria-labelledby="train-title">
       <h3 id="train-title" data-i18n="train_title">Дрессировка</h3>
-      <p class="panel-hint" id="train-hint" data-i18n="train_hint">Запомните команду и повторите!</p>
+      <p class="panel-hint" id="train-hint" data-i18n="train_hint">Запомни три команды и повтори их по порядку. Вторая ошибка завершает игру.</p>
       <div class="train-step" id="train-step">Шаг 1/5</div>
       <div class="train-prompt" id="train-prompt">…</div>
       <div class="train-btns" id="train-btns"></div>
@@ -347,12 +356,12 @@
     <div class="modal-card" role="dialog" aria-labelledby="help-title">
       <h3 id="help-title" data-i18n="help">Как играть</h3>
       <ul class="help-list">
-        <li data-i18n="help_1">Погладь собаку — получи косточки. Спокойный темп: не чаще двух раз в секунду.</li>
+        <li data-i18n="help_1">Нажимай на собачку или пробел — каждое нажатие даёт косточки. Усталость уменьшает доход, но не блокирует клики.</li>
         <li data-i18n="help_2">Ласка и прогулки расходуют энергию. Во время прогулки собачка недоступна.</li>
         <li data-i18n="help_3">Магазин, стая и дрессировка усиливают почесушки и автодоход — кости капают сами, даже без кликов.</li>
         <li data-i18n="help_4">Выбери маршрут: больше косточек или больше шансов найти наклейку. Доход известен заранее.</li>
         <li data-i18n="help_5">Выставка сбрасывает апгрейды за медальки навсегда.</li>
-        <li data-i18n="help_6">Открывай стаю прогулками и играми. Карточки дают постоянный доход, а не разовую награду за покупку.</li>
+        <li data-i18n="help_6">В «Стае» первая карточка каждой ветки доступна бесплатно. Остальные открываются покупкой ветки за реальные деньги; уровни покупаются за косточки.</li>
       </ul>
       <button type="button" class="btn" data-help-close data-i18n="help_ok">Понятно</button>
     </div>

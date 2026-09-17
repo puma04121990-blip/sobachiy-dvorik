@@ -27,8 +27,8 @@ const RACE_DECAY_PER_SEC = 8;
 const RACE_TAP_GAIN = 8;
 
 const COMBO_WINDOW_MS = 800;
-const COMBO_MAX = 1.25;
-const COMBO_STEP = 0.025;
+const COMBO_MAX = 3;
+const COMBO_STEP = 0.08;
 const COMBO_DECAY_PER_SEC = 0.55;
 const WHISTLE_COMBO_MS = 40;
 
@@ -56,7 +56,7 @@ const ENERGY_REST_COOLDOWN_MS = 40 * 1000;
 
 const EVENT_MIN_MS = 90 * 1000;
 const EVENT_MAX_MS = 180 * 1000;
-const TOY_DURATION_MS = 10 * 1000;
+const TOY_DURATION_MS = 6 * 1400;
 const TOY_REWARD_PER_TAP = 2.2;
 const EVENT_REWARD_MULT = 1.05;
 

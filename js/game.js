@@ -43,7 +43,7 @@ function startGame() {
   } = Game;
 
   const Economy = window.DogEconomy;
-  let lastPetAt = null;
+  let lastAchievementCheck = 0;
   let eventUnit = .5;
   let toyLastAttempt = -Infinity;
   let trainMistakes = 0;
@@ -222,12 +222,7 @@ function startGame() {
   function getTrainingAllIncomeMult() {
     return 1 + getTrainingSum('allIncome');
   }
-  function isPackCatOwned(cat) {
-    return !!(state.packUnlocked && state.packUnlocked[cat]) ||
-      (cat === 'crew' && state.stats.walksDone >= 2) ||
-      (cat === 'district' && state.stats.eventsDone >= 2) ||
-      (cat === 'special' && state.yardStage >= 2);
-  }
+  function isPackCatOwned(cat) { return !!(state.packPaid && state.packPaid[cat]); }
   function grantPackCat(cat) {
     if (!state.packUnlocked) state.packUnlocked = defaultPackUnlocks();
     if (!state.packPaid) state.packPaid = defaultPackUnlocks();
@@ -249,7 +244,7 @@ function startGame() {
     if (!state.packUnlocked) state.packUnlocked = defaultPackUnlocks();
     if (!state.packPaid) state.packPaid = defaultPackUnlocks();
     CARD_CATS.forEach(function (cat) {
-      state.packUnlocked[cat] = !!(state.packPaid[cat] || packHasPaidProgress(cat, state.levelsCards, state.packPaid));
+      state.packUnlocked[cat] = !!state.packPaid[cat];
     });
   }
   function packProductByCat(cat) {
@@ -808,6 +803,11 @@ function startGame() {
     }
     if (!grid) return;
     grid.innerHTML = '';
+    if (!isPackCatOwned(activeCardCat)) {
+      const offer = document.createElement('button'); offer.type = 'button'; offer.className = 'btn pack-offer';
+      offer.textContent = tr('pack_buy_h', {name:tr('cat_' + activeCardCat)}) + ' · ' + packPriceLabel((packProductByCat(activeCardCat) || {}).tag);
+      offer.addEventListener('click', function () { openPackBuyModal(activeCardCat); }); grid.appendChild(offer);
+    }
     SKILL_CARDS.forEach(function (c) {
       if (c.cat !== activeCardCat) return;
       const branchOwned = isPackCatOwned(c.cat);
@@ -824,11 +824,11 @@ function startGame() {
       let desc = '<span class="skill-card-now">' + tr('card_now', { n: fmt(now) }) + '</span>';
       desc += '<span class="skill-card-next">' + tr('plus_ops_lvl', { n: fmt(c.orePerSec) }) + (unlocked && !maxed ? ' · ' + fmtPayback(cost / (c.orePerSec * getIdleMult(true))) : '') + '</span>';
       if (maxed) desc += '<span class="skill-card-next">' + tr('maxed') + '</span>';
-      const costHtml = !unlocked ? (!branchOwned ? tr('branch_' + c.cat) : cardUnlockText(c)) : (maxed ? tr('maxed') : '🦴 ' + fmt(cost));
+      const costHtml = !unlocked ? (!branchOwned ? packPriceLabel((packProductByCat(c.cat) || {}).tag) : cardUnlockText(c)) : (maxed ? tr('maxed') : '🦴 ' + fmt(cost));
       card.innerHTML = '<div class="skill-card-top"><span class="skill-card-ico">' + c.icon + '</span><span class="skill-card-lvl">' + tr('lvl') + lvl + '</span></div><div class="skill-card-name">' + locn(c) + '</div><div class="skill-card-desc">' + desc + '</div><div class="skill-card-cost">' + costHtml + '</div>';
       card.addEventListener('click', function () {
         if (!unlocked) {
-          if (!branchOwned) { showToast(tr('branch_' + c.cat)); return; }
+          if (!branchOwned) { openPackBuyModal(c.cat); return; }
           showToast(cardUnlockText(c) || tr('locked'));
           return;
         }
@@ -842,7 +842,7 @@ function startGame() {
     const c = SKILL_CARDS_BY_ID[id];
     if (!c) return;
     if (!isPackCardOpen(c)) {
-      if (!isPackCatOwned(c.cat)) { showToast(tr('branch_' + c.cat)); return; }
+      if (!isPackCatOwned(c.cat)) { openPackBuyModal(c.cat); return; }
       showToast(cardUnlockText(c) || tr('locked'));
       return;
     }
@@ -1735,7 +1735,7 @@ function startGame() {
       let guard = 0;
       while (used[pick] && guard < 8) { pick = (pick + 1) % QUEST_POOL.length; guard++; }
       used[pick] = true;
-      const tpl = QUEST_POOL[pick];
+      const tpl = QUEST_POOL.find(function(t) { return t.type === ['clicks','walks','events'][i]; });
       const ti = Math.floor(seededRand(seed, i * 3 + 1) * tpl.targets.length);
       const target = tpl.type === 'earn' ? Math.ceil(economyRate() * tpl.targets[ti]) : tpl.targets[ti];
       list.push({ id: seed + '-' + i + '-' + tpl.type, type: tpl.type, target: target, progress: 0, reward: makeQuestReward(tpl.type, target), label: tpl.label(target), claimed: false });
@@ -1857,8 +1857,9 @@ function startGame() {
     if (!root) return;
     root.innerHTML = '';
     renderExploration(root);
-    const requests = document.createElement('details');
-    requests.innerHTML = '<summary>' + tr('optional_requests') + '</summary>';
+    const requests = document.createElement('section');
+    requests.className = 'requests-board';
+    requests.innerHTML = '<h3>' + tr('optional_requests') + '</h3><p>' + tr('requests_explained') + '</p>';
     root.appendChild(requests);
     const dailyHead = document.createElement('div');
     dailyHead.className = 'section-subhead';
@@ -1878,7 +1879,7 @@ function startGame() {
     });
     const qHead = document.createElement('div');
     qHead.className = 'section-subhead';
-    qHead.innerHTML = '<strong>' + tr('tab_quests') + '</strong> · ' + (state.questStreak || 0);
+    qHead.textContent = tr('requests_done', {n:state.quests.filter(function(q){return q.claimed;}).length});
     requests.appendChild(qHead);
     state.quests.forEach(function (q) {
       const done = !q.claimed && q.progress >= q.target;
@@ -1886,20 +1887,26 @@ function startGame() {
       card.className = 'quest-card' + (done ? ' done' : '');
       card.setAttribute('data-quest-id', q.id);
       const pct = questBarPct(q);
-      card.innerHTML = '<div class="quest-title">' + escapeHtml(qLabel(q)) + '</div><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(q.progress, q.target)) + ' / ' + fmt(q.target) + ' · ' + tr('reward_bones', { n: fmt(q.reward) }) + '</div>' + (q.claimed ? '<span class="breed-active">' + tr('claimed') + '</span>' : done ? '<button type="button" class="btn btn-sm" data-claim="' + escapeHtml(q.id) + '">' + tr('claim') + '</button>' : '');
+      card.innerHTML = '<div class="quest-title">' + tr('request_' + q.type) + '</div><p>' + escapeHtml(qLabel(q)) + '</p><div class="quest-bar"><span style="width:' + pct + '%"></span></div><div class="quest-meta">' + fmt(Math.min(q.progress, q.target)) + ' / ' + fmt(q.target) + ' · ' + tr('reward_bones', { n: fmt(q.reward) }) + '</div>' + (q.claimed ? '<span class="breed-active">' + tr('claimed') + '</span>' : done ? '<button type="button" class="btn btn-sm" data-claim="' + escapeHtml(q.id) + '">' + tr('claim') + '</button>' : '');
+      if (!done && !q.claimed) {
+        const action = document.createElement('button'); action.type = 'button'; action.className = 'btn btn-sm'; action.textContent = tr(q.type === 'walks' ? 'walk' : q.type === 'events' ? 'event' : 'request_to_yard');
+        action.addEventListener('click', function () { if (q.type === 'walks') onWalkButton(); else if (q.type === 'events') onEventButton(); else { setTab('shop'); $('#dogActor').focus(); $('#mine-area').scrollIntoView({block:'center'}); } }); card.appendChild(action);
+      }
       requests.appendChild(card);
     });
   }
 
   function checkAchievements() {
-    let any = false;
-    ACHIEVEMENTS.forEach(function (a) {
-      if (state.achievementsClaimed[a.id]) return;
-      if (a.check(state)) any = true;
-    });
-    if (any && activeTab === 'achievements') renderAchievements();
+    const available = ACHIEVEMENTS.filter(function(a) { return !state.achievementsClaimed[a.id] && a.check(state); });
+    const alert = $('#achievement-alert');
+    if (alert) {
+      alert.hidden = available.length === 0;
+      const message = available.length ? tr('achievement_notice', {name:locn(available[0]),count:available.length}) : '';
+      if (alert.textContent !== message) alert.textContent = message;
+    }
+    if (available.length && activeTab === 'achievements') renderAchievements();
   }
-  function achievementReward(a) { return Math.min(a.reward, Math.floor(Math.max(60, economyRate() * 120))); }
+  function achievementReward(a) { return a.reward; }
   function albumReward(set) { return Math.min(set.reward, Math.floor(Math.max(90, economyRate() * 180))); }
   function claimAchievement(id) {
     const a = ACHIEVEMENTS.find(function (x) { return x.id === id; });
@@ -1913,7 +1920,7 @@ function startGame() {
     if (id === 'prestige_1') grantSticker('medal');
     if (window.Sounds) window.Sounds.playBuy();
     showToast(tr('ach_done', { n: fmt(achievementReward(a)) }));
-    renderAchievements(); renderStats(); maybeUnlockStory(); scheduleSave();
+    checkAchievements(); renderAchievements(); renderStats(); maybeUnlockStory(); scheduleSave();
   }
   function renderAchievements() {
     const root = $('#achievements');
@@ -2012,7 +2019,7 @@ function startGame() {
     hideEventBanner();
   }
   function pickEventType() {
-    const pool = ['toy', 'train', 'hide', 'race'];
+    const pool = ['toy', 'train', 'hide'];
     return pool[Math.floor(Math.random() * pool.length)];
   }
   function eventTitle(type) {
@@ -2084,7 +2091,8 @@ function startGame() {
     const tapsEl = $('#toy-taps');
     const timerEl = $('#toy-timer');
     if (tapsEl) tapsEl.textContent = '0';
-    if (timerEl) timerEl.textContent = '10.0';
+    if (timerEl) timerEl.textContent = (TOY_DURATION_MS / 1000).toFixed(1);
+    if ($('#toy-feedback')) $('#toy-feedback').textContent = tr('catch_ready');
     if (modal) modal.hidden = false;
     if (window.Sounds) window.Sounds.playCombo();
     syncBgm();
@@ -2094,6 +2102,8 @@ function startGame() {
       if (timerEl) timerEl.textContent = (left / 1000).toFixed(1);
       const marker = $('#fetch-marker');
       if (marker) marker.style.left = (Economy.timing(TOY_DURATION_MS - left) * 100) + '%';
+      const round = Math.floor((TOY_DURATION_MS - left) / 1400);
+      if ($('#toy-tap')) $('#toy-tap').disabled = toyLastAttempt === round;
       if (left <= 0) { endToyGame(); return; }
       toyRaf = requestAnimationFrame(frame);
     }
@@ -2103,13 +2113,23 @@ function startGame() {
   function toyTap() {
     if (!toyActive) return;
     const now = Date.now();
-    if (now >= toyEndsAt || now - toyLastAttempt < 1000) return;
-    toyLastAttempt = now;
+    const round = Math.floor((TOY_DURATION_MS - (toyEndsAt - now)) / 1400);
+    if (now >= toyEndsAt || toyLastAttempt === round) return;
+    toyLastAttempt = round;
     const position = Economy.timing(TOY_DURATION_MS - (toyEndsAt - now));
-    if (position >= .60 && position <= .85) toyTaps += 1;
+    const hit = position >= .60 && position <= .85;
+    if (hit) toyTaps += 1;
+    if ($('#toy-feedback')) $('#toy-feedback').textContent = tr(hit ? 'catch_hit' : 'catch_miss');
+    if ($('#toy-tap')) $('#toy-tap').disabled = true;
     const tapsEl = $('#toy-taps');
     if (tapsEl) tapsEl.textContent = String(toyTaps);
     if (window.Sounds) window.Sounds.playPet();
+  }
+  function showActivityResult(message) {
+    const modal = $('#activity-result');
+    if (!modal) return;
+    $('#activity-result-text').textContent = message; modal.hidden = false;
+    $('#activity-result-close').focus();
   }
   function endToyGame() {
     if (!toyActive) return;
@@ -2129,11 +2149,11 @@ function startGame() {
       grantSticker('ball', true);
       addEventAcorns(0.8);
       if (window.Sounds) window.Sounds.playOffline();
-      showToast(tr('toy_found', { n: fmt(reward), taps: taps }));
+      showActivityResult(tr('toy_found', { n: fmt(reward), taps: taps }));
       checkAchievements(); maybeUnlockStory();
-      maybeOfferFullscreen('event');
+
     } else {
-      showToast(tr('toy_miss'));
+      showActivityResult(tr('toy_miss'));
     }
     scheduleNextEvent();
     renderStats(); updateEventBtn(); scheduleSave();
@@ -2160,7 +2180,7 @@ function startGame() {
     trainActive = true;
     trainSeq = [];
     trainMistakes = 0;
-    for (let i = 0; i < 5; i++) trainSeq.push(TRAIN_CMDS[Math.floor(Math.random() * TRAIN_CMDS.length)].id);
+    for (let i = 0; i < 3; i++) trainSeq.push(TRAIN_CMDS[Math.floor(Math.random() * TRAIN_CMDS.length)].id);
     trainIndex = 0;
     const modal = $('#train-modal');
     if (modal) modal.hidden = false;
@@ -2174,11 +2194,11 @@ function startGame() {
     const prompt = $('#train-prompt');
     const btns = $('#train-btns');
     const status = $('#train-status');
-    if (stepEl) stepEl.textContent = tr('train_step', { n: trainIndex + 1 });
+    if (stepEl) stepEl.textContent = (trainIndex + 1) + '/' + trainSeq.length;
     if (status) status.textContent = tr('train_watch');
     trainShowing = true;
     const cmd = TRAIN_CMDS.find(function (c) { return c.id === trainSeq[trainIndex]; });
-    if (prompt) prompt.textContent = cmd ? tr(cmd.key) : '?';
+    if (prompt) prompt.textContent = trainSeq.map(function(id) { return tr(TRAIN_CMDS.find(function(c){return c.id === id;}).key); }).join(' → ');
     if (btns) btns.innerHTML = '';
     setTimeout(function () {
       if (!trainActive) return;
@@ -2196,21 +2216,22 @@ function startGame() {
         b.addEventListener('click', function () { answerTrain(c.id); });
         btns.appendChild(b);
       });
-    }, 900);
+    }, 2500);
   }
   function answerTrain(id) {
     if (!trainActive || trainShowing) return;
     if (id !== trainSeq[trainIndex]) {
       trainMistakes += 1;
       if (window.Sounds) window.Sounds.playPet();
-      showToast(tr('train_miss'));
-      showTrainStep();
+      if (trainMistakes >= 2) { endTrainGame(false); return; }
+      if ($('#train-status')) $('#train-status').textContent = tr('train_one_error');
       return;
     }
     if (window.Sounds) window.Sounds.playBuy();
     trainIndex += 1;
     if (trainIndex >= trainSeq.length) { endTrainGame(true); return; }
-    showTrainStep();
+    if ($('#train-step')) $('#train-step').textContent = (trainIndex + 1) + '/' + trainSeq.length;
+    if ($('#train-status')) $('#train-status').textContent = tr('train_next');
   }
   function endTrainGame(success) {
     if (!trainActive) return;
@@ -2225,9 +2246,10 @@ function startGame() {
       grantSticker('star', true);
       addEventAcorns(1);
       if (window.Sounds) window.Sounds.playOffline();
-      showToast(tr('train_win', { n: fmt(reward) }));
-      maybeOfferFullscreen('event');
+      showActivityResult(tr('train_win', { n: fmt(reward) }));
+
     }
+    if (!success) showActivityResult(tr('train_failed'));
     scheduleNextEvent();
     checkAchievements(); maybeUnlockStory(); renderStats(); updateEventBtn(); scheduleSave();
     syncBgm();
@@ -2264,7 +2286,7 @@ function startGame() {
     syncBgm();
   }
   function pickHideCard(idx, btn) {
-    if (!hideActive || hideShowing || !btn || btn.classList.contains('flipped')) return;
+    if (!hideActive || hideShowing || hideTriesLeft <= 0 || !btn || btn.classList.contains('flipped')) return;
     btn.classList.add('flipped');
     if (idx === hideBoneIndex) {
       btn.textContent = '🦴';
@@ -2300,10 +2322,10 @@ function startGame() {
       grantSticker('hide');
       const ac = addEventAcorns(1.1);
       if (window.Sounds) window.Sounds.playOffline();
-      showToast(tr('hide_win', { n: fmt(reward) }) + (ac ? ' · 🌰+' + ac : ''));
-      maybeOfferFullscreen('event');
+      showActivityResult(tr('hide_win', { n: fmt(reward) }) + (ac ? ' · 🌰+' + ac : ''));
+
     } else {
-      showToast(tr('hide_miss'));
+      showActivityResult(tr('hide_miss'));
     }
     scheduleNextEvent();
     checkAchievements(); maybeUnlockStory(); renderStats(); updateEventBtn(); scheduleSave();
@@ -2371,7 +2393,7 @@ function startGame() {
       if (window.Sounds) window.Sounds.playOffline();
       showToast(tr('race_win', { n: fmt(reward), pct: Math.floor(pct) }) + (ac ? ' · 🌰+' + ac : ''));
       checkAchievements(); maybeUnlockStory();
-      maybeOfferFullscreen('event');
+
     } else {
       showToast(tr('race_miss', { pct: Math.floor(pct) }));
     }
@@ -3005,7 +3027,7 @@ function startGame() {
   function updateCombo() {
     const now = Date.now();
     const windowMs = getComboWindow();
-    if (state.lastClickAt && now - state.lastClickAt >= 500 && now - state.lastClickAt <= windowMs) {
+    if (state.lastClickAt && now - state.lastClickAt <= windowMs) {
       state.combo = Math.min(COMBO_MAX, state.combo + COMBO_STEP);
       const milestone = Math.floor(state.combo * 2) / 2;
       if (milestone >= 1.5 && milestone > lastComboMilestone) {
@@ -3025,11 +3047,8 @@ function startGame() {
 
   function mineClick(ev) {
     if (!ready || destroyed) return;
-    const petNow = Date.now();
+    if (toyActive || trainActive || hideActive || raceActive) return;
     if (state.activeWalk) { showToast(tr('pet_away')); return; }
-    if (state.energy < ENERGY_PER_CLICK) { showToast(tr('pet_tired')); return; }
-    if (!Economy.petAllowed(petNow, lastPetAt, state.energy, false)) return;
-    lastPetAt = petNow;
     const hint = $('#hint-first');
     if (hint) hint.hidden = true;
     updateCombo();
@@ -3373,7 +3392,7 @@ function startGame() {
     state.storyRead = Object.assign({}, data.storyRead || {});
     state.nextEventAt = Number(data.nextEventAt) || 0;
     const okEvent = { toy: 1, train: 1, hide: 1, race: 1 };
-    state.eventReadyType = okEvent[data.eventReadyType] ? data.eventReadyType : null;
+    state.eventReadyType = data.eventReadyType === 'race' ? 'toy' : (okEvent[data.eventReadyType] ? data.eventReadyType : null);
     state.stickers = Array.isArray(data.stickers) ? data.stickers.filter(function (id, i, arr) {
       return STICKERS.some(function (st) { return st.id === id; }) && arr.indexOf(id) === i;
     }) : [];
@@ -3514,6 +3533,7 @@ function startGame() {
     const gain = getOrePerSec() * dt;
     if (gain > 0 && isFinite(gain)) { creditBones(gain, 'idle', true); }
     regenEnergy(dt);
+    if (now - lastAchievementCheck >= 1000) { lastAchievementCheck = now; checkAchievements(); }
     if (state.activeWalk && state.activeWalk.endsAt <= Date.now()) {
       updateWalkUI();
     }
@@ -3653,6 +3673,8 @@ function startGame() {
     });
     listen($('#pack-buy-modal'), 'click', function (e) { if (e.target === e.currentTarget) hidePackBuyModal(); });
     listen($('#event-banner-go'), 'click', function () { startEvent(state.eventReadyType); });
+    listen($('#achievement-alert'), 'click', function () { setTab('achievements'); });
+    listen($('#activity-result-close'), 'click', function () { $('#activity-result').hidden = true; });
     listen($('#toy-tap'), 'click', toyTap);
     listen($('#train-modal'), 'click', function (e) {
       if (e.target === e.currentTarget && trainActive) endTrainGame(false);
