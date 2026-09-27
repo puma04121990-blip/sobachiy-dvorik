@@ -212,6 +212,21 @@ Object.assign(BREEDS.lab, { walkFrames: 24, idleFrames: 24, sitdownFrames: 12,
   BREEDS.lab[state + 'Src'] = 'assets/lab-v5/' + state + '.webp';
 });
 BREEDS.lab.sitReactionSrc = 'assets/lab-v5/sitReaction.webp';
+// Distance per complete cycle, in actor widths; short legs take shorter steps.
+const BREED_GAITS = {
+  corgi: { walkStride: 0.28, walkDuration: 0.9 },
+  husky: { walkStride: 0.44, walkDuration: 1.1 },
+  dachshund: { walkStride: 0.23, walkDuration: 0.95 },
+  shiba: { walkStride: 0.35, walkDuration: 1.0 },
+  poodle: { walkStride: 0.40, walkDuration: 1.1 },
+  beagle: { walkStride: 0.33, walkDuration: 1.05 }
+};
+Object.keys(BREED_GAITS).forEach(function (id) {
+  Object.assign(BREEDS[id], BREED_GAITS[id], {
+    idleFps: 4, sitFps: 4, reactionFps: 8, transitionFps: 8,
+    restPingPong: true
+  });
+});
 const BREED_COUNT = Object.keys(BREEDS).length;
 
 const YARDS = {

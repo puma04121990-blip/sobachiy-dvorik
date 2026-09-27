@@ -30,3 +30,37 @@ for(const width of [280,320,360,600])for(const area of [[.30,.80],[.28,.72],[.32
 }
 assert.equal(images.length,8,'all sheets preload once; only changed sheet reloads');
 sandbox.window.matchMedia=()=>({matches:true});tick();assert.equal(actor.dataset.mode,'sit');assert.equal(sprite.style.backgroundPosition,'0px 0');sandbox.dog.stop();console.log('dog animation: stride, bounds, states, breed switch, seated click, tab pause, reduced motion OK');
+
+// Exercise the actual runtime with every shipping breed, not just the Labrador.
+const {BREEDS}=require('../js/content.js');
+sandbox.window.matchMedia=()=>({matches:false});
+stage.clientWidth=360; bg.dataset.walkLeft=.30; bg.dataset.walkRight=.80;
+for(const breed of Object.values(BREEDS)) {
+  assert(breed.walkStride>0&&breed.walkDuration>0,breed.id+' has calibrated gait');
+  sandbox.getBreed=()=>breed;
+  sandbox.applyBreedArt();
+  sandbox.dog.start();
+  const visited=new Set();
+  for(let i=0;i<1600;i++) {
+    tick();visited.add(actor.dataset.mode);
+    assert(!JSON.stringify(sprite.style).includes('NaN'),breed.id+' finite frame position');
+    const name=actor.dataset.mode==='approach'?'walk':actor.dataset.mode;
+    assert(sprite.style.backgroundImage.includes(breed[name+'Src']),breed.id+' '+name+' sheet');
+    const offset=-parseFloat(sprite.style.backgroundPosition);
+    assert(offset>=0&&offset<96*breed[name+'Frames'],breed.id+' frame in bounds');
+  }
+  for(const name of ['walk','sitdown','sit','standup','idle'])assert(visited.has(name),breed.id+' visits '+name);
+  sandbox.dog.stop();
+}
+// A failed optional image resolves preload and falls back to a decoded sheet.
+sandbox.getBreed=()=>({...BREEDS.corgi,reactionSrc:'missing-reaction.webp'});
+sandbox.applyBreedArt();
+sandbox.Image=class {set src(value){if(value==='missing-reaction.webp')this.onerror();else this.onload()}};
+sandbox.dog=vm.runInContext('createYardDog()',sandbox);
+sandbox.dog.start();tick();handlers['dog:react']();tick();
+assert.equal(actor.dataset.mode,'reaction');
+assert(sprite.style.backgroundImage.includes(BREEDS.corgi.idleSrc),'failed reaction uses intact idle');
+for(let i=0;i<40;i++)tick();
+assert.notEqual(actor.dataset.mode,'reaction','failed asset does not freeze actor');
+sandbox.dog.stop();
+console.log('all seven breeds: gait, complete state cycles, valid frame bounds, missing-sheet fallback OK');

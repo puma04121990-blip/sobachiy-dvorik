@@ -986,18 +986,21 @@ function startGame() {
     let transStart = 0;
     let reactionUntil = 0;
     let activeWalkSrc = '';
+    let restDirection = 1;
+    let turnUntil = 0;
     const decodedSheets = new Map();
     function sheetsReady() {
       return ['walk', 'idle', 'sitdown', 'sit', 'standup', 'reaction', 'sitReaction'].map(function (state) {
         const src = actor.dataset[state + 'Src'];
         if (!src) return true;
         if (!decodedSheets.has(src)) {
-          const entry = { ready: false, image: new Image() };
+          const entry = { ready: false, failed: false, image: new Image() };
           decodedSheets.set(src, entry);
           entry.image.onload = function () {
             if (entry.image.decode) entry.image.decode().then(function () { entry.ready = true; }).catch(function () { entry.ready = true; });
             else entry.ready = true;
           };
+          entry.image.onerror = function () { entry.failed = true; entry.ready = true; };
           entry.image.src = src;
         }
         return decodedSheets.get(src).ready;
@@ -1007,7 +1010,7 @@ function startGame() {
       return Number(actor.dataset.walkStride) > 0 ? (actor.clientWidth || ACTOR_W) * Number(actor.dataset.walkStride) / Number(actor.dataset.walkDuration || 1.2) : WALK_SPEED;
     }
     function walkFps() { return Number(actor.dataset.walkDuration) > 0 ? walkFrameCount() / Number(actor.dataset.walkDuration) : FRAME_FPS; }
-    function loopFps(fallback) { return Number(actor.dataset.loopFps) || fallback; }
+    function loopFps(fallback) { return Number(actor.dataset[sheet + 'Fps']) || Number(actor.dataset.loopFps) || fallback; }
     function transitionFps() { return Number(actor.dataset.transitionFps) || TRANS_FPS; }
 
     function prefersReduced() {
@@ -1083,7 +1086,18 @@ function startGame() {
 
     function paintSheetFrame(frames) {
       if (!sprite) return;
-      const src = actor.dataset[(sheet === 'sit' && performance.now() < reactionUntil && actor.dataset.sitReactionSrc ? 'sitReaction' : sheet) + 'Src'];
+      let src = actor.dataset[(sheet === 'sit' && performance.now() < reactionUntil && actor.dataset.sitReactionSrc ? 'sitReaction' : sheet) + 'Src'];
+      const entry = decodedSheets.get(src);
+      if (entry && entry.failed) {
+        // A missing optional sheet must not freeze every animation or paint blank.
+        const fallback = ['idle', 'walk', 'sit'].find(function (name) {
+          const candidate = decodedSheets.get(actor.dataset[name + 'Src']);
+          return candidate && candidate.ready && !candidate.failed;
+        });
+        if (!fallback) return;
+        src = actor.dataset[fallback + 'Src'];
+        frames = frameCount(fallback, 7);
+      }
       if (src && sprite.dataset.sheetSrc !== src) {
         sprite.style.backgroundImage = 'url("' + src + '")';
         sprite.dataset.sheetSrc = src;
@@ -1111,6 +1125,7 @@ function startGame() {
       frame = 0;
       frameAcc = 0;
       sheet = 'idle';
+      restDirection = 1;
       paintSheetFrame(frameCount('idle', 7));
     }
 
@@ -1120,6 +1135,7 @@ function startGame() {
       frame = 0;
       frameAcc = 0;
       sheet = 'sit';
+      restDirection = 1;
       paintSheetFrame(frameCount('sit', 7));
     }
 
@@ -1169,7 +1185,11 @@ function startGame() {
       const frameDur = 1 / Math.max(0.5, fps);
       while (frameAcc >= frameDur) {
         frameAcc -= frameDur;
-        frame = (frame + 1) % frames;
+        if (actor.dataset.restPingPong === 'true' && (sheet === 'idle' || sheet === 'sit') && frames > 1) {
+          if (frame >= frames - 1) restDirection = -1;
+          else if (frame <= 0) restDirection = 1;
+          frame += restDirection;
+        } else frame = (frame + 1) % frames;
       }
     }
 
@@ -1269,6 +1289,13 @@ function startGame() {
       schedule(now);
     }
 
+    function enterTurn(now, next) {
+      enterIdle(now);
+      pendingDir = next;
+      turnUntil = now + 180;
+      modeUntil = now + 360;
+    }
+
     function tick(ts) {
       if (!running || destroyed) return;
       raf = requestAnimationFrame(tick);
@@ -1285,7 +1312,8 @@ function startGame() {
 
       if (activeWalkSrc !== actor.dataset.walkSrc) {
         activeWalkSrc = actor.dataset.walkSrc;
-        enterWalk(ts, false);
+        reactionUntil = 0;
+        enterWalk(ts, true);
       }
       if (prefersReduced()) {
         const b = walkBounds();
@@ -1309,9 +1337,9 @@ function startGame() {
           const oldX = x;
           x = Math.max(b.minX, Math.min(b.maxX, x + dir * walkSpeed() * dt));
           advanceWalkFrames(Math.abs(x - oldX) / walkSpeed(), walkFps());
-          if (x <= b.minX) requestDir(1);
-          if (x >= b.maxX) requestDir(-1);
           if (b.maxX === b.minX) enterIdle(ts);
+          else if (x <= b.minX && dir < 0) enterTurn(ts, 1);
+          else if (x >= b.maxX && dir > 0) enterSitdown(ts);
         }
       }
 
@@ -1337,8 +1365,9 @@ function startGame() {
       }
 
       if (mode === 'idle') {
+        if (pendingDir != null && ts >= turnUntil) requestDir(pendingDir);
         advanceLoopFrames(dt, loopFps(IDLE_FPS), frameCount('idle', 7));
-        if (ts >= modeUntil) enterWalk(ts, true);
+        if (ts >= modeUntil) enterWalk(ts, false);
       }
 
       if (mode === 'sitdown') {
@@ -1355,7 +1384,7 @@ function startGame() {
         const frames = frameCount('standup', 6);
         const elapsed = (ts - transStart) / 1000;
         frame = Math.min(frames - 1, Math.floor(elapsed * transitionFps()));
-        if (elapsed >= frames / transitionFps()) enterIdle(ts);
+        if (elapsed >= frames / transitionFps()) enterTurn(ts, -1);
       } else if (mode === 'reaction') {
         advanceLoopFrames(dt, loopFps(REACTION_FPS), frameCount('reaction', 7));
         if (ts >= reactionUntil) enterWalk(ts, false);
@@ -1428,6 +1457,10 @@ function startGame() {
       actor.dataset.walkDuration = String(breed.walkDuration || 0);
       actor.dataset.loopFps = String(breed.loopFps || 0);
       actor.dataset.transitionFps = String(breed.transitionFps || 0);
+      actor.dataset.idleFps = String(breed.idleFps || 0);
+      actor.dataset.sitFps = String(breed.sitFps || 0);
+      actor.dataset.reactionFps = String(breed.reactionFps || 0);
+      actor.dataset.restPingPong = String(!!breed.restPingPong);
       actor.dataset.walkSrc = walkSrc;
       actor.dataset.idleSrc = idleSrc;
       actor.dataset.sitSrc = sitSrc;
