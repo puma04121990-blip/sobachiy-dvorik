@@ -227,6 +227,14 @@ Object.keys(BREED_GAITS).forEach(function (id) {
     restPingPong: true
   });
 });
+// All poses share the same Corgi puppet, texture scale and planted-paw baseline.
+Object.assign(BREEDS.corgi, { walkFrames: 32, idleFrames: 32, sitdownFrames: 20,
+  sitFrames: 32, standupFrames: 20, reactionFrames: 32, frameW: 256, frameH: 256,
+  walkStride: (36 / 0.62) / 256, walkDuration: 1.05, loopFps: 24,
+  idleFps: 24, sitFps: 24, reactionFps: 32, transitionFps: 28, restPingPong: false });
+['walk', 'idle', 'sitdown', 'sit', 'standup', 'reaction', 'sitReaction'].forEach(function (state) {
+  BREEDS.corgi[state + 'Src'] = 'assets/corgi-v3/' + state + '.webp';
+});
 const BREED_COUNT = Object.keys(BREEDS).length;
 
 const YARDS = {

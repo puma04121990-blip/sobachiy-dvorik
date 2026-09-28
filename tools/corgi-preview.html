@@ -1,0 +1,18 @@
+<!doctype html><html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Корги: анимация</title>
+<style>*{box-sizing:border-box}body{margin:0;padding:20px;background:#f2f6f1;color:#263f31;font:16px system-ui}main{max-width:640px;margin:auto}h1{font-size:24px}.stage{height:300px;border:1px solid #adbfaa;background:#e1efdb;border-radius:8px;display:grid;place-items:center;margin:20px 0}.dog{width:256px;height:256px;background-repeat:no-repeat}.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}button,select{font:inherit;padding:10px;border:1px solid #98ad95;border-radius:6px;background:white}label{display:flex;gap:8px;align-items:center}input{width:110px}#status{min-height:25px}</style>
+<main><h1>Корги: новая анимация</h1><div class="controls"><select id="state" aria-label="Анимация"><option value="walk">Ходьба</option><option value="idle">Стоит</option><option value="sitdown">Садится</option><option value="sit">Сидит</option><option value="standup">Встаёт</option><option value="reaction">Виляет хвостом</option><option value="sitReaction">Виляет хвостом сидя</option></select></div><div class="stage"><div class="dog" id="dog" role="img" aria-label="Анимация корги"></div></div><div class="controls"><button id="play">Пауза</button><button id="step">Кадр →</button><button id="flip">Развернуть</button><label>Темп <input id="speed" type="range" min=".25" max="1.5" step=".25" value="1"></label></div><p id="status" role="status">Загрузка…</p></main>
+<script>
+const assets=/*ASSETS*/{};
+const counts={walk:32,idle:32,sitdown:20,sit:32,standup:20,reaction:32,sitReaction:32};
+const dog=document.querySelector('#dog'),status=document.querySelector('#status'),play=document.querySelector('#play');
+let mode='walk',frame=0,acc=0,last=0,ready=false,playing=!matchMedia('(prefers-reduced-motion: reduce)').matches,request=0,dir=1;
+function label(){play.textContent=playing?'Пауза':'Воспроизвести'}label();
+function draw(){dog.style.backgroundSize=(counts[mode]*256)+'px 100%';dog.style.backgroundPosition=(-frame*256)+'px 0';status.textContent='Кадр '+(frame+1)+' / '+counts[mode]}
+function select(){const id=++request;ready=false;frame=0;acc=0;status.textContent='Загрузка…';const img=new Image();img.onload=()=>{if(id!==request)return;dog.style.backgroundImage='url("'+assets[mode]+'")';ready=true;draw()};img.onerror=()=>{status.textContent='Ошибка загрузки изображения'};img.src=assets[mode]}
+document.querySelector('#state').onchange=e=>{mode=e.target.value;select()};
+play.onclick=()=>{playing=!playing;label()};
+document.querySelector('#step').onclick=()=>{if(!ready)return;playing=false;label();frame=(frame+1)%counts[mode];draw()};
+document.querySelector('#flip').onclick=()=>{dir*=-1;dog.style.transform='scaleX('+dir+')'};
+function tick(now){const dt=last?Math.min(.05,(now-last)/1000):0;last=now;if(playing&&ready&&!document.hidden){const transition=mode==='sitdown'||mode==='standup';const fps=mode==='walk'?32/1.05:transition?28:mode.includes('Reaction')||mode==='reaction'?32:24;acc+=dt*Number(document.querySelector('#speed').value);while(acc>=1/fps){acc-=1/fps;frame++;if(frame>=counts[mode]){frame=transition?counts[mode]-1:0;if(transition){playing=false;label();break}}}draw()}requestAnimationFrame(tick)}select();requestAnimationFrame(tick);
+</script></html>

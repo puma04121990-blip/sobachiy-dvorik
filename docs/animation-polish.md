@@ -19,7 +19,10 @@ sprite inspection page; runtime transitions are covered by the game tests.
 
 ## Artwork limitations
 
-This pass does not regenerate or downsample artwork. The six legacy breeds
+The subsequent Corgi v3 pass replaces its six legacy sheets with a consistent
+32-frame textured puppet, including a dedicated seated tail reaction. See
+`assets/corgi-v3/README.md` and the self-contained `preview.html` in that folder.
+The five remaining legacy breeds
 still have seven walk frames and some blue chroma edging in their source
 textures. Timing changes cannot supply missing in-between drawings or repair
 anatomy. A later artwork pass should replace these with consistent, registered

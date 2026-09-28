@@ -1,0 +1,16 @@
+{
+  "frameW": 256,
+  "frameH": 256,
+  "states": {
+    "walk": 32,
+    "idle": 32,
+    "sitdown": 20,
+    "sit": 32,
+    "standup": 20,
+    "reaction": 32,
+    "sitReaction": 32
+  },
+  "ground": 224,
+  "stride": 58.064516129032256,
+  "walkDuration": 1.05
+}
