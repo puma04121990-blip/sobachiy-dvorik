@@ -988,6 +988,19 @@ function startGame() {
     let activeWalkSrc = '';
     let restDirection = 1;
     let turnUntil = 0;
+    let testPose = null;
+    if (window.__DOG_TEST_MODE) {
+      const onTest = function(e) {
+        const p=e.detail || {};
+        if (p.state === 'auto') { testPose=null;enterWalk(performance.now(),true);return; }
+        if (!['walk','idle','sitdown','sit','standup','reaction'].includes(p.state)) return;
+        testPose=p;mode=p.state;sheet=p.state;
+        if(p.step)frame=(frame+1)%frameCount(sheet,7);else {frame=0;frameAcc=0;}
+        dir=p.dir === -1 ? -1 : 1;paint();
+      };
+      actor.addEventListener('dog:test',onTest);
+      cleanups.push(function(){actor.removeEventListener('dog:test',onTest)});
+    }
     const decodedSheets = new Map();
     function sheetsReady() {
       return ['walk', 'idle', 'sitdown', 'sit', 'standup', 'reaction', 'sitReaction'].map(function (state) {
@@ -1314,6 +1327,13 @@ function startGame() {
         activeWalkSrc = actor.dataset.walkSrc;
         reactionUntil = 0;
         enterWalk(ts, true);
+      }
+      if (testPose) {
+        mode=testPose.state;sheet=testPose.state;
+        const count=frameCount(sheet,7);
+        const fps=sheet==='walk'?walkFps():(sheet==='sitdown'||sheet==='standup'?transitionFps():loopFps(IDLE_FPS));
+        if(!testPose.paused)advanceLoopFrames(dt*Math.max(.25,Math.min(2,Number(testPose.speed)||1)),fps,count);
+        dir=testPose.dir === -1 ? -1 : 1;paint();return;
       }
       if (prefersReduced()) {
         const b = walkBounds();
@@ -4141,6 +4161,16 @@ function startGame() {
     persist: persist,
     fmt: fmt,
   };
+  if (window.__DOG_TEST_MODE && window.DogTestTools) {
+    window.DogAdmin=window.DogTestTools.create({
+      state:state,content:Game,serialize:serialize,render:renderAll,persist:persist,
+      energyMax:getEnergyMax,checkAchievements:checkAchievements,selectTab:setTab,
+      startEvent:startEvent,startWalk:startWalk,completeWalk:completeWalk,
+      busy:function(){return toyActive||trainActive||hideActive||raceActive},
+      animation:function(p){$('#dogActor').dispatchEvent(new CustomEvent('dog:test',{detail:p}))}
+    });
+    cleanups.push(function(){delete window.DogAdmin});
+  }
 
   return function destroy() {
     destroyed = true;

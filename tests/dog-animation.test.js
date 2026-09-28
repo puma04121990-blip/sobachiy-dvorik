@@ -64,3 +64,19 @@ for(let i=0;i<40;i++)tick();
 assert.notEqual(actor.dataset.mode,'reaction','failed asset does not freeze actor');
 sandbox.dog.stop();
 console.log('all seven breeds: gait, complete state cycles, valid frame bounds, missing-sheet fallback OK');
+
+// Admin controls use the same renderer while pinning movement and frame timing.
+sandbox.window.__DOG_TEST_MODE=true;sandbox.cleanups=[];
+actor.addEventListener=(name,fn)=>{handlers[name]=fn};actor.removeEventListener=name=>{delete handlers[name]};
+sandbox.getBreed=()=>BREEDS.corgi;sandbox.applyBreedArt();
+sandbox.dog=vm.runInContext('createYardDog()',sandbox);sandbox.dog.start();tick();
+handlers['dog:test']({detail:{state:'walk',paused:true,speed:1,dir:-1}});tick();
+const frozen=sprite.style.backgroundPosition;for(let i=0;i<10;i++)tick();
+assert.equal(sprite.style.backgroundPosition,frozen,'admin pause holds frame');
+assert(actor.style.transform.includes('scaleX(-1)'),'admin direction');
+handlers['dog:test']({detail:{state:'walk',paused:true,speed:1,dir:-1,step:true}});tick();
+assert.notEqual(sprite.style.backgroundPosition,frozen,'admin single step');
+handlers['dog:test']({detail:{state:'sitdown',paused:false,speed:.5,dir:1}});tick();assert.equal(actor.dataset.mode,'sitdown');
+handlers['dog:test']({detail:{state:'auto',speed:1}});tick();assert.notEqual(actor.dataset.mode,'sitdown');
+sandbox.dog.stop();sandbox.cleanups.forEach(fn=>fn());assert(!handlers['dog:test'],'admin listener cleaned up');
+console.log('admin animation: paused frame, step, direction, forced pose, automatic mode, cleanup OK');
